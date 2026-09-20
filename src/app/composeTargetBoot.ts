@@ -33,6 +33,11 @@ import { composeTargetRecoveryResearch } from './composeTargetRecoveryResearch.t
 import { composeTargetFxResearch, createTargetRecoveryCostContext } from './targetFxResearch.ts';
 import { runInternalExecutionPass } from './target/executionPass.ts';
 import { composeOfferExecution, runExternalExecutionCycle, EXTERNAL_OFFER_SELECT_STATEMENTS } from './target/externalOfferExecution.ts';
+import {
+  composeStayExecution,
+  runExternalStayExecutionCycle,
+  EXTERNAL_STAY_CAPABILITY_STATEMENTS,
+} from './target/externalStayExecution.ts';
 import { provisionWorkspaceAuthority, workspacePrincipalId } from './target/workspaceAuthority.ts';
 
 /** Idle cadence of the case lifecycle pass (escalation + resolution); a reassessment drain also triggers it immediately. */
@@ -293,26 +298,70 @@ export async function composeTargetBoot(
   console.log(offerExecution
     ? `[atlas] sandbox offer execution composed (mode=${adapterConfig.adapterMode})`
     : '[atlas] sandbox offer execution not composed (needs ADAPTER_MODE=LIVE|RECORD + Atlas sandbox credentials) - transport Recover will be refused with an explicit reason');
-  const externalExecution = offerExecution
+  // A4: protected Nuitée stay book/cancel. Composed only with honest LIVE|RECORD
+  // Nuitée credentials; otherwise approval refuses stay strategies explicitly.
+  const stayExecution = composeStayExecution(adapterConfig, options.cwd ?? process.cwd());
+  console.log(stayExecution
+    ? `[atlas] sandbox stay execution composed (mode=${adapterConfig.adapterMode})`
+    : '[atlas] sandbox stay execution not composed (needs ADAPTER_MODE=LIVE|RECORD + Nuitée credentials) - stay Recover will be refused with an explicit reason');
+
+  const externalCapabilityStatements = [
+    ...(offerExecution ? EXTERNAL_OFFER_SELECT_STATEMENTS : []),
+    ...(stayExecution ? EXTERNAL_STAY_CAPABILITY_STATEMENTS : []),
+  ];
+
+  const externalExecution = (offerExecution || stayExecution)
     ? createPeriodicService({
         name: 'externalExecution',
         pollMs: EXECUTION_POLL_MS,
         run: async (now) => {
-          const ctx = { pool: endpoints.app.pool, workspaceId: config.workspaceId, actorPrincipalId: `northstar-execution:${config.workspaceId}`, uow: () => endpoints.app.unitOfWork(), executorPrincipalId, external: offerExecution, now };
-          return runExternalExecutionCycle(ctx);
+          const shared = {
+            pool: endpoints.app.pool,
+            workspaceId: config.workspaceId,
+            actorPrincipalId: `northstar-execution:${config.workspaceId}`,
+            uow: () => endpoints.app.unitOfWork(),
+            executorPrincipalId,
+            now,
+          };
+          const offer = offerExecution
+            ? await runExternalExecutionCycle({ ...shared, external: offerExecution })
+            : undefined;
+          const stay = stayExecution
+            ? await runExternalStayExecutionCycle({ ...shared, external: stayExecution })
+            : undefined;
+          return { offer, stay };
         },
-        summarize: ({ report, reconciliation, leaseUnavailable }) => ({ candidates: report.candidates, executed: report.executed, failed: report.failed, unknown: report.unknown, deferred: report.deferred, refused: report.refused, canonicalUpdates: report.canonicalUpdates + reconciliation.canonicalUpdates, reconciled: reconciliation.reconciled, stillUnknown: reconciliation.stillUnknown, leaseUnavailable }),
-        onRun({ report, reconciliation, leaseUnavailable }) {
-          if (leaseUnavailable) {
+        summarize: ({ offer, stay }) => ({
+          offerCandidates: offer?.report.candidates ?? 0,
+          offerExecuted: offer?.report.executed ?? 0,
+          stayCandidates: stay?.report.candidates ?? 0,
+          stayExecuted: stay?.report.executed ?? 0,
+          leaseUnavailable: Boolean(offer?.leaseUnavailable || stay?.leaseUnavailable),
+        }),
+        onRun({ offer, stay }) {
+          if (offer?.leaseUnavailable || stay?.leaseUnavailable) {
             console.log('[atlas] external execution deferred: workspace operation in progress');
-            return;
           }
-          for (const outcome of report.outcomes) {
+          for (const outcome of offer?.report.outcomes ?? []) {
             if (outcome.result === 'DEFERRED') continue;
             console.log(`[atlas] external execution ${outcome.result} intent=${outcome.intentId}${outcome.detail ? ` (${outcome.detail})` : ''}`);
           }
-          for (const pending of report.canonicalPending) console.log(`[atlas] canonical update pending intent=${pending.intentId} (${pending.error})`);
-          if (reconciliation.reconciled > 0) console.log(`[atlas] external reconciliation: reconciled=${reconciliation.reconciled} stillUnknown=${reconciliation.stillUnknown}`);
+          for (const pending of offer?.report.canonicalPending ?? []) {
+            console.log(`[atlas] canonical update pending intent=${pending.intentId} (${pending.error})`);
+          }
+          if (offer && offer.reconciliation.reconciled > 0) {
+            console.log(`[atlas] external reconciliation: reconciled=${offer.reconciliation.reconciled} stillUnknown=${offer.reconciliation.stillUnknown}`);
+          }
+          for (const outcome of stay?.report.outcomes ?? []) {
+            if (outcome.result === 'DEFERRED') continue;
+            console.log(`[atlas] stay execution ${outcome.result} intent=${outcome.intentId}${outcome.detail ? ` (${outcome.detail})` : ''}`);
+          }
+          for (const pending of stay?.report.canonicalPending ?? []) {
+            console.log(`[atlas] stay canonical update pending intent=${pending.intentId} (${pending.error})`);
+          }
+          if (stay && stay.reconciliation.reconciled > 0) {
+            console.log(`[atlas] stay reconciliation: reconciled=${stay.reconciliation.reconciled} stillUnknown=${stay.reconciliation.stillUnknown}`);
+          }
         },
       })
     : undefined;
@@ -347,7 +396,7 @@ export async function composeTargetBoot(
     executorPrincipalId,
     ...(intelligence ? { intelligence } : {}),
     afterApproval: async () => { await execution.runNow(); await externalExecution?.runNow(); },
-    ...(offerExecution ? { externalCapabilities: EXTERNAL_OFFER_SELECT_STATEMENTS } : {}),
+    ...(externalCapabilityStatements.length > 0 ? { externalCapabilities: externalCapabilityStatements } : {}),
     afterExecution: () => lifecycle.runNow(),
     // R3: the ONE planning coordinator instance (also used by the C4
     // progression pass above) so the product planning trigger cannot diverge

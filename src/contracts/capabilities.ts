@@ -706,8 +706,17 @@ export interface HotelBookingStatusView {
   bookingId: string;
   status: 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'UNKNOWN';
   propertyName?: string;
+  /** Opaque provider property id when the retrieve payload includes it. */
+  propertyId?: string;
+  /** Caller-owned client reference when the retrieve payload includes it. */
+  clientReference?: string;
+  /** Observed total when the retrieve payload includes amount+currency. */
+  totalPrice?: Money;
   checkIn?: IsoDateTime;
   checkOut?: IsoDateTime;
+  /** Local stay dates when the provider returns date-only values. */
+  checkInDate?: string;
+  checkOutDate?: string;
   cancellationFee?: Money;
 }
 

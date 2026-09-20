@@ -827,11 +827,18 @@ export function mapBookingStatus(status: unknown): HotelBookingStatusView['statu
   return 'UNKNOWN';
 }
 
-/** liteAPI stay dates are often date-only; the contract wants IsoDateTime,
- *  so date-only values are omitted rather than padded with invented times. */
+/** liteAPI stay dates are often date-only; ISO datetimes stay on checkIn/checkOut,
+ *  while date-only values are preserved separately for material matching. */
 function toIsoDateTimeOrUndefined(value: unknown): string | undefined {
   if (typeof value !== 'string' || value.length === 0) return undefined;
   return /^\d{4}-\d{2}-\d{2}T/.test(value) ? value : undefined;
+}
+
+function toIsoDateOrUndefined(value: unknown): string | undefined {
+  if (typeof value !== 'string' || value.length === 0) return undefined;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  if (/^\d{4}-\d{2}-\d{2}T/.test(value)) return value.slice(0, 10);
+  return undefined;
 }
 
 export function normalizeRetrieve(raw: NuiteeRetrieveRaw): HotelBookingStatusView {
@@ -843,10 +850,36 @@ export function normalizeRetrieve(raw: NuiteeRetrieveRaw): HotelBookingStatusVie
   if (typeof data.hotelName === 'string' && data.hotelName.length > 0) {
     view.propertyName = data.hotelName;
   }
+  if (typeof data.hotelId === 'string' && data.hotelId.length > 0) {
+    view.propertyId = data.hotelId;
+  }
+  if (typeof data.clientReference === 'string' && data.clientReference.length > 0) {
+    view.clientReference = data.clientReference;
+  }
   const checkIn = toIsoDateTimeOrUndefined(data.checkin);
   if (checkIn) view.checkIn = checkIn;
   const checkOut = toIsoDateTimeOrUndefined(data.checkout);
   if (checkOut) view.checkOut = checkOut;
+  const checkInDate = toIsoDateOrUndefined(data.checkin);
+  if (checkInDate) view.checkInDate = checkInDate;
+  const checkOutDate = toIsoDateOrUndefined(data.checkout);
+  if (checkOutDate) view.checkOutDate = checkOutDate;
+  const amount = typeof data.price === 'number'
+    ? data.price
+    : typeof data.price === 'string' && data.price.trim().length > 0
+      ? Number(data.price)
+      : undefined;
+  if (
+    amount !== undefined
+    && Number.isFinite(amount)
+    && typeof data.currency === 'string'
+    && /^[A-Z]{3}$/.test(data.currency)
+  ) {
+    view.totalPrice = { amount, currency: data.currency };
+  } else {
+    const roomTotal = sumRetailTotals(data.roomTypes);
+    if (roomTotal) view.totalPrice = roomTotal;
+  }
   const posture = cancellationPosture(data.cancellationPolicies?.cancelPolicyInfos);
   if (posture.fee) view.cancellationFee = posture.fee;
   return view;

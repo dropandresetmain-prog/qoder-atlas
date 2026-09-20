@@ -31,6 +31,7 @@ import { AUTHORIZE_ACTION_KIND, DISPATCH_ACTION_KIND, scopeCoversRequired } from
 import { computeEnvelopeFingerprint } from '../../resolution/authority/envelope.ts';
 import { compileActionPlan, type CapabilityStatement } from '../../resolution/planning/compiler.ts';
 import { resolveOfferExecutionInputsForStrategy } from '../../persistence/postgres/execution/providerExecutionInputs.ts';
+import { resolveStayExecutionInputsForStrategy } from '../../persistence/postgres/execution/stayExecutionInputs.ts';
 import { holdBudgetForIntent } from '../../persistence/postgres/commands/m8AuthorityCommands.ts';
 import { PgAggregateHeadReader } from '../../persistence/postgres/pgAggregateHeadReader.ts';
 import type { ExactMoney } from '../../domain/v2/shared/money.ts';
@@ -142,7 +143,7 @@ async function stayCancellationOwnership(
   const requested = new Map(lines.map((effect) => [effect.reservationLineId, effect.journeyItemId]));
   const rows = await pool.query<{ line_id: string; journey_id: string; reservation_id: string; order_key: string }>(
     `SELECT a.line_id, ji.journey_id, a.reservation_id, ji.order_key
-       FROM allocations a
+       FROM reservation_allocations a
        JOIN journey_items ji ON ji.workspace_id = a.workspace_id AND ji.id = a.journey_item_id
       WHERE a.workspace_id = $1 AND a.line_id = ANY($2::uuid[])
         AND a.journey_item_id = ANY($3::uuid[])`,
@@ -197,17 +198,48 @@ async function externalExecutionBlockerFor(
   externalCapabilities: readonly CapabilityStatement[] | undefined,
 ): Promise<{ code: string; message: string } | undefined> {
   const offers = strategy.effects.flatMap((e) => (e.effectKind === 'SELECT_OFFER' ? [e] : []));
-  if (offers.length === 0) return undefined;
-  if (!externalCapabilities?.some((c) => c.capabilityRef === 'external:offer.select' && c.supported)) {
-    return { code: 'EXTERNAL_EXECUTION_NOT_COMPOSED', message: 'this runtime has no provider execution capability composed for transport bookings' };
-  }
-  for (const effect of offers) {
-    const inputs = await resolveOfferExecutionInputsForStrategy(pool, workspaceId, { strategyId: strategy.id, journeyItemId: effect.journeyItemId, offerKey: effect.offerId });
-    if (!inputs.ready && inputs.reason === 'FRESH_PROVIDER_QUOTE_REQUIRED') {
-      return { code: 'FRESH_PROVIDER_QUOTE_REQUIRED', message: 'This fare was checked from saved records, not with the airline. A fresh live price check is needed before it can be booked.' };
+  const stayBooks = strategy.effects.flatMap((e) => (e.effectKind === 'ADD_JOURNEY_STAY' ? [e] : []));
+  const stayCancels = strategy.effects.flatMap((e) => (e.effectKind === 'CANCEL_STAY' ? [e] : []));
+  if (offers.length === 0 && stayBooks.length === 0 && stayCancels.length === 0) return undefined;
+
+  if (offers.length > 0) {
+    if (!externalCapabilities?.some((c) => c.capabilityRef === 'external:offer.select' && c.supported)) {
+      return { code: 'EXTERNAL_EXECUTION_NOT_COMPOSED', message: 'this runtime has no provider execution capability composed for transport bookings' };
     }
-    if (!inputs.ready) return { code: 'EXECUTION_INPUTS_UNAVAILABLE', message: `${inputs.reason}: ${inputs.detail}` };
+    for (const effect of offers) {
+      const inputs = await resolveOfferExecutionInputsForStrategy(pool, workspaceId, { strategyId: strategy.id, journeyItemId: effect.journeyItemId, offerKey: effect.offerId });
+      if (!inputs.ready && inputs.reason === 'FRESH_PROVIDER_QUOTE_REQUIRED') {
+        return { code: 'FRESH_PROVIDER_QUOTE_REQUIRED', message: 'This fare was checked from saved records, not with the airline. A fresh live price check is needed before it can be booked.' };
+      }
+      if (!inputs.ready) return { code: 'EXECUTION_INPUTS_UNAVAILABLE', message: `${inputs.reason}: ${inputs.detail}` };
+    }
   }
+
+  if (stayBooks.length > 0 || stayCancels.length > 0) {
+    if (!externalCapabilities?.some((c) => c.capabilityRef === 'external:stay.book' && c.supported)
+      || !externalCapabilities?.some((c) => c.capabilityRef === 'external:stay.cancel' && c.supported)) {
+      return { code: 'EXTERNAL_STAY_EXECUTION_NOT_COMPOSED', message: 'this runtime has no provider execution capability composed for stay book/cancel' };
+    }
+    for (const effect of stayBooks) {
+      const inputs = await resolveStayExecutionInputsForStrategy(pool, workspaceId, {
+        strategyId: strategy.id,
+        action: 'BOOK',
+        offerKey: effect.offerId,
+        journeyItemId: effect.proposedJourneyItemId,
+      });
+      if (!inputs.ready) return { code: 'EXECUTION_INPUTS_UNAVAILABLE', message: `${inputs.reason}: ${inputs.detail}` };
+    }
+    for (const effect of stayCancels) {
+      const inputs = await resolveStayExecutionInputsForStrategy(pool, workspaceId, {
+        strategyId: strategy.id,
+        action: 'CANCEL',
+        journeyItemId: effect.journeyItemId,
+        reservationLineId: effect.reservationLineId,
+      });
+      if (!inputs.ready) return { code: 'EXECUTION_INPUTS_UNAVAILABLE', message: `${inputs.reason}: ${inputs.detail}` };
+    }
+  }
+
   const budget = await budgetCandidatesFor(pool, workspaceId, strategy);
   if (budget.needed && budget.ids.length === 0) {
     return { code: 'BUDGET_UNAVAILABLE', message: 'no budget of the trip organisation can fund this costed option' };

@@ -166,6 +166,7 @@
       "postgres-integration/a3JordanConnectionFoundation.pgtest.ts",
       "postgres-integration/atomicCommit.pgtest.ts",
       "postgres-integration/a4ObservedStay.pgtest.ts",
+      "postgres-integration/a4StayExecution.pgtest.ts",
       "postgres-integration/a4SelectedPlanContinuation.pgtest.ts",
       "postgres-integration/a3ReviewedEntryPublication.pgtest.ts",
       "postgres-integration/a3CandidateGeography.pgtest.ts",

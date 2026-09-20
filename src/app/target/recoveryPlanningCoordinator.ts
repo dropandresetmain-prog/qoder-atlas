@@ -57,6 +57,7 @@ import { unmetProgrammeItems, type FailingSubject } from '../../resolution/plann
 import { createProgrammeTimeSwapProposer } from '../../resolution/planning/proposers/programmeTimeSwapProposer.ts';
 import { createTransportProposer } from '../../resolution/planning/proposers/transportProposer.ts';
 import { persistOfferExecutionBindings } from '../../persistence/postgres/execution/providerExecutionInputs.ts';
+import { persistStayExecutionBindings } from '../../persistence/postgres/execution/stayExecutionInputs.ts';
 import type { WTransportService } from '../../resolution/world/world.ts';
 import type { ResolvedOffer } from '../../resolution/scenarios/overlay.ts';
 import { materializeTransportOffers } from '../../resolution/planning/transportOfferMaterialization.ts';
@@ -530,6 +531,15 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
           strategies: core.viableStrategies,
           services: capturedOfferServices,
           resolvedOffers: capturedResolvedOffers,
+        });
+      }
+      if (capturedHotelMaterialization && core.viableStrategies.length > 0) {
+        await persistStayExecutionBindings(deps.pool, {
+          workspaceId: deps.workspaceId,
+          actorId: deps.actorPrincipalId,
+          recoveryCaseId: input.recoveryCaseId,
+          strategies: core.viableStrategies,
+          quotedStays: capturedHotelMaterialization.quotedStays,
         });
       }
 

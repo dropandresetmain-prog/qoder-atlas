@@ -44,6 +44,8 @@ import type { ExecuteOutcome } from '../pgUnitOfWork.ts';
 import { PgArrangementRepositories } from '../repositories/pgArrangementRepositories.ts';
 import { PgGeographyRepository } from '../repositories/pgGeographyRepository.ts';
 import { PgJourneyRepository } from '../repositories/pgJourneyRepository.ts';
+import { currentTransactionClient } from '../transactionContext.ts';
+import { recordSelectedPlanCanonicalApplication } from '../execution/selectedPlanContinuation.ts';
 
 const COMMAND_TYPE = 'OBSERVED_STAY_ATTACHED';
 const Uuid = z.uuid();
@@ -105,6 +107,13 @@ export interface ObservedStayAttachmentParams {
   };
   /** Explicit approved entry context for a stay. Omitted for legacy callers. */
   approvedVisit?: ApprovedVisitInput;
+  /** Links a successful external attempt to this canonical receipt in the same transaction. */
+  canonicalApplication?: {
+    attemptId: string;
+    actionPlanId: string;
+    actionIntentId: string;
+    source: { kind: 'EXTERNAL_PROVIDER'; observationId: string };
+  };
   evidenceRefs?: string[];
 }
 
@@ -190,6 +199,17 @@ export async function attachObservedStay(
     params.booking.reservationResponsibleOrganisationId,
   ].filter((id): id is string => id !== undefined);
   if (inputIds.some((id) => !Uuid.safeParse(id).success)) return reject('all domain references must be UUIDs', refs);
+  if (params.canonicalApplication) {
+    const bridgeIds = [
+      params.canonicalApplication.attemptId,
+      params.canonicalApplication.actionPlanId,
+      params.canonicalApplication.actionIntentId,
+      params.canonicalApplication.source.observationId,
+    ];
+    if (bridgeIds.some((id) => !Uuid.safeParse(id).success)) {
+      return reject('canonicalApplication ids must be valid UUIDs when supplied', refs);
+    }
+  }
   const approvedVisitResult = params.approvedVisit === undefined
     ? undefined
     : ApprovedVisitInputSchema.safeParse(params.approvedVisit);
@@ -389,6 +409,28 @@ export async function attachObservedStay(
         reservationRevision: 1,
         connectionRevision: connectionAdvanced.value.afterRevision,
       };
+      if (params.canonicalApplication) {
+        const application = await recordSelectedPlanCanonicalApplication(currentTransactionClient(), {
+          workspaceId: params.workspaceId,
+          actorId: params.actorPrincipalId,
+          attemptId: params.canonicalApplication.attemptId,
+          actionPlanId: params.canonicalApplication.actionPlanId,
+          actionIntentId: params.canonicalApplication.actionIntentId,
+          commandNamespace: envelope.commandType,
+          idempotencyKey: envelope.idempotencyKey,
+          source: params.canonicalApplication.source,
+        });
+        if (!application.ok) {
+          return {
+            ok: false,
+            conflict: typedConflict(
+              'VALIDATION_FAILED',
+              `selected-plan canonical application rejected: ${application.reason}`,
+              [journeyRef],
+            ),
+          };
+        }
+      }
       await appendAuditTrail({ envelope, advanced, destinationKind: COMMAND_TYPE, payload: value });
       return { ok: true, value, receipt: buildReceipt({ envelope, value, advanced }) };
     });
