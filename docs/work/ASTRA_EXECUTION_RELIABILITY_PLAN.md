@@ -147,36 +147,43 @@ The exact winning strategy is allowed to be programme-side if that remains the c
 
 Astra should use valid existing R4 evidence where still applicable, but physical product acceptance must reflect the actual A2 candidate.
 
-### A3 — Jordan Runtime Acceptance
+### A3 — Jordan Multi-Domain Planning Acceptance
 
 Goal:
 
-Make Jordan's progressive S2 backend path work through the same generalized PostgreSQL recovery architecture.
-
-Minimum acceptance is backend/runtime truth, not final UI polish.
-
-At minimum prove the current generalized path can represent and process:
-
-baseline -> progressive upstream delay -> connection risk -> connection failure -> recovery research -> whole-trip viability comparison -> authority/execution boundary -> observation/reassessment -> viable final state.
-
-Do not inflate the closed hero into mandatory composite hotel/transfer/insurance execution unless current authoritative scenario truth requires it.
-
-### A4 — Jordan Product Acceptance
-
-Goal:
-
-Make Jordan physically runnable through the actual product.
+Prove one complete Jordan recovery recommendation through the same generalized PostgreSQL engine, not a flight-only shortcut.
 
 Minimum acceptance:
 
-- founder can drive the progressive S2 sequence through product controls;
-- V5.6 explains Jordan's causal disruption truth;
-- V7.2 reflects Jordan in the wider event world;
-- viable and rejected recovery are understandable;
-- consequential external action follows the normal deterministic authority/execution chain;
-- observed state is reconciled;
-- trip/case resolve only after current truth passes;
-- Reset can restore a repeatable baseline without manual SQL repair.
+- baseline -> progressive delay -> connection failure -> RecoveryCase;
+- LIVE Qwen/Model Studio plus relevant Atlas, Nuitée, configured authoritative entry-source and FX evidence;
+- one composite candidate world containing replacement flight + Narita overnight + scoped landside-entry evidence + required Singapore revised-stay consequence + finals objective;
+- provider/default and other alternatives rejected for explicit deterministic reasons where they fail;
+- one complete strategy is VIABLE and physically visible on the desktop Case with costs, FX provenance, uncertainty, alternatives and authority readiness;
+- no external A4 transaction is required merely to close A3.
+
+Do not broaden A3 into generic hotel management, immigration/credential administration, transfer booking, claims processing, healthy-trip requests, mobile or extra scenarios.
+
+### A4 — Jordan Selected Execution / Product Acceptance
+
+Goal:
+
+Execute the already-selected A3 composite through the existing authority/action/observation architecture and prove whole-trip recovery in the product.
+
+Minimum acceptance:
+
+- operator approves the selected composite;
+- protected Atlas replacement-flight action;
+- protected Nuitée Narita booking;
+- protected Nuitée Singapore replacement booking;
+- displaced Singapore stay cancellation only after replacement confirmation;
+- durable per-action attempts and observation/reconciliation, with no blind redispatch after unknown outcomes;
+- bounded atomic canonical stay updates and safe continuation across the plan's own accounted mutations;
+- V5.6 explains the causal disruption/recovery; V7.2 retains the wider population context;
+- whole-trip reassessment reaches current PASS before Case RESOLVED / VIABLE;
+- repeated demo runs use safe fresh/resettable workspaces without deleting unresolved external identity.
+
+Use the existing ActionPlan/execution machinery; do not create a workflow engine or general provider-orchestration platform.
 
 ### A5 — Cross-Scenario Convergence & Final Candidate
 
