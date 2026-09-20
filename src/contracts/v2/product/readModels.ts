@@ -642,6 +642,43 @@ export const PlanningBlastRadiusViewSchema = z.strictObject({
 });
 export type PlanningBlastRadiusView = z.infer<typeof PlanningBlastRadiusViewSchema>;
 
+/** Decision-time comparison evidence, kept separate from any booked amount. */
+export const PlanningCostLineViewSchema = z.strictObject({
+  kind: PlanningEvidenceLabelSchema,
+  providerAmount: z.strictObject({ amount: z.string().min(1), currency: z.string().length(3) }),
+  homeAmount: z.strictObject({ amount: z.string().min(1), currency: z.string().length(3) }),
+  observed: z.boolean(),
+});
+export type PlanningCostLineView = z.infer<typeof PlanningCostLineViewSchema>;
+
+export const PlanningFxEvidenceViewSchema = z.strictObject({
+  source: PlanningEvidenceLabelSchema,
+  baseCurrency: z.string().length(3),
+  homeCurrency: z.string().length(3),
+  rate: z.number().positive(),
+  observedAt: z.string().datetime({ offset: true }),
+  validUntil: z.string().datetime({ offset: true }).optional(),
+});
+export type PlanningFxEvidenceView = z.infer<typeof PlanningFxEvidenceViewSchema>;
+
+/** An explicit cost comparison or the reason it could not be made. */
+export const PlanningCostComparisonViewSchema = z.discriminatedUnion('status', [
+  z.strictObject({
+    status: z.literal('AVAILABLE'),
+    homeCurrency: z.string().length(3),
+    totalHomeAmount: z.strictObject({ amount: z.string().min(1), currency: z.string().length(3) }),
+    lines: z.array(PlanningCostLineViewSchema).default([]),
+    selectedFxEvidence: z.array(PlanningFxEvidenceViewSchema).default([]),
+    comparedAt: z.string().datetime({ offset: true }),
+  }),
+  z.strictObject({
+    status: z.literal('UNAVAILABLE'),
+    reason: z.string().min(1),
+    comparedAt: z.string().datetime({ offset: true }),
+  }),
+]);
+export type PlanningCostComparisonView = z.infer<typeof PlanningCostComparisonViewSchema>;
+
 /** C9 Q6/Q7 — one material alternative considered, and its disposition/reasons. */
 export const PlanningCandidateViewSchema = z.strictObject({
   candidateKey: z.string().min(1),
@@ -654,6 +691,8 @@ export const PlanningCandidateViewSchema = z.strictObject({
   reasons: z.array(z.string().min(1)).default([]),
   outcomeDelta: z.array(PlanningOutcomeDeltaViewSchema).default([]),
   blastRadius: PlanningBlastRadiusViewSchema.optional(),
+  /** Present only when planning captured a comparison or its uncertainty. */
+  costComparison: PlanningCostComparisonViewSchema.optional(),
 });
 export type PlanningCandidateView = z.infer<typeof PlanningCandidateViewSchema>;
 

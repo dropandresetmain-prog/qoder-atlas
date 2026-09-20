@@ -172,6 +172,21 @@ function changeLineHtml(line: CaseChangeLine): string {
   }
 }
 
+function costEvidenceHtml(option: CaseOptionModel): string {
+  const evidence = option.costEvidence;
+  if (!evidence) return option.costLine ? `<dt>Cost</dt><dd>${escapeHtml(option.costLine)}</dd>` : '';
+  if (evidence.uncertainty) {
+    return `<dt>Cost comparison</dt><dd>${escapeHtml(evidence.uncertainty)}</dd>`;
+  }
+  const lines = evidence.lines.length > 0
+    ? `<ul>${evidence.lines.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}</ul>`
+    : '';
+  const rates = evidence.rates.length > 0
+    ? `<ul>${evidence.rates.map((rate) => `<li>${escapeHtml(rate)}</li>`).join('')}</ul>`
+    : '';
+  return `<dt>Cost comparison</dt><dd>${evidence.total ? `<strong>${escapeHtml(evidence.total)}</strong>` : ''}${lines}${rates}</dd>`;
+}
+
 function factsHtml(option: CaseOptionModel, fullApprover: boolean): string {
   const changes = option.changes.length > 0
     ? `<ul>${option.changes.map(changeLineHtml).join('')}</ul>`
@@ -182,7 +197,7 @@ function factsHtml(option: CaseOptionModel, fullApprover: boolean): string {
     <dt>What changes</dt><dd>${changes}</dd>
     ${people ? `<dt>Trip recovery for</dt><dd>${people}</dd>` : ''}
     ${why ? `<dt>Why it works</dt><dd>${why}</dd>` : ''}
-    ${option.costLine ? `<dt>Cost</dt><dd>${escapeHtml(option.costLine)}</dd>` : ''}
+    ${costEvidenceHtml(option)}
     ${fullApprover ? `<dt>Approval</dt><dd>${escapeHtml(option.approverLine)}</dd>` : ''}
   </dl>`;
 }

@@ -505,6 +505,12 @@ export async function runRecoveryPlanning(
     viability: 'VIABLE' as const,
     stale: false,
   }));
+  // Minor units only carry an ordering inside one currency. Preserve the full
+  // evidence for presentation, but decline to rank costs when viable candidates
+  // were compared into different home currencies.
+  const viableHomeCurrencies = new Set(viable.flatMap((candidate) =>
+    candidate.costComparison?.status === 'AVAILABLE' ? [candidate.costComparison.homeCurrency] : []));
+  const canRankDeclaredCosts = viableHomeCurrencies.size <= 1;
   const provisionalFacts: CandidateComparisonFacts[] = [];
   for (const e of viable) {
     const provisional = materialCandidateFromEvaluation({
@@ -512,7 +518,7 @@ export async function runRecoveryPlanning(
       strategyRef: e.result.strategy.id as SubjectId, recommended: false, result: e.result,
       evidenceRefs: evidenceRefsForDomain(evidence, e.domainId),
     });
-    const costFacts = declaredCostFacts(e.costComparison);
+    const costFacts = canRankDeclaredCosts ? declaredCostFacts(e.costComparison) : undefined;
     const facts = comparisonFactsFromEvidence(provisional, deps.preferences?.length
       ? { ...(costFacts ?? {}), satisfiedPreferenceCodes: satisfiedPreferenceCodes(provisional, deps.preferences) }
       : costFacts);
