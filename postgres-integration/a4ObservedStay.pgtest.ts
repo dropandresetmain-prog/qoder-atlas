@@ -223,6 +223,29 @@ describe('A4 atomic observed stay attachment', () => {
     assert.equal((await f.pool.query('SELECT COUNT(*) FROM journey_items WHERE workspace_id=$1 AND journey_id=$2', [f.seed.workspaceId, f.journeyId])).rows[0].count, '0');
   });
 
+  test('refuses transit visits and approved visit windows that do not cover the observed stay', async () => {
+    const f = await setup();
+    const uow = () => new PgUnitOfWork(f.pool, f.seed.workspaceId);
+    const transitVisit = approvedProposedVisit(f);
+    transitVisit.visit.transitIntent = true;
+    const transit = await attachObservedStay(uow(), {
+      ...input(f, randomUUID()),
+      approvedVisit: transitVisit,
+    });
+    assert.equal(transit.ok, false);
+    if (!transit.ok) assert.match(transit.conflict.message, /landside/);
+
+    const narrowVisit = approvedProposedVisit(f);
+    narrowVisit.visit.intendedDates = { start: '2030-01-03T00:00:00Z', end: '2030-01-04T00:00:00Z' };
+    const narrow = await attachObservedStay(uow(), {
+      ...input(f, randomUUID()),
+      approvedVisit: narrowVisit,
+    });
+    assert.equal(narrow.ok, false);
+    if (!narrow.ok) assert.match(narrow.conflict.message, /cover/);
+    assert.equal((await f.pool.query('SELECT COUNT(*) FROM reservations WHERE workspace_id=$1', [f.seed.workspaceId])).rows[0].count, '0');
+  });
+
   test('rolls back approved visit and credential selection when later stay attachment fails', async () => {
     const f = await setup({ existingJourneyItem: true });
     const uow = () => new PgUnitOfWork(f.pool, f.seed.workspaceId);
