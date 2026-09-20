@@ -91,8 +91,11 @@ Singapore replacement through real supported sandbox operations, then observes a
 Singapore revised stay dates are an explicit hero requirement, expressed as source/config
 truth and evaluated generically. A late arrival does not itself prove the supplier cancelled
 the original booking. Preserve actual cancellation/no-show terms, fees and unused-night costs.
-Nuitée has no supported in-place date modification. Required operation pair: CANCEL_STAY then
-ADD/BOOK_STAY, with sensible dependencies and separate observations under the existing ActionPlan.
+Nuitée has no supported in-place date modification. The required semantic pair is replacement
+ADD/BOOK_STAY plus cancellation of the displaced stay, with separate observations under the
+existing ActionPlan. Safe execution requires the replacement Singapore stay to be confirmed
+before cancelling the displaced booking, unless authoritative provider constraints require a
+different explicitly fail-safe ordering.
 
 Retain the existing Frankfurter adapter and layered resolver. Compose only the current-runtime
 path needed for original provider currency plus home-currency comparison and dated FX provenance.
