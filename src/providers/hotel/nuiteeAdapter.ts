@@ -120,7 +120,7 @@ export interface NuiteeRateRaw {
    *  single OBJECT — both shapes are real and both are consumed. */
   retailRate?: { total?: NuiteeMoneyRaw | NuiteeMoneyRaw[] };
   cancellationPolicies?: {
-    cancelPolicyInfos?: NuiteeCancelPolicyInfoRaw[];
+    cancelPolicyInfos?: NuiteeCancelPolicyInfoRaw[] | null;
     hotelRemarks?: unknown[];
     refundableTag?: string;
   };
@@ -194,12 +194,15 @@ export interface NuiteeRetrieveRaw {
     hotelConfirmationCode?: string;
     hotelId?: string;
     hotelName?: string;
+    hotel?: { name?: string };
     checkin?: string;
     checkout?: string;
+    /** Direct observed booking total from retrieve responses. */
+    price?: number | string;
     currency?: string;
     roomTypes?: NuiteeRoomTypeRaw[];
     cancellationPolicies?: {
-      cancelPolicyInfos?: NuiteeCancelPolicyInfoRaw[];
+      cancelPolicyInfos?: NuiteeCancelPolicyInfoRaw[] | null;
       refundableTag?: string;
     };
   };
@@ -686,7 +689,7 @@ function toIsoDeadline(value: unknown, timezone: unknown): string | undefined {
  * Provider-neutral cancellation posture from cancelPolicyInfos:
  * deadline = latest zero-penalty cancelTime; fee = first positive penalty.
  */
-function cancellationPosture(infos: NuiteeCancelPolicyInfoRaw[] | undefined): {
+function cancellationPosture(infos: NuiteeCancelPolicyInfoRaw[] | null | undefined): {
   deadline?: string;
   fee?: { amount: number; currency: string };
 } {
@@ -929,6 +932,8 @@ export function normalizeStayContext(raw: NuiteeRetrieveRaw): StayContext {
   const context: StayContext = {};
   if (typeof data.hotelName === 'string' && data.hotelName.length > 0) {
     context.propertyName = data.hotelName;
+  } else if (typeof data.hotel?.name === 'string' && data.hotel.name.length > 0) {
+    context.propertyName = data.hotel.name;
   }
   const checkIn = toIsoDateTimeOrUndefined(data.checkin);
   const checkOut = toIsoDateTimeOrUndefined(data.checkout);
@@ -946,6 +951,23 @@ export function normalizeStayContext(raw: NuiteeRetrieveRaw): StayContext {
     };
     if (posture.deadline) cancellation.deadline = posture.deadline;
     if (posture.fee) cancellation.fee = posture.fee;
+    const observedPrice = toNumber(data.price);
+    const observedCurrency = toCurrency(data.currency);
+    const hasValidObservedPrice = observedPrice !== undefined
+      && observedPrice > 0
+      && observedCurrency !== undefined
+      && /^[A-Z]{3}$/.test(observedCurrency);
+    const hasPolicyDetails = Array.isArray(policies.cancelPolicyInfos) && policies.cancelPolicyInfos.length > 0;
+    if (
+      data.status === 'CONFIRMED'
+      && policies.refundableTag === 'NRFN'
+      && posture.fee === undefined
+      && !hasPolicyDetails
+      && hasValidObservedPrice
+    ) {
+      cancellation.maximumLoss = { amount: observedPrice, currency: observedCurrency };
+      cancellation.maximumLossBasis = 'NONREFUNDABLE_BOOKING_PRICE';
+    }
     context.cancellation = cancellation;
   }
   return context;

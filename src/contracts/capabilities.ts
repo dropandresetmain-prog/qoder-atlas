@@ -608,7 +608,15 @@ export interface StayContext {
   checkInWindow?: { start?: IsoDateTime; end?: IsoDateTime };
   noShowCutoff?: IsoDateTime;
   lateArrivalSupported?: boolean;
-  cancellation?: { refundable: boolean; deadline?: IsoDateTime; fee?: Money };
+  cancellation?: {
+    refundable: boolean;
+    deadline?: IsoDateTime;
+    /** Exact provider-reported penalty, when one is available. */
+    fee?: Money;
+    /** Conservative ceiling for a confirmed nonrefundable booking. */
+    maximumLoss?: Money;
+    maximumLossBasis?: 'NONREFUNDABLE_BOOKING_PRICE';
+  };
 }
 
 /** Provider-opaque location input: external ref or coordinates + radius. */

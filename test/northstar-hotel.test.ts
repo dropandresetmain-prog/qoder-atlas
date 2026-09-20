@@ -37,6 +37,7 @@ import {
   NUITEE_PROVIDER_ID,
   containsAnySecret,
 } from '../src/providers/index.ts';
+import { normalizeStayContext } from '../src/providers/hotel/nuiteeAdapter.ts';
 import type { HotelBookQuery, HotelSearchQuery } from '../src/contracts/capabilities.ts';
 import {
   NUITEE_CAPTURE_BOOK_QUERY,
@@ -225,6 +226,77 @@ test('RV-N7 hotel: REPLAY getStayContext honors Checkpoint-C semantics', async (
   // The captured rate has a penalty-only policy: no zero-fee window exists,
   // so no deadline is fabricated.
   assert.equal(ctx.cancellation?.deadline, undefined);
+});
+
+test('A3 hotel: confirmed NRFN context exposes a conservative booking-price loss ceiling', () => {
+  const context = normalizeStayContext({
+    data: {
+      status: 'CONFIRMED',
+      price: 1135.63,
+      currency: 'USD',
+      hotel: { name: 'Observed Property' },
+      cancellationPolicies: { refundableTag: 'NRFN', cancelPolicyInfos: null },
+    },
+  });
+
+  assert.equal(context.propertyName, 'Observed Property');
+  assert.equal(context.cancellation?.refundable, false);
+  assert.equal(context.cancellation?.fee, undefined);
+  assert.deepEqual(context.cancellation?.maximumLoss, { amount: 1135.63, currency: 'USD' });
+  assert.equal(context.cancellation?.maximumLossBasis, 'NONREFUNDABLE_BOOKING_PRICE');
+});
+
+test('A3 hotel: exact cancellation fees remain authoritative over the loss ceiling', () => {
+  const context = normalizeStayContext({
+    data: {
+      status: 'CONFIRMED',
+      price: 1135.63,
+      currency: 'USD',
+      cancellationPolicies: {
+        refundableTag: 'NRFN',
+        cancelPolicyInfos: [{ amount: 42.5, currency: 'USD' }],
+      },
+    },
+  });
+
+  assert.deepEqual(context.cancellation?.fee, { amount: 42.5, currency: 'USD' });
+  assert.equal(context.cancellation?.maximumLoss, undefined);
+  assert.equal(context.cancellation?.maximumLossBasis, undefined);
+});
+
+test('A3 hotel: loss ceiling fails closed for non-confirmed, refundable, unknown, or malformed evidence', () => {
+  const cases: Array<{
+    status: string;
+    price: number | string;
+    currency: string;
+    refundableTag: string;
+    cancelPolicyInfos?: Array<{ amount?: number; currency?: string }>;
+  }> = [
+    { status: 'CANCELLED', price: 1135.63, currency: 'USD', refundableTag: 'NRFN' },
+    { status: 'CONFIRMED', price: 1135.63, currency: 'USD', refundableTag: 'RFN' },
+    { status: 'CONFIRMED', price: 1135.63, currency: 'USD', refundableTag: 'UNKNOWN' },
+    { status: 'CONFIRMED', price: 0, currency: 'USD', refundableTag: 'NRFN' },
+    { status: 'CONFIRMED', price: -1, currency: 'USD', refundableTag: 'NRFN' },
+    { status: 'CONFIRMED', price: 1135.63, currency: 'US', refundableTag: 'NRFN' },
+    { status: 'CONFIRMED', price: 'not-a-price', currency: 'USD', refundableTag: 'NRFN' },
+    { status: 'CONFIRMED', price: 1135.63, currency: 'USD', refundableTag: 'NRFN', cancelPolicyInfos: [{ amount: 12.5 }] },
+  ] as const;
+
+  for (const candidate of cases) {
+    const context = normalizeStayContext({
+      data: {
+        status: candidate.status,
+        price: candidate.price,
+        currency: candidate.currency,
+        cancellationPolicies: {
+          refundableTag: candidate.refundableTag,
+          cancelPolicyInfos: candidate.cancelPolicyInfos,
+        },
+      },
+    });
+    assert.equal(context.cancellation?.maximumLoss, undefined, JSON.stringify(candidate));
+    assert.equal(context.cancellation?.maximumLossBasis, undefined, JSON.stringify(candidate));
+  }
 });
 
 test('RV-N7 hotel: modifyStay is a structured UNAVAILABLE failure (liteAPI cannot modify in place)', async () => {
