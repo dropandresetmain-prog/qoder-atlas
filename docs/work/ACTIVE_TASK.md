@@ -3,7 +3,7 @@
 - Goal: one generalized PostgreSQL engine, two rich desktop hero recoveries. [Hard scope lock](ASTRA_HERO_DEPTH_SCOPE.md).
 - Primary: `integration/astra-post-r4` in `C:/Dev/qoder-atlas/.worktrees/astra-post-r4`.
 - Immutable R4 base: `2baf1f6df484319e131590d37a0b026222324d03`.
-- Latest verified pushed checkpoint: `d61b5175fa0c81c5ab890bd9968db42e4e1710c0`; clean at push. Later merges through4f06e3d are being checkpointed with the focused baseline fix.
+- Latest verified pushed checkpoint before this commit: `9fd842f0dd0c2df2c5982c24ed4a56820e1dad0f`. This commit checkpoints the integrated cost UI, reviewed context and normal research composition; LIVE acceptance remains pending.
 - Accepted: A0 `f55899b15200de692dd749bbcfb795c67f6a22e0`; A1 `a948917c239fc02435020f6740474283dd795ea8`; A2 `f0c79f2412513e3a676737ac32c3c3694c03388a` (tested565f561).
 - Evidence: [A1](ASTRA_A1_PRODUCT_EVIDENCE.md), [A2 LIVE](ASTRA_A2_LIVE_EVIDENCE.md), [A3 decisions](ASTRA_A3_STAY_EXTENSION_DECISION.md), [ROADMAP](../ROADMAP.md).
 
@@ -17,10 +17,10 @@
 
 ## Current lanes — all Act Now
 
-- Terra `codex/a3-case-cost-evidence`:1d75557 ready with focused50/50 and TS; closing positional stay-label inference, reference-date wording, and no-price programme compatibility before integration.
-- Luna `codex/a3-reviewed-runtime-context`:769f25b draft NOT integrated. Root found airport/hotel binding, insertion, passenger and freshness errors; lane correcting and proving actual PG path. This blocks normal boot composition.
-- Luna `codex/a3-stay-replacement-context`: actual9b2e46c34005b2c34d23d5dc0b7da573dbd6ced3 integrated at4f06e3d.4focused+TS; distinct airport/hotel and real CANCEL+ADD overlay proof. Now read-only inventory of smallest A4 atomic observed-stay command.
-- Root dirty composition: composeTargetBoot.ts, target/recoveryPlanningCoordinator.ts, targetFxResearch.ts, test/a3-target-fx.test.ts, new composeTargetRecoveryResearch.ts. Waiting for corrected context module. Do not boot/claim these complete yet.
+- Terra cost UI5c6e236 integrated atd16708f;51focused+TS. Now implementing explicit source-owned intended visits only, in an isolated lane. No automatic stay-to-visit inference.
+- Luna reviewed context61a859a8edc940f89125baa4cf824538ae08dac1 integrated; root7focused+TS and boundary279 pass with normal composition. Now bounded read-only official source review for the existing destination encounter.
+- Luna destination resolver9b2e46c integrated;4focused+TS. Now designing the smallest A4 atomic observed-stay attachment command; root reviews its exact contract before implementation.
+- Root normal boot composes HOTEL/RESEARCH, reviewed context and existing layered FX through the shared coordinator. Physical PG/provider preparation proof remains next.
 
 ## Integrated A3 evidence
 
@@ -36,6 +36,7 @@
 ## Triage / exact next actions
 
 - **Act Now:** finish corrected context + boot composition, explicit sandbox inputs/current destination provider booking terms, LIVE whole composite recommendation, desktop evidence. Source date truth is4→3 nights (29Sep→3Oct becomes30Sep→3Oct); founder3→2 was a conditional example.
+- **Act Now:** actual PG has zero intended visits despite the source destination stay. Add one explicit source-declared original destination visit, pin the configured passport using existing commands, and supply exact scoped reviewed entry evidence. Reuse that encounter for replacement. Missing legal evidence remains UNKNOWN; never infer a visit from every hotel.
 - **Investigate Now:** current destination cancellation fees/refund policy and real active sandbox baseline booking; old historical Nuitee references were cancelled. Missing policy stays UNKNOWN. Required home-currency evidence must not imply payment FX or future FX.
 - **Act Now A4:** flight, Narita book, destination replacement book, old-stay cancel through existing ActionPlan. Replacement confirmation precedes cancellation; both mandatory. Unknown outcome lookup before any retry; no blind redispatch. Atomic observed stay command still missing.
 - **Park for Later:** healthy-trip requests/composer, mobile, generic programme/hotel/visit/credential management, immigration/crawling breadth, unrelated providers, transfer transactions, claims, multi-incidents/extra scenarios, importer atomicity, unrelated parity/refactors/infrastructure.

@@ -29,6 +29,8 @@ import { createRecoveryPlanningCoordinator } from './target/recoveryPlanningCoor
 import { buildTargetTimezoneResolver } from './targetTransportResearch.ts';
 import { composeTransportFamilies } from './targetProviderFamilies.ts';
 import { composeTargetIntelligence } from './composeTargetIntelligence.ts';
+import { composeTargetRecoveryResearch } from './composeTargetRecoveryResearch.ts';
+import { composeTargetFxResearch, createTargetRecoveryCostContext } from './targetFxResearch.ts';
 import { runInternalExecutionPass } from './target/executionPass.ts';
 import { composeOfferExecution, runExternalExecutionCycle, EXTERNAL_OFFER_SELECT_STATEMENTS } from './target/externalOfferExecution.ts';
 import { provisionWorkspaceAuthority, workspacePrincipalId } from './target/workspaceAuthority.ts';
@@ -212,13 +214,32 @@ export async function composeTargetBoot(
   } else {
     console.log('[qwen] Model Studio not composed (credentials absent) — AI domain suggestion unavailable');
   }
+  const recoveryResearch = await composeTargetRecoveryResearch({
+    config: adapterConfig,
+    cwd: options.cwd ?? process.cwd(),
+    configurationFile: resolved.NORTHSTAR_RECOVERY_RESEARCH_CONFIG,
+    pool: endpoints.app.pool,
+    workspaceId: config.workspaceId,
+    actorPrincipalId: lifecycleActor,
+    uow: () => endpoints.app.unitOfWork(),
+    reviewerPrincipalId: authority.principals.operator,
+  });
+  console.log(recoveryResearch
+    ? `[atlas] reviewed entry and hotel research composed (mode=${adapterConfig.adapterMode}, read-only)`
+    : '[atlas] reviewed overnight research unavailable (explicit configuration and hotel credentials required)');
   const planner = createRecoveryPlanningCoordinator({
     pool: endpoints.app.pool,
     workspaceId: config.workspaceId,
     actorPrincipalId: lifecycleActor,
     uow: () => endpoints.app.unitOfWork(),
     // G01: advertise exactly the composed provider families (never a phantom set).
-    availableCapabilities: families.availableCapabilities,
+    availableCapabilities: [...families.availableCapabilities, ...(recoveryResearch ? ['HOTEL' as const, 'RESEARCH' as const] : [])],
+    ...(recoveryResearch ? { preparePlanningContext: recoveryResearch.prepare } : {}),
+    ...(recoveryResearch ? {
+      costContextForCandidate: createTargetRecoveryCostContext(
+        composeTargetFxResearch(adapterConfig, options.cwd ?? process.cwd(), endpoints.app.pool, config.workspaceId).resolver,
+      ),
+    } : {}),
     ...(transportResearch ? { transportPlanning: transportResearch } : {}),
     ...(intelligence ? { intelligence } : {}),
   });

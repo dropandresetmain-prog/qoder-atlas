@@ -71,6 +71,7 @@ import {
   runRecoveryPlanning,
   type CoordinatorMinters,
   type DomainProposerBinding,
+  type CoordinatorCoreDeps,
 } from '../../resolution/planning/coordinatorCore.ts';
 import { loadPlanningPreferences, preferenceOwnerIds } from './planningPreferences.ts';
 import { suggestRecoveryDomains } from './planningDomainSuggestion.ts';
@@ -136,6 +137,7 @@ export interface RecoveryPlanningCoordinatorDeps {
    * leaves existing transport-only planning unchanged and invents no stay.
    */
   hotelPlanning?: HotelPlanningOptions;
+  costContextForCandidate?: CoordinatorCoreDeps['costContextForCandidate'];
   /**
    * Bounded entry/property evidence preparation, shared by HTTP and progression.
    * Publication uses the existing knowledge commands outside the pure planner.
@@ -448,6 +450,7 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
           domainRegistry,
           availableCapabilities,
           proposers,
+          ...(deps.costContextForCandidate ? { costContextForCandidate: deps.costContextForCandidate } : {}),
           ...(preferences.length > 0 ? { preferences } : {}),
           ...(aiSuggestedDomains ? { aiSuggestedDomains } : {}),
           minters: planningMinters(deps, input.recoveryCaseId, basis.basisAssessmentId, now, baseStrategyVersion),

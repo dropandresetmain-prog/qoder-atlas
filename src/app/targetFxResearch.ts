@@ -18,6 +18,8 @@ import { FileRecordingStore, type RecordingStore } from '../providers/recordingS
 import { PgArrangementReadQueries } from '../persistence/postgres/queries/pgArrangementReadQueries.ts';
 import type { FxObservationHit } from '../contracts/v2/repository/arrangementQueries.ts';
 import type { Pool } from '../persistence/postgres/pool.ts';
+import type { ScenarioEffect } from '../contracts/v2/scenario/scenarioChange.ts';
+import type { CapturedWorld } from '../resolution/world/world.ts';
 
 export interface TargetFxBudgetRates {
   ratesFor(baseCurrency: string, homeCurrency: string): Promise<FxRateEvidence[]>;
@@ -127,5 +129,57 @@ export function composeTargetFxResearch(
         .map(([sourceId]) => sourceId)
         .sort(),
     },
+  };
+}
+
+/** One captured FX read per currency pair and planning basis, shared by all alternatives. */
+export function createTargetRecoveryCostContext(
+  resolver: Pick<LayeredFxRateResolver, 'ratesFor'>,
+  clock: () => string = () => new Date().toISOString(),
+) {
+  const ratesByWorld = new WeakMap<CapturedWorld, Map<string, Promise<FxRateEvidence[]>>>();
+  return async (input: { effects: readonly ScenarioEffect[]; basis: { world: CapturedWorld } }) => {
+    const world = input.basis.world;
+    const journeyIds = new Set<string>();
+    const currencies = new Set<string>();
+    for (const effect of input.effects) {
+      if (effect.effectKind === 'ADD_JOURNEY_STAY') {
+        journeyIds.add(effect.journeyId);
+        currencies.add(effect.offerPrice.currency);
+      } else if (effect.effectKind === 'SELECT_OFFER' || effect.effectKind === 'CANCEL_STAY') {
+        const item = world.journeyItems.find((candidate) => candidate.id === effect.journeyItemId);
+        if (!item) return undefined;
+        journeyIds.add(item.journeyId);
+        if (effect.effectKind === 'CANCEL_STAY') currencies.add(effect.cancellationPenalty.currency);
+        else if (effect.offerPrice) currencies.add(effect.offerPrice.currency);
+      }
+    }
+    if (!journeyIds.size) return undefined;
+    const organisationIds = new Set<string>();
+    for (const journeyId of journeyIds) {
+      const journey = world.journeys.find((candidate) => candidate.id === journeyId);
+      if (!journey?.responsibilityOrganisationId) return undefined;
+      organisationIds.add(journey.responsibilityOrganisationId);
+    }
+    // Multiple payers require an explicit allocation policy. The hero has one;
+    // guessing a common currency for unrelated organisations is not permitted.
+    if (organisationIds.size !== 1) return undefined;
+    const homeCurrency = world.organisations.find((organisation) => organisationIds.has(organisation.id))?.defaultCurrencyCode;
+    if (!homeCurrency) return undefined;
+    let cache = ratesByWorld.get(world);
+    if (!cache) { cache = new Map(); ratesByWorld.set(world, cache); }
+    const pending: Promise<FxRateEvidence[]>[] = [];
+    for (const currency of currencies) {
+      if (currency === homeCurrency) continue;
+      const key = `${currency}:${homeCurrency}`;
+      let request = cache.get(key);
+      if (!request) {
+        request = resolver.ratesFor(currency, homeCurrency);
+        cache.set(key, request);
+      }
+      pending.push(request);
+    }
+    const rates = (await Promise.all(pending)).flat();
+    return { homeCurrency, rates, comparedAt: clock() };
   };
 }

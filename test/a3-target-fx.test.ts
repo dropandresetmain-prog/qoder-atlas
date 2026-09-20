@@ -1,9 +1,32 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadConfig } from '../src/config/config.ts';
-import { composeTargetFxResearch, mapPgFxObservation } from '../src/app/targetFxResearch.ts';
+import { composeTargetFxResearch, createTargetRecoveryCostContext, mapPgFxObservation } from '../src/app/targetFxResearch.ts';
+import { emptyWorld, id } from './support/m6World.ts';
+import type { ScenarioEffect } from '../src/contracts/v2/scenario/scenarioChange.ts';
 
 const WORKSPACE = '11111111-1111-4111-8111-111111111111';
+
+test('cost research uses captured owning organisation and reads each pair once per basis', async () => {
+  const world = emptyWorld();
+  const organisationId = id();
+  const journeyId = id();
+  world.organisations.push({ id: organisationId, revision: 1, defaultCurrencyCode: 'NZD' });
+  world.journeys.push({ id: journeyId, revision: 1, tripId: id(), travellerId: id(), lifecycleStatus: 'ACTIVE', intendedWindow: null, responsibilityOrganisationId: organisationId });
+  const effects: ScenarioEffect[] = [{ effectKind: 'ADD_JOURNEY_STAY', proposedJourneyItemId: id(), journeyId, orderKey: '020', offerId: id(), offerPrice: { amount: '120', currency: 'JPY' }, visit: { kind: 'EXISTING', visitId: id() } }];
+  const requested: string[] = [];
+  const contextFor = createTargetRecoveryCostContext({ async ratesFor(base, home) { requested.push(`${base}:${home}`); return []; } }, () => '2030-01-02T00:00:00Z');
+  const before = structuredClone(world);
+  const first = await contextFor({ effects, basis: { world } });
+  await contextFor({ effects, basis: { world } });
+  assert.deepEqual(requested, ['JPY:NZD']);
+  assert.deepEqual(first, { homeCurrency: 'NZD', rates: [], comparedAt: '2030-01-02T00:00:00Z' });
+  assert.deepEqual(world, before);
+  assert.equal(await contextFor({ effects: [], basis: { world } }), undefined);
+  world.journeys[0]!.responsibilityOrganisationId = null;
+  assert.equal(await contextFor({ effects, basis: { world } }), undefined);
+  assert.deepEqual(requested, ['JPY:NZD'], 'missing payer must not become a guessed currency lookup');
+});
 
 function hit(overrides: Partial<Parameters<typeof mapPgFxObservation>[0]> = {}) {
   return {
