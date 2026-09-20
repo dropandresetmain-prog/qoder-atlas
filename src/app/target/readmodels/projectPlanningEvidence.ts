@@ -242,6 +242,8 @@ function projectCostComparison(cost: NonNullable<MaterialCandidateEvidence['cost
     status: 'AVAILABLE' as const,
     homeCurrency: cost.homeCurrency,
     totalHomeAmount: cost.totalHomeAmount,
+    ...(cost.newSpendHomeAmount ? { newSpendHomeAmount: cost.newSpendHomeAmount } : {}),
+    ...(cost.potentialLossHomeAmount ? { potentialLossHomeAmount: cost.potentialLossHomeAmount } : {}),
     lines: cost.lines.map((line) => ({
       kind: { label: COST_KIND_LABELS[line.kind], code: line.kind },
       providerAmount: line.providerAmount,

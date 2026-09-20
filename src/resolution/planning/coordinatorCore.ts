@@ -296,6 +296,8 @@ async function costComparisonForCandidate(input: {
     status: 'AVAILABLE',
     homeCurrency: compared.homeCurrency,
     totalHomeAmount: compared.totalHomeAmount,
+    newSpendHomeAmount: compared.newSpendHomeAmount,
+    potentialLossHomeAmount: compared.potentialLossHomeAmount,
     lines: compared.lines,
     selectedFxEvidence,
     comparedAt: compared.comparedAt,

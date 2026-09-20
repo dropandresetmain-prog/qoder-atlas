@@ -193,7 +193,16 @@ function proposalFromEvaluation(result: EvaluateStrategyResult): MaterialCandida
     const place = item?.intendedPlaceId
       ? result.proposedWorld.places.find((candidate) => candidate.id === item.intendedPlaceId)
       : undefined;
-    return item?.intendedWindow && place ? [{ placeLabel: place.name.trim().slice(0, 160) || 'Proposed accommodation', start: item.intendedWindow.start, end: item.intendedWindow.end, timeZone: place.timeZone }] : [];
+    if (!item?.intendedWindow || !place) return [];
+    const placeLabel = place.name.trim().slice(0, 160) || 'Proposed accommodation';
+    const propertyLabel = item.standaloneTitle?.trim().slice(0, 160);
+    return [{
+      placeLabel,
+      ...(propertyLabel && propertyLabel !== placeLabel ? { propertyLabel } : {}),
+      start: item.intendedWindow.start,
+      end: item.intendedWindow.end,
+      timeZone: place.timeZone,
+    }];
   }).slice(0, 4);
   const dimensions = result.strategy.candidateAssessmentResults.flatMap((assessment) => assessment.dimensions)
     .filter((dimension) => dimension.applicable && dimension.blocking);

@@ -36,6 +36,7 @@
       "test/a3-existing-visit-entry-context.test.ts",
       "test/a3-recovery-cost-comparison.test.ts",
       "test/a3-stay-replacement-context.test.ts",
+      "test/a4-cp4a-progression-closure.test.ts",
       "test/a3-target-fx.test.ts",
       "test/a3-sandbox-protected-documents.test.ts",
       "test/hotel-property-policy.test.ts",

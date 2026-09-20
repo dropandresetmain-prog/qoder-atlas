@@ -46,7 +46,7 @@ export const HotelPropertyPolicySchema = z.strictObject({
   standardCheckOut: z.string().regex(HH_MM),
   lateArrivalSupported: z.boolean().nullable(),
   effectiveWindow: DateIntervalSchema,
-  maxEvidenceAgeSeconds: z.number().int().positive().max(86_400),
+  maxEvidenceAgeSeconds: z.number().int().positive().max(1_209_600),
   sources: z.array(sourceRefSchema).min(1).max(16),
   note: z.string().trim().min(1).max(1024),
 }).superRefine((policy, context) => {

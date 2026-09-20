@@ -114,7 +114,10 @@ export const MaterialCandidateCostComparisonSchema = z.discriminatedUnion('statu
   z.strictObject({
     status: z.literal('AVAILABLE'),
     homeCurrency: CurrencyCodeSchema,
+    /** Maximum exposure (new spend + potential loss). Prefer the split fields for operator display. */
     totalHomeAmount: ExactMoneySchema,
+    newSpendHomeAmount: ExactMoneySchema.optional(),
+    potentialLossHomeAmount: ExactMoneySchema.optional(),
     lines: z.array(RecoveryCostLineEvidenceSchema).max(32),
     /** Full selected dated FX records, not opaque identifiers alone. */
     selectedFxEvidence: z.array(FxRateEvidenceSchema).max(32),
@@ -141,7 +144,10 @@ export const MaterialCandidateProposalSchema = z.strictObject({
     arrivalTimeZone: z.string().min(1).max(128).optional(),
   })).max(4).default([]),
   stays: z.array(z.strictObject({
+    /** Destination / geography place context for the stay window. */
     placeLabel: z.string().min(1).max(160),
+    /** Quoted/selected hotel property identity when provider evidence supplied it. */
+    propertyLabel: z.string().min(1).max(160).optional(),
     start: InstantSchema,
     end: InstantSchema,
     timeZone: z.string().min(1).max(128).optional(),
@@ -297,6 +303,13 @@ export type RecoveryPlanningResult = z.infer<typeof RecoveryPlanningResultSchema
 export interface RecoveryPlanningInput {
   recoveryCaseId: SubjectId;
   reason: RecoveryPlanningReason;
+  /**
+   * Optional planning clock for progressive demo/operator control.
+   * Boardability and evidence capture use this instant when supplied;
+   * otherwise the composed coordinator clock (or wall clock) applies.
+   * Never a scenario-named switch — any world may advance planning time.
+   */
+  now?: string;
 }
 
 /**

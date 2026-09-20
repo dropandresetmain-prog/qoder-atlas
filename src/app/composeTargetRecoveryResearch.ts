@@ -127,7 +127,9 @@ export async function composeTargetRecoveryResearch(input: {
     pool: input.pool, workspaceId: input.workspaceId, actorPrincipalId: input.actorPrincipalId,
     uow: input.uow, reviewerRef: { kind: 'PRINCIPAL', id: input.reviewerPrincipalId },
     hotelTransport: hotel.transport, officialDocuments, hotelPolicies, entryPolicies, configuration,
-    verificationClock: () => new Date().toISOString(),
+    // Publication/verification use the planning `now` supplied to prepare(). A
+    // wall-clock override makes coverage expire before progressive planningNow
+    // and loops STALE_RETRY / requirement_coverage_incomplete for overnight.
     jurisdictionCountryCode: async (jurisdictionId) => {
       // Country codes are explicitly bound to source jurisdiction identities in
       // reviewed configuration, never guessed from a jurisdiction name or UUID.

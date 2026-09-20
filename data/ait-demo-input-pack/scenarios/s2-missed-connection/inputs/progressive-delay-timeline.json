@@ -56,12 +56,14 @@
     {
       "id": "same_night_window_closing",
       "at": "2026-09-29T21:00:00+09:00",
-      "narrative": "Further delay / clock advance eliminates sensible same-night boarding; overnight Narita becomes necessary. Executable REPLAY cannot swap the orderReference-keyed state recording mid-run; overnight is asserted via planning time + traveller report + inventory roles."
+      "planningNow": "2026-09-29T21:00:00+09:00",
+      "narrative": "Further delay / clock advance eliminates sensible same-night boarding; overnight Narita becomes necessary. Boardability is evaluated against planning now (departure must be at or after now). Executable REPLAY cannot swap the orderReference-keyed state recording mid-run; overnight is asserted via planning time + traveller report + inventory roles."
     },
     {
       "id": "overnight_narita_necessary",
       "at": "2026-09-29T21:30:00+09:00",
-      "narrative": "Overnight transit hotel + JP entry/insurance context may apply. Reported morning TR885 remains whole-trip viable vs finals showcase 20:45 once checked; TR867 is the inadequate late alternative."
+      "planningNow": "2026-09-29T21:30:00+09:00",
+      "narrative": "Overnight transit hotel + JP entry/insurance context may apply. Reported morning TR885 remains whole-trip viable vs finals showcase 20:45 once checked; TR867 is the inadequate late alternative. Same-night evening inventory is no longer boardable under this planning now."
     },
     {
       "id": "D4_connection_missed",

@@ -25,6 +25,14 @@ export interface RecoveryCostLine {
 export interface RecoveryCostComparison {
   ok: true;
   homeCurrency: ExactMoney['currency'];
+  /** Confirmed new-purchase spend (replacement offers and stays only). */
+  newSpendHomeAmount: ExactMoney;
+  /** Maximum cancellation / policy loss exposure — not a confirmed new purchase. */
+  potentialLossHomeAmount: ExactMoney;
+  /**
+   * Maximum total exposure = new spend + potential loss.
+   * Do not present this alone as “cost”; prefer the split fields above.
+   */
   totalHomeAmount: ExactMoney;
   lines: readonly RecoveryCostLine[];
   selectedFxEvidence: readonly string[];
@@ -162,19 +170,39 @@ export function compareRecoveryCosts(input: {
     if (parsed.data.effectKind === 'SELECT_OFFER' && !cost) return unavailable('MISSING_EFFECT_PRICE', 'SELECT_OFFER has no captured offer price');
     if (cost) costs.push(cost);
   }
-  let totalHomeAmount: ExactMoney = { amount: '0', currency: input.homeCurrency };
+  let newSpendHomeAmount: ExactMoney = { amount: '0', currency: input.homeCurrency };
+  let potentialLossHomeAmount: ExactMoney = { amount: '0', currency: input.homeCurrency };
   const lines: RecoveryCostLine[] = [];
   const selectedFxEvidence: string[] = [];
   for (const cost of costs) {
     const converted = convertLine(cost.amount, input.homeCurrency, input.comparedAt, parsedRates);
     if (!converted.ok) return converted;
     try {
-      totalHomeAmount = addExactMoney(totalHomeAmount, converted.homeAmount);
+      if (cost.kind === 'POLICY_PENALTY_ESTIMATE') {
+        potentialLossHomeAmount = addExactMoney(potentialLossHomeAmount, converted.homeAmount);
+      } else {
+        newSpendHomeAmount = addExactMoney(newSpendHomeAmount, converted.homeAmount);
+      }
     } catch {
       return unavailable('UNSUPPORTED_MONEY_PRECISION', 'an amount exceeds the supported currency precision');
     }
     if (converted.fxEvidenceId && !selectedFxEvidence.includes(converted.fxEvidenceId)) selectedFxEvidence.push(converted.fxEvidenceId);
     lines.push({ kind: cost.kind, providerAmount: cost.amount, homeAmount: converted.homeAmount, ...(converted.fxEvidenceId ? { fxEvidenceId: converted.fxEvidenceId } : {}), observed: cost.observed });
   }
-  return { ok: true, homeCurrency: input.homeCurrency, totalHomeAmount, lines, selectedFxEvidence, comparedAt: input.comparedAt };
+  let totalHomeAmount: ExactMoney;
+  try {
+    totalHomeAmount = addExactMoney(newSpendHomeAmount, potentialLossHomeAmount);
+  } catch {
+    return unavailable('UNSUPPORTED_MONEY_PRECISION', 'an amount exceeds the supported currency precision');
+  }
+  return {
+    ok: true,
+    homeCurrency: input.homeCurrency,
+    newSpendHomeAmount,
+    potentialLossHomeAmount,
+    totalHomeAmount,
+    lines,
+    selectedFxEvidence,
+    comparedAt: input.comparedAt,
+  };
 }

@@ -10,7 +10,7 @@
     "standardCheckOut": "11:00",
     "lateArrivalSupported": null,
     "effectiveWindow": { "start": "2026-01-01", "end": "2027-01-01" },
-    "maxEvidenceAgeSeconds": 86400,
+    "maxEvidenceAgeSeconds": 1209600,
     "sources": [
       {
         "sourceId": "narita-gateway-faq",

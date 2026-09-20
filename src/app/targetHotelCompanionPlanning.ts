@@ -227,7 +227,12 @@ interface SearchBinding {
   request: PlanningToolRequest;
   replacement?: StayReplacementContext;
 }
-interface RateBinding extends SearchBinding { rate: HotelRateView; quoteRequestId: string; }
+interface RateBinding extends SearchBinding {
+  rate: HotelRateView;
+  quoteRequestId: string;
+  /** Provider property name from the search outcome that produced this rate. */
+  propertyName?: string;
+}
 interface ReplacementBinding {
   replacement: StayReplacementContext;
   contextRequest: PlanningToolRequest;
@@ -508,7 +513,13 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
         });
         const fingerprint = planningToolRequestFingerprint(request);
         if (seenFingerprints.has(fingerprint)) continue;
-        const rateBindings = bindings.map((binding) => ({ ...binding, rate, quoteRequestId: request.id }));
+        const propertyName = outcome.properties.find((property) => property.propertyId === rate.propertyId)?.name.trim();
+        const rateBindings = bindings.map((binding) => ({
+          ...binding,
+          rate,
+          quoteRequestId: request.id,
+          ...(propertyName && propertyName.length > 0 ? { propertyName: propertyName.slice(0, 160) } : {}),
+        }));
         const existing = quotes.get(fingerprint) ?? [];
         if (existing.some((binding) => !sameRate(binding.rate, rate))) continue;
         quotes.set(fingerprint, [...existing, ...rateBindings]);
@@ -547,6 +558,7 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
         const offer: ResolvedStayOffer = {
           offerId: stableId('stay-offer', JSON.stringify({ rateId: binding.rate.rateId, propertyId: binding.rate.propertyId, placeId: binding.context.placeId, stayWindow: binding.context.stayWindow, price: terms.price, searchRequestFingerprint: binding.fingerprint })),
           placeId: binding.context.placeId, stayWindow: binding.context.stayWindow, price: terms.price,
+          ...(binding.propertyName ? { propertyName: binding.propertyName } : {}),
         };
         quotedStays.push({
           baseCandidateKey: binding.context.baseCandidateKey, journeyId: binding.context.journeyId,

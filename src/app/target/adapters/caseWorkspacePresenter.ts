@@ -554,7 +554,13 @@ function proposalLines(proposal: MaterialCandidateProposal | undefined): string[
       const route = origin && destination ? ` (${origin} → ${destination})` : '';
       return `${flight.label}${route}: ${formatCaseWindowInstant(flight.departure, flight.departureTimeZone)} to ${formatCaseWindowInstant(flight.arrival, flight.arrivalTimeZone)}`;
     }),
-    ...proposal.stays.map((stay) => `Stay at ${stay.placeLabel}: ${formatCaseWindow(stay.start, stay.end, stay.timeZone)}`),
+    ...proposal.stays.map((stay) => {
+      const property = stay.propertyLabel ?? stay.placeLabel;
+      const placeNote = stay.propertyLabel && stay.propertyLabel !== stay.placeLabel
+        ? ` (place ${stay.placeLabel})`
+        : '';
+      return `Stay at ${property}${placeNote}: ${formatCaseWindow(stay.start, stay.end, stay.timeZone)}`;
+    }),
     ...proposal.entryResults.map((entry) => `${displayCode(entry.dimension)}: ${entry.verdict.toLowerCase()}${entry.reasonCodes.length ? ` (${entry.reasonCodes.map(displayCode).join(', ')})` : ''}`),
     ...proposal.blockers.map((blocker) => `${displayCode(blocker.dimension)}: ${blocker.verdict.toLowerCase()} (${displayCode(blocker.reasonCode)})${timingEvidence(blocker.timing)}`),
     ...programmeChecks.map((check) => {

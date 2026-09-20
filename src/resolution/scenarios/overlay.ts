@@ -41,6 +41,12 @@ export interface ResolvedStayOffer {
   placeId: string;
   stayWindow: { start: Instant; end: Instant };
   price: ExactMoney;
+  /**
+   * Provider property display name from hotel.search / quote evidence when known.
+   * Distinct from placeId geography — alternate-property search may quote a
+   * different hotel than the destination place label.
+   */
+  propertyName?: string;
 }
 
 export interface OverlayApplyInput {
@@ -290,6 +296,8 @@ function applyEffect(
       // facts from the captured offer, never a reservation, allocation, or
       // supplier-observed status. The overlay itself is the proposed-state
       // convention; PLANNED remains the canonical JourneyItem lifecycle shape.
+      // standaloneTitle carries the quoted property name when research supplied
+      // one so operators can distinguish property identity from place geography.
       world.journeyItems.push({
         id: effect.proposedJourneyItemId,
         journeyId: journey.id,
@@ -304,7 +312,7 @@ function applyEffect(
         intendedPlaceId: place.id,
         requiredNights,
         participationId: null,
-        standaloneTitle: null,
+        standaloneTitle: offer.propertyName?.trim() ? offer.propertyName.trim().slice(0, 160) : null,
         standaloneWindow: null,
         resourceId: null,
         intendedLocationPlaceId: null,

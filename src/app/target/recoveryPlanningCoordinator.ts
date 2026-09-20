@@ -282,7 +282,7 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
     planCaseDetailed(input: RecoveryPlanningInput): Promise<CoordinatorPlanOutcome>;
   } = {
     async planCaseDetailed(input: RecoveryPlanningInput): Promise<CoordinatorPlanOutcome> {
-      const now = deps.now ?? new Date().toISOString();
+      const now = input.now ?? deps.now ?? new Date().toISOString();
       const status = await caseStatus(deps.pool, deps.workspaceId, input.recoveryCaseId);
       if (!status) return { ok: false, error: applicationError('CASE_NOT_FOUND', `recovery case ${input.recoveryCaseId} does not exist`) };
       if (TERMINAL.has(status)) return { ok: false, error: applicationError('CASE_NOT_OPEN', `recovery case ${input.recoveryCaseId} is ${status}`) };

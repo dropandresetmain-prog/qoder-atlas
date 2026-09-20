@@ -21,6 +21,7 @@ import {
   type StayReplacementContext,
   type StayReplacementContextResolver,
 } from './targetHotelCompanionPlanning.ts';
+import { deterministicUuid, RUNTIME_ID_NAMESPACES } from './target/deterministicId.ts';
 import type { ResolvedOffer } from '../resolution/scenarios/overlay.ts';
 import type { CapturedWorld, WCredential, WCredentialVersion } from '../resolution/world/world.ts';
 import { projectEffectiveWorld } from '../resolution/world/effectiveItinerary.ts';
@@ -259,7 +260,10 @@ export function createStayReplacementContextResolver(binding: StayReplacementBin
       rooms: binding.guests.rooms,
       guestNationality: binding.passport.guestNationality,
     };
-    const proposedJourneyItemId = stableId('stay-replacement', `${candidate.key}|${old.id}|${binding.reservationLineId}|${selectedService.id}`);
+    const proposedJourneyItemId = deterministicUuid(
+      RUNTIME_ID_NAMESPACES.planning,
+      `stay-replacement|${candidate.key}|${old.id}|${binding.reservationLineId}|${selectedService.id}`,
+    );
     // The final replacement candidate cancels the old item before adding this one.
     // Refuse a pre-existing same-order peer so the overlay cannot create an ambiguous order.
     if (world.journeyItems.some((item) => item.id !== old.id && item.journeyId === journey.id

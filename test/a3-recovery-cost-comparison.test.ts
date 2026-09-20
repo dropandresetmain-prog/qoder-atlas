@@ -31,6 +31,8 @@ test('compares flight, stays, and policy penalty in exact home currency while pr
   assert.equal(result.ok, true);
   if (!result.ok) return;
   assert.deepEqual(result.totalHomeAmount, { amount: '945.00', currency: 'SGD' });
+  assert.deepEqual(result.newSpendHomeAmount, { amount: '860.00', currency: 'SGD' });
+  assert.deepEqual(result.potentialLossHomeAmount, { amount: '85.00', currency: 'SGD' });
   assert.deepEqual(result.lines.map((line) => line.homeAmount), [
     { amount: '135.00', currency: 'SGD' },
     { amount: '290.00', currency: 'SGD' },

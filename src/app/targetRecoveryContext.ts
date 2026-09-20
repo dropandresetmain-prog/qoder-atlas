@@ -229,6 +229,8 @@ export class TargetRecoveryContextPreparer {
   private readonly deps: TargetRecoveryContextDeps;
   private readonly documentCache = new Map<string, { evidence: OfficialDocumentEvidence; maxAgeSeconds: number; mode: PlanningToolProvenanceMode }>();
   private readonly publicationCache = new Map<string, string>();
+  /** In-process keys already published successfully — never republish in this boot. */
+  private readonly publishedPublicationKeys = new Set<string>();
 
   constructor(deps: TargetRecoveryContextDeps) {
     this.deps = deps;
@@ -263,12 +265,17 @@ export class TargetRecoveryContextPreparer {
     return result.rows.length === 1 && result.rows[0]!.nationality === configured;
   }
 
-  private async readDocuments(sourceIds: readonly string[], maxAgeSeconds: number, now: string): Promise<{ documents: OfficialDocumentEvidence[]; mode: PlanningToolProvenanceMode } | undefined> {
+  private async readDocuments(sourceIds: readonly string[], maxAgeSeconds: number, _now: string): Promise<{ documents: OfficialDocumentEvidence[]; mode: PlanningToolProvenanceMode } | undefined> {
     const documents: OfficialDocumentEvidence[] = [];
     let mode: PlanningToolProvenanceMode = 'REPLAY';
     for (const sourceId of sourceIds) {
       const cached = this.documentCache.get(sourceId);
-      if (cached && Date.parse(cached.evidence.observedAt) + cached.maxAgeSeconds * 1000 > Date.parse(now)) {
+      // Reuse process-stable evidence once read. Freshness for publication is
+      // enforced by verifyReviewedEntryEvidence against verificationClock/now.
+      // Re-reading when planning `now` is ahead of wall-observed evidence would
+      // mint new RECORD observedAt values, change publication digests, and loop
+      // prepare → SCOPE_ADVANCED → STALE_RETRY forever.
+      if (cached) {
         documents.push(cached.evidence);
         mode = cached.mode;
         continue;
@@ -422,7 +429,8 @@ export class TargetRecoveryContextPreparer {
       const publicationKey = `${target.visitId}|${target.entryPolicy.id}|${target.passport.guestNationality}|${documents.documents.map((document) => `${document.sourceId}:${document.contentSha256}:${document.observedAt}`).sort().join(',')}`;
       const publicationNow = this.deps.verificationClock?.() ?? input.now;
       const cachedPublicationExpiry = this.publicationCache.get(publicationKey);
-      if (!cachedPublicationExpiry || Date.parse(cachedPublicationExpiry) <= Date.parse(publicationNow)) {
+      const alreadyPublished = this.publishedPublicationKeys.has(publicationKey);
+      if (!alreadyPublished && (!cachedPublicationExpiry || Date.parse(cachedPublicationExpiry) <= Date.parse(publicationNow))) {
         const publication = await publishReviewedEntryKnowledge({
           pool: this.deps.pool, workspaceId: this.deps.workspaceId, actorPrincipalId: this.deps.actorPrincipalId,
           reviewerRef: this.deps.reviewerRef, uow: this.deps.uow,
@@ -445,6 +453,9 @@ export class TargetRecoveryContextPreparer {
           continue;
         }
         this.publicationCache.set(publicationKey, publication.expiresAt);
+        this.publishedPublicationKeys.add(publicationKey);
+      } else if (cachedPublicationExpiry) {
+        this.publishedPublicationKeys.add(publicationKey);
       }
       evidence.push(evidenceRecord('research.entry_requirements', evidenceRef, documents.documents, documents.mode, `Verified reviewed entry policy ${target.entryPolicy.id} for the configured existing visit.`, target.entryPolicy.operationalNotes));
     }
@@ -508,13 +519,17 @@ export class TargetRecoveryContextPreparer {
         const publicationKey = `${proposedVisitId}|${target.entryPolicy.id}|${targetSelection.guestNationality}|${entryDocs.documents.map((document) => `${document.sourceId}:${document.contentSha256}:${document.observedAt}`).sort().join(',')}`;
         const cachedPublicationExpiry = this.publicationCache.get(publicationKey);
         const publicationNow = this.deps.verificationClock?.() ?? input.now;
-        if (!cachedPublicationExpiry || Date.parse(cachedPublicationExpiry) <= Date.parse(publicationNow)) {
+        const alreadyPublished = this.publishedPublicationKeys.has(publicationKey);
+        if (!alreadyPublished && (!cachedPublicationExpiry || Date.parse(cachedPublicationExpiry) <= Date.parse(publicationNow))) {
           const publication = await publishReviewedEntryKnowledge({ pool: this.deps.pool, workspaceId: this.deps.workspaceId, actorPrincipalId: this.deps.actorPrincipalId, reviewerRef: this.deps.reviewerRef, uow: this.deps.uow }, {
             policy: target.entryPolicy, actualOfficialDocumentEvidence: entryDocs.documents, now: publicationNow,
             context: { journeyId: corridor.journeyId, visitId: proposedVisitId, jurisdictionId: target.jurisdictionId, countryCode: target.config.countryCode, purpose: 'transit_overnight', nationalityCode: targetSelection.guestNationality, visitWindow: window.stayWindow },
           });
           if (!publication.ok) continue;
           this.publicationCache.set(publicationKey, publication.expiresAt);
+          this.publishedPublicationKeys.add(publicationKey);
+        } else if (cachedPublicationExpiry) {
+          this.publishedPublicationKeys.add(publicationKey);
         }
         const provenance: PlanningToolProvenance = { mode: hotelDocs.mode, observedAt: window.sourceProvenance.reduce((latest, source) => Date.parse(source.observedAt) > Date.parse(latest) ? source.observedAt : latest, window.sourceProvenance[0]!.observedAt), sourceRefs: window.sourceProvenance.map((source) => source.sourceId) };
         prepared.push({ target, journeyId: corridor.journeyId, corridorJourneyItemId: corridor.journeyItemId, upstreamJourneyItemId: recovery.upstreamJourneyItemId, anchorDate, checkOutDate, stayWindow: window.stayWindow, proposedJourneyItemId, proposedVisitId, proposedSelectionId, credentialId: credential.id, credentialVersionId: version.id, guestNationality: targetSelection.guestNationality, provenance });

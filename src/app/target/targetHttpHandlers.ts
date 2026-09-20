@@ -415,7 +415,12 @@ export async function handleTargetProductHttp(
         sendJson(res, 503, { ok: false, error: { code: 'PLANNER_NOT_COMPOSED', message: 'planning coordinator is not composed in this runtime', mutatesState: false } });
         return true;
       }
-      const outcome = await planner.planCaseDetailed({ recoveryCaseId: caseId as never, reason: 'OPERATOR_REQUEST' });
+      const body = (await readJson(req).catch(() => ({}))) as { now?: unknown };
+      const outcome = await planner.planCaseDetailed({
+        recoveryCaseId: caseId as never,
+        reason: 'OPERATOR_REQUEST',
+        ...(typeof body.now === 'string' && body.now.trim().length > 0 ? { now: body.now } : {}),
+      });
       if (!outcome.ok) {
         const status = outcome.error.code === 'CASE_NOT_FOUND' ? 404 : 409;
         sendJson(res, status, { ok: false, error: outcome.error });

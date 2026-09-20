@@ -117,8 +117,14 @@ function proposalHtml(candidate: PlanningCandidateView | undefined): string {
   const flights = p.flights.map((flight) => `<article><p class="cw-kicker">Flight · proposed — not yet applied</p><h4>${e(decisionText(flight.label, 'Replacement flight'))}</h4>
     ${flight.originLabel || flight.destinationLabel ? `<p>${e(decisionText(flight.originLabel, 'Origin not supplied'))} → ${e(decisionText(flight.destinationLabel, 'Destination not supplied'))}</p>` : ''}
     <dl class="cw-times"><div><dt>Depart</dt><dd>${e(decisionTime(flight.departure, flight.departureTimeZone))}</dd></div><div><dt>Arrive</dt><dd>${e(decisionTime(flight.arrival, flight.arrivalTimeZone))}</dd></div></dl></article>`).join('');
-  const stays = p.stays.map((stay) => `<article><p class="cw-kicker">Accommodation · proposed — not yet applied</p><h4>${e(decisionText(stay.placeLabel, 'Property not supplied'))}</h4>
-    <p>${e(decisionTime(stay.start, stay.timeZone))} → ${e(decisionTime(stay.end, stay.timeZone))}</p></article>`).join('');
+  const stays = p.stays.map((stay) => {
+    const property = stay.propertyLabel ?? stay.placeLabel;
+    const placeContext = stay.propertyLabel && stay.propertyLabel !== stay.placeLabel
+      ? `<p class="cw-muted">Place context: ${e(stay.placeLabel)}</p>`
+      : '';
+    return `<article><p class="cw-kicker">Accommodation · proposed — not yet applied</p><h4>${e(decisionText(property, 'Property not supplied'))}</h4>
+    ${placeContext}<p>${e(decisionTime(stay.start, stay.timeZone))} → ${e(decisionTime(stay.end, stay.timeZone))}</p></article>`;
+  }).join('');
   const checks = p.programmeChecks ?? [];
   const primaryChecks = checks.filter((c) => c.verdict !== 'PASS');
   primaryChecks.push(...checks.filter((c) => c.verdict === 'PASS').slice(0, Math.max(0, 3 - primaryChecks.length)));

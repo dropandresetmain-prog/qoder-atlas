@@ -58,6 +58,9 @@ async function visitInput(
 ): Promise<ApprovedVisitInput | undefined> {
   const visit = quote.context.visit;
   if (visit.kind === 'EXISTING') {
+    // Visit scope lives on credential_selection_visits (0025), not a JSON/array
+    // column on credential_selections. Aggregate the association table the same
+    // way journey reads do — never invent a duplicate storage field.
     const selection = (
       await db.query<{
         id: string;
@@ -65,10 +68,19 @@ async function visitInput(
         credential_version_id: string;
         scope_intended_visit_ids: string[];
       }>(
-        `SELECT id, credential_id, credential_version_id, scope_intended_visit_ids
-           FROM credential_selections
-          WHERE workspace_id = $1 AND journey_id = $2 AND $3::uuid = ANY(scope_intended_visit_ids)
-          ORDER BY id LIMIT 1`,
+        `SELECT s.id, s.credential_id, s.credential_version_id,
+                COALESCE(
+                  array_agg(v.intended_visit_id ORDER BY v.intended_visit_id)
+                    FILTER (WHERE v.intended_visit_id IS NOT NULL),
+                  '{}'::uuid[]
+                ) AS scope_intended_visit_ids
+           FROM credential_selections s
+           INNER JOIN credential_selection_visits v
+             ON v.workspace_id = s.workspace_id AND v.selection_id = s.id
+          WHERE s.workspace_id = $1 AND s.journey_id = $2 AND v.intended_visit_id = $3::uuid
+          GROUP BY s.workspace_id, s.id, s.credential_id, s.credential_version_id
+          ORDER BY s.id
+          LIMIT 1`,
         [workspaceId, quote.journeyId, visit.visitId],
       )
     ).rows[0];
