@@ -286,7 +286,32 @@ export function projectFocusedCaseGraphEnrichment(
     if (!seenEdgeIds.has(edge.id)) {
       seenEdgeIds.add(edge.id);
       edges.push(edge);
+      return;
     }
+    // Topology edges are emitted first without a condition. A later evaluator
+    // explanation may annotate the same producer-owned id with relationship
+    // truth (AFFECTED / FAILED) without inventing a second edge.
+    if (edge.semanticState) {
+      const index = edges.findIndex((candidate) => candidate.id === edge.id);
+      if (index >= 0 && edges[index] && !edges[index]!.semanticState) {
+        edges[index] = { ...edges[index]!, semanticState: edge.semanticState };
+      }
+    }
+  };
+  /**
+   * Connection relationship colour comes from the evaluator reason, not from
+   * endpoint tones. A delayed arrival stays CHANGED; the connection itself is
+   * AFFECTED when merely below minimum, FAILED when broken/impossible.
+   */
+  const connectionRelationshipState = (
+    step: NonNullable<FocusedCaseGraphEnrichmentInput['causalPath']>[number],
+  ): LdgSemanticState | undefined => {
+    if (step.dimension !== 'connection_feasibility') return undefined;
+    const gap = typeof step.facts.gapMinutes === 'number' ? step.facts.gapMinutes : undefined;
+    if (step.reasonCode === 'connection_broken' || (gap !== undefined && gap < 0)) return 'FAILED';
+    if (step.reasonCode === 'connection_below_minimum') return 'AFFECTED';
+    if (step.reasonCode === 'transfer_does_not_fit') return gap !== undefined && gap < 0 ? 'FAILED' : 'AFFECTED';
+    return undefined;
   };
   const assessmentFor = (ref: string): SubjectAssessmentView | undefined => input.assessmentViews.get(ref);
   const stateFor = (ref: string): { semanticState: LdgSemanticState; evaluation?: AssessmentViewStatus } => {
@@ -535,6 +560,46 @@ export function projectFocusedCaseGraphEnrichment(
         toRef: itemRef,
         kind: 'RELIES_ON',
         authority: 'AUTHORITATIVE',
+      });
+    }
+  }
+
+  // Connection feasibility owns the relationship between the delayed arrival
+  // and the onward booking. Annotate that producer-owned edge (and, when a
+  // timing node exists, the arrival→onward edge) so definitive failure is red
+  // while a merely tight connection stays amber/watch — without painting the
+  // delayed arrival itself FAILED.
+  for (const step of input.causalPath ?? []) {
+    const relationshipState = connectionRelationshipState(step);
+    if (!relationshipState) continue;
+    const relatedItemIds = step.relatedSubjectRefs
+      .filter((ref) => ref.startsWith('JOURNEY_ITEM:'))
+      .map((ref) => ref.slice('JOURNEY_ITEM:'.length));
+    if (relatedItemIds.length < 2) continue;
+    const upstreamItemId = relatedItemIds[0]!;
+    const downstreamItemId = relatedItemIds[1]!;
+    const upstreamItem = input.journeyItems.find((item) => item.id === upstreamItemId);
+    const downstreamItem = input.journeyItems.find((item) => item.id === downstreamItemId);
+    if (!upstreamItem?.selectedServiceId || !downstreamItem?.selectedServiceId) continue;
+    const upstreamBooking = `SERVICE_BOOKING:${upstreamItem.selectedServiceId}`;
+    const downstreamBooking = `SERVICE_BOOKING:${downstreamItem.selectedServiceId}`;
+    pushEdge({
+      id: `MUST_HAPPEN_BEFORE:${upstreamBooking}:${downstreamBooking}`,
+      fromRef: upstreamBooking,
+      toRef: downstreamBooking,
+      kind: 'MUST_HAPPEN_BEFORE',
+      authority: 'AUTHORITATIVE',
+      semanticState: relationshipState,
+    });
+    const timingRef = timingRefByJourneyItem.get(upstreamItemId);
+    if (timingRef) {
+      pushEdge({
+        id: `MUST_HAPPEN_BEFORE:${timingRef}:${downstreamBooking}`,
+        fromRef: timingRef,
+        toRef: downstreamBooking,
+        kind: 'MUST_HAPPEN_BEFORE',
+        authority: 'AUTHORITATIVE',
+        semanticState: relationshipState,
       });
     }
   }

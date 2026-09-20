@@ -90,10 +90,10 @@ function moneySummaryHtml(candidate: PlanningCandidateView | undefined): string 
     ? ' · up to (source maximum)'
     : ' · estimate';
   return `<div class="cw-metrics" data-test="cost-separated">
-    <div class="cw-metric"><small>Estimated new spend · home currency</small><strong>${e(cost.newSpend?.join(' + ') ?? 'Not supplied')}</strong></div>
-    <div class="cw-metric"><small>Potential cancellation loss${exposureNote}</small><strong>${e(cost.potentialLoss?.join(' + ') ?? 'Not supplied')}</strong></div>
+    <div class="cw-metric cw-metric-spend" data-test="cost-new-spend"><small>NEW SPEND</small><strong>${e(cost.newSpend?.join(' + ') ?? 'Not supplied')}</strong><span class="cw-metric-note">Proposed expenditure · home currency</span></div>
+    <div class="cw-metric cw-metric-exposure" data-test="cost-potential-loss"><small>POTENTIAL DISPLACED-BOOKING LOSS</small><strong>${e(cost.potentialLoss?.join(' + ') ?? 'Not supplied')}</strong><span class="cw-metric-note">Not a confirmed charge${exposureNote}</span></div>
   </div>
-  ${cost.providerSpend ? `<p class="cw-muted">Original currency: ${e(cost.providerSpend.join(' + '))}.</p>` : ''}`;
+  ${cost.providerSpend ? `<p class="cw-muted">Original provider currency: ${e(cost.providerSpend.join(' + '))}.</p>` : ''}`;
 }
 
 function costBreakdownHtml(candidate: PlanningCandidateView | undefined, key: string): string {
@@ -332,8 +332,8 @@ export function renderProductRecoveryCase(view: RecoveryCaseView): string {
   return `${OPERATOR_WORKSPACE_STYLES}<main class="shell product-recovery-case case-workspace" data-test="product-recovery-case" ${attrs}>
     ${region('header', headerHtml(m))}
     ${region('lead', leadHtml(view, m))}
-    ${region('affects', affectsHtml(m))}
     ${region('graph', graphHtml(view, m))}
+    ${region('affects', affectsHtml(m))}
     <div class="case-decision-grid">
       <div class="case-decision-main">
         ${region('options', optionsRegion)}

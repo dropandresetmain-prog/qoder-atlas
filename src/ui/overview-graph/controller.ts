@@ -25,12 +25,24 @@ export const OVERVIEW_GRAPH_SCRIPT = `
     canvas.__ogInit = true;
     var key = canvas.getAttribute('data-og-key') || 'overview';
     var active = canvas.getAttribute('data-og-active') === 'true';
+    var focusIdentity = canvas.getAttribute('data-og-focus-id') || '';
     var saved = store[key];
     if (saved && saved.release) saved.release();
-    var st = saved || { x: 0, y: 0, scale: 1, expanded: false, view: active ? 'change' : 'event', selected: null, fitted: false, mode: 'auto', explicitView: false };
+    var st = saved || { x: 0, y: 0, scale: 1, expanded: false, view: active ? 'change' : 'event', selected: null, fitted: false, mode: 'auto', explicitView: false, wasActive: false, focusIdentity: '' };
     store[key] = st;
     var homeBox = parseBox(canvas.getAttribute('data-og-home'));
     var incidentBox = parseBox(canvas.getAttribute('data-og-incident'));
+    // New active incident may reframe automatically. Updates to the same
+    // incident, and any manual/explicit camera choice, keep the operator's view.
+    var becameActive = active && !st.wasActive;
+    var focusChanged = active && focusIdentity !== '' && focusIdentity !== st.focusIdentity;
+    st.wasActive = active;
+    st.focusIdentity = focusIdentity;
+    if ((becameActive || focusChanged) && st.mode !== 'manual' && !st.explicitView) {
+      st.mode = 'auto';
+      st.fitted = false;
+      st.view = 'change';
+    }
     var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var nodes = Array.prototype.slice.call(canvas.querySelectorAll('[data-og-node]'));
     var edges = Array.prototype.slice.call(canvas.querySelectorAll('.og-edge'));

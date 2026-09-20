@@ -69,6 +69,13 @@ test('Overview case navigation dominates and the full searchable population rema
   assert.equal((html.match(/data-test="population-row"[^>]*data-journey-ref=/g) ?? []).length, 12);
   assert.equal((html.match(/data-test="population-row" hidden[^>]*data-journey-ref=/g) ?? []).length, 2);
   assert.ok(html.indexOf('data-poll-region="overview-attention"') < html.indexOf('data-test="simulated-airline-update"'));
+  const graphAt = html.indexOf('data-test="event-overview-graph"');
+  const attentionAt = html.indexOf('data-poll-region="overview-attention"');
+  const summaryAt = html.indexOf('data-poll-region="overview-summary"');
+  if (graphAt >= 0) {
+    assert.ok(summaryAt >= 0 && summaryAt < graphAt, 'readiness summary must precede the event graph');
+    assert.ok(graphAt < attentionAt, 'event graph must precede Needs attention');
+  }
   assert.match(html, /data-test="overview-readiness"/);
   assert.match(html, /data-test="product-summary-tiles"/);
   assert.match(html, /data-test="decisions-needed"/);
@@ -184,6 +191,11 @@ test('exact price totals keep expenditure, provider currency and potential loss 
   assert.equal(decisionCosts(undefined).unavailable?.includes('free'), true);
   const html = renderProductRecoveryCase(view());
   assert.match(html, /data-test="cost-separated"/);
+  assert.match(html, /data-test="cost-new-spend"/);
+  assert.match(html, /NEW SPEND/);
+  assert.match(html, /data-test="cost-potential-loss"/);
+  assert.match(html, /POTENTIAL DISPLACED-BOOKING LOSS/);
+  assert.match(html, /Not a confirmed charge/);
   assert.match(html, /Published reference feed/);
   assert.match(html, /data-region-key="cost-evidence-selected"/);
 });
@@ -240,6 +252,8 @@ test('polling regions, immutable Original, graph and layout order remain compose
     assert.equal((html.match(new RegExp(`data-poll-region="${name}"`, 'g')) ?? []).length, 1, name);
   }
   const body = html.slice(html.indexOf('<main'));
+  assert.ok(body.indexOf('data-poll-region="lead"') < body.indexOf('data-poll-region="graph"'));
+  assert.ok(body.indexOf('data-poll-region="graph"') < body.indexOf('data-poll-region="affects"'));
   assert.ok(body.indexOf('data-poll-region="graph"') < body.indexOf('case-decision-grid'));
   assert.ok(body.indexOf('case-decision-grid') < body.indexOf('data-poll-region="alternatives"'));
   assert.match(html, /data-test="original-current-toggle"/);

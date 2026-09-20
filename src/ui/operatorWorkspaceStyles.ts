@@ -33,8 +33,12 @@ export const OPERATOR_WORKSPACE_STYLES = `<style data-operator-workspace-styles>
 .case-workspace .cw-compact-list li { margin: 6px 0; }
 .case-workspace .cw-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .case-workspace .cw-metric { padding: 12px; border: 1px solid var(--line-soft); border-radius: 10px; }
-.case-workspace .cw-metric small { display: block; color: var(--text-soft); font-size: 12px; }
-.case-workspace .cw-metric strong { display: block; font-size: 19px; font-variant-numeric: tabular-nums; }
+.case-workspace .cw-metric small { display: block; color: var(--text-soft); font-size: 11px; font-weight: 800; letter-spacing: 0.06em; }
+.case-workspace .cw-metric strong { display: block; font-size: 19px; font-variant-numeric: tabular-nums; margin-top: 4px; }
+.case-workspace .cw-metric-note { display: block; margin-top: 6px; color: var(--text-soft); font-size: 12px; line-height: 1.35; }
+.case-workspace .cw-metric-spend { border-color: var(--ok-border, #b7d9c8); background: var(--ok-bg, #f3faf6); }
+.case-workspace .cw-metric-exposure { border-style: dashed; border-color: var(--watch-border, #edc477); background: var(--watch-bg, #fff8ea); }
+.case-workspace .cw-metric-exposure strong { color: var(--watch, #a56800); }
 .case-workspace .cw-cost-table, .case-workspace .cw-research-table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 13px; }
 .case-workspace .cw-cost-table th, .case-workspace .cw-cost-table td,
 .case-workspace .cw-research-table th, .case-workspace .cw-research-table td { padding: 9px 5px; border-bottom: 1px solid var(--line-soft); text-align: left; vertical-align: top; }

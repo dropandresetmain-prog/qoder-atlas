@@ -69,6 +69,12 @@ describe('R2 Case workspace composition', () => {
     assert.match(html, /data-test="focused-case-graph-section"/);
     assert.match(html, /data-test="focused-case-graph"/);
     assert.match(html, /How the trip is affected/);
+    assert.ok(
+      html.indexOf('data-test="focused-case-graph-section"')
+        < html.indexOf('data-test="case-affects"')
+        || html.indexOf('data-test="case-affects"') < 0,
+      'graph must render above the affects block when both are present',
+    );
   });
 
   test('carries the change-awareness attributes the polling contract requires', () => {

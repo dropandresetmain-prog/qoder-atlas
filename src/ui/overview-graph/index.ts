@@ -86,6 +86,7 @@ export function renderEventOverviewGraph(view: OperatorOverview): string {
     'data-og-canvas',
     'data-og-key="overview"',
     `data-og-active="${model.active ? 'true' : 'false'}"`,
+    focus ? `data-og-focus-id="${escapeHtml(focus.incidentIds.join('|'))}"` : '',
     `data-og-home="${boxAttr(layout.home)}"`,
     layout.incident ? `data-og-incident="${boxAttr(layout.incident)}"` : '',
   ].filter(Boolean).join(' ');

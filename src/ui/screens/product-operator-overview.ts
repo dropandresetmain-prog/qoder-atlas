@@ -17,10 +17,10 @@ export function renderProductOperatorOverview(view: OperatorOverview): string {
     <p class="meta">Generated ${escapeHtml(formatInstant(view.generatedAt))}</p>
     <p class="sub" data-test="overview-reconciling"${lifecycle.state === 'RECONCILING' ? '' : ' hidden'}>Reconciling changes…</p></div>
   <div data-poll-region="overview-summary">${surface.summaryHtml}</div>
+  ${renderOverviewGraphAssets()}${renderEventOverviewGraph(view)}
   <section class="section" aria-label="Needs attention" data-poll-region="overview-attention">
     <h2>Needs attention <span class="count${surface.attentionCount > 0 ? ' c-alert' : ''}">${surface.attentionCount}</span></h2>
     ${surface.attentionHtml}</section>
-  ${renderOverviewGraphAssets()}${renderEventOverviewGraph(view)}
   <section class="section" aria-label="All participants" data-poll-region="overview-roster">
     <h2>All participants <span class="count">${overviewCountedTotal(view)}</span></h2>${surface.rosterHtml}</section>
   <details class="section" data-test="simulated-airline-update" data-region-key="simulated-airline-update" data-configured="${airlineConfigured ? 'true' : 'false'}">
