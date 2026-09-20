@@ -4,6 +4,7 @@
  * fresh for the bounded policy window. This module proves provenance and
  * scope; it never publishes coverage or decides legal feasibility.
  */
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { SubjectIdSchema } from '../../domain/v2/shared/identity.ts';
 import {
@@ -237,7 +238,9 @@ export function verifyReviewedEntryEvidence(
     if (matches.length === 0) return failure('missing_source_evidence');
     if (matches.length !== 1) return failure('duplicate_source_evidence');
     const document = matches[0]!;
-    if (document.url !== source.url || document.publisher !== source.publisher || document.contentSha256 !== source.contentSha256) {
+    const actualHash = createHash('sha256').update(document.text, 'utf8').digest('hex');
+    if (document.url !== source.url || document.publisher !== source.publisher
+      || document.contentSha256 !== source.contentSha256 || actualHash !== document.contentSha256) {
       return failure('source_provenance_mismatch');
     }
     const observed = Date.parse(document.observedAt);

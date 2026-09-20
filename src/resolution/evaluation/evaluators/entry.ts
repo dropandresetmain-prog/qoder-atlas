@@ -152,6 +152,8 @@ export interface CoverageCheck {
 export interface CoverageContext {
   journeyId: string;
   visitId: string | null;
+  purpose?: string | null;
+  visitWindow?: { start: Instant | null; end: Instant | null };
 }
 
 function validCoverageScopeId(value: unknown): value is string {
@@ -162,10 +164,24 @@ function coverageMatchesContext(coverage: WCoverage, context: CoverageContext | 
   const bounds = coverage.queryBounds;
   const hasJourneyScope = Object.prototype.hasOwnProperty.call(bounds, 'journeyId');
   const hasVisitScope = Object.prototype.hasOwnProperty.call(bounds, 'visitId');
-  if (!hasJourneyScope && !hasVisitScope) return true;
+  const hasPurposeScope = Object.prototype.hasOwnProperty.call(bounds, 'purpose');
+  const hasWindowScope = Object.prototype.hasOwnProperty.call(bounds, 'visitWindow');
+  if (!hasJourneyScope && !hasVisitScope && !hasPurposeScope && !hasWindowScope) return true;
   if (!context) return false;
   if (hasJourneyScope && (!validCoverageScopeId(bounds.journeyId) || !validCoverageScopeId(context.journeyId) || bounds.journeyId !== context.journeyId)) return false;
   if (hasVisitScope && (!validCoverageScopeId(bounds.visitId) || !validCoverageScopeId(context.visitId) || bounds.visitId !== context.visitId)) return false;
+  if (hasPurposeScope && (!validCoverageScopeId(bounds.purpose) || bounds.purpose !== context.purpose)) return false;
+  if (hasWindowScope) {
+    const bound = bounds.visitWindow;
+    if (!bound || typeof bound !== 'object' || Array.isArray(bound)) return false;
+    const window = bound as Record<string, unknown>;
+    const expectedStart = typeof window.start === 'string' ? Date.parse(window.start) : NaN;
+    const expectedEnd = typeof window.end === 'string' ? Date.parse(window.end) : NaN;
+    const actualStart = context.visitWindow?.start ? Date.parse(context.visitWindow.start) : NaN;
+    const actualEnd = context.visitWindow?.end ? Date.parse(context.visitWindow.end) : NaN;
+    if (!Number.isFinite(expectedStart) || !Number.isFinite(expectedEnd) || expectedEnd <= expectedStart
+      || expectedStart !== actualStart || expectedEnd !== actualEnd) return false;
+  }
   return true;
 }
 
@@ -242,7 +258,9 @@ function evaluateEncounter(world: CapturedWorld, now: Instant, journey: WJourney
   const lookup = requirementsFor(world, journey, e.kind, e.jurisdictionId, e.at);
   boundaries.push(...lookup.boundaries);
   const topic = TOPIC[e.kind];
-  const coverage = coverageFor(world, topic, e.jurisdictionId, now, { journeyId: journey.id, visitId: e.visitId });
+  const coverage = coverageFor(world, topic, e.jurisdictionId, now, {
+    journeyId: journey.id, visitId: e.visitId, purpose: e.purpose, visitWindow: { start: e.at, end: e.exit },
+  });
   for (const c of coverage.records) boundaries.push(c.expiresAt);
   const jurisdictionSubject: TypedRef = { kind: 'JURISDICTION', id: e.jurisdictionId };
 
@@ -352,7 +370,7 @@ function evaluate(subject: TypedRef, { now, world, effective }: EvaluationContex
 
 export const entryEvaluator: Evaluator = {
   id: ENTRY_EVALUATOR_ID,
-  version: '2',
+  version: '3',
   assessmentKind: 'ENTRY',
   subjectKinds: ['JOURNEY'],
   dimensions: [DIMENSION.ENTRY, DIMENSION.TRANSIT],

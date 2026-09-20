@@ -238,3 +238,26 @@ hotel/entry composition and atomic observed stay creation are still required bef
 Act Now: finish these normal composition seams. Park for Later: importer atomicity and
 unrelated hotel/immigration breadth. Focused/adjacent signals and direct PG proof are reused;
 no new broad gate was run. The A2 server still runs its accepted source and retains its audit.
+
+## Bounded entry publication and synthetic inputs
+
+**WHAT WE KNOW:** entry evaluation needs durable reviewed requirements, scoped coverage and
+an explicitly selected passport edition. Existing protected references have no content resolver.
+**WHAT WE DO NOT KNOW:** the final composed recommendation and selected provider outcomes.
+**KEY ASSUMPTION:** finish the existing minimal seams; do not build a document or legal platform.
+**WHAT SHOULD BE TESTED NEXT:** wire the approved synthetic input and source context into normal
+planning, then prove one whole-trip recommendation before adding execution.
+
+Act Now: entry publication uses existing M5 commands, binds the Journey/visit/purpose/window,
+and publishes COMPLETE coverage last. Interrupted prefixes remain incomplete and retry safely.
+The caller must publish before capturing the final planning basis, never pretend an older
+snapshot is current. Retrieved text is hashed independently against the reviewed digest.
+Changed purpose or visit dates invalidate scoped coverage; entry evaluator edition advances to3.
+This is researched visa/passport eligibility, not an observed guarantee of individual admission.
+Focused59 and direct PG1/1 prove the current seam, including final-command failure/retry.
+
+Act Now: the actively completed synthetic document lane encrypts only explicit NOT-VALID-FOR-
+TRAVEL markers in PostgreSQL, under sandbox-only guards and a supplied key. No production
+passport custody, document UI, key-management platform or arbitrary plaintext ingestion.
+Park all expansion beyond required evaluator/provisioner inputs. The hard scope lock in
+ASTRA_HERO_DEPTH_SCOPE.md governs remaining Singapore cancellation/rebooking and FX work.

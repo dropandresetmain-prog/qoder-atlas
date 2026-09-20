@@ -18,8 +18,8 @@ sandbox operations. Unsupported transaction seams are disclosed, never simulated
 Sarah may correctly choose programme recovery; separate transport proof stays separate.
 
 Jordan includes replacement flight, Narita overnight hotel, authoritative entry/landside
-feasibility from traveller/country/context inputs, Singapore stay consequences and
-modification/cancellation/rebooking where selected recovery requires it, material transfer
+feasibility from traveller/country/context inputs, required Singapore stay cancellation
+and replacement booking, material transfer
 consequences, finals viability, and insurance reasoning where evidence exists. Entry
 sources retain provenance, freshness and uncertainty. No general immigration platform.
 
@@ -80,3 +80,35 @@ providers from composition to authoritative inputs, planning use and protected e
 
 No application branches on traveller/scenario/event/provider fixture identity. No blind
 redispatch after unknown provider outcomes. Provider success alone never means trip recovery.
+
+## Hard scope lock — supersedes earlier conditional Singapore scope
+
+A0/A1/A2 are accepted. A3 closes at ONE physically visible, normal PostgreSQL composite
+recommendation using LIVE Qwen, Atlas, Nuitée, bounded configured Japan entry sources and
+required FX. A4 executes the selected flight, Narita hotel, Singapore cancellation and
+Singapore replacement through real supported sandbox operations, then observes and reassesses.
+
+Singapore revised stay dates are an explicit hero requirement, expressed as source/config
+truth and evaluated generically. A late arrival does not itself prove the supplier cancelled
+the original booking. Preserve actual cancellation/no-show terms, fees and unused-night costs.
+Nuitée has no supported in-place date modification. Required operation pair: CANCEL_STAY then
+ADD/BOOK_STAY, with sensible dependencies and separate observations under the existing ActionPlan.
+
+Retain the existing Frankfurter adapter and layered resolver. Compose only the current-runtime
+path needed for original provider currency plus home-currency comparison and dated FX provenance.
+Organisation/budget FX retains precedence. Never fabricate future rates or replace charge currency.
+Transfers and insurance remain bounded operational context; no transaction integration.
+
+Finish useful active work in its simplest form. Stop further platform breadth: healthy-trip
+requests/composer, mobile, programme intake/management, arbitrary itinerary or visit editing,
+credential administration, legal crawling, hotel administration, new providers, multi-incidents,
+extra scenarios, importer atomicity, unrelated parity/infrastructure. Do not delete dormant work.
+
+**WHAT WE KNOW:** connection foundation and Sarah LIVE pass; bounded hotel research, proposed
+stay, scoped entry checks and dynamic reads are integrated. Three active Terra/Luna lanes directly
+enable the required composite recommendation. No A3/A4 acceptance is claimed.
+**WHAT WE DO NOT KNOW:** current selected hotel terms, full composed recommendation, and all
+four external actions' normal-runtime outcome. **KEY ASSUMPTION:** existing evaluation/authority/
+execution machinery plus the small required typed stay action set suffice.
+**WHAT SHOULD BE TESTED NEXT:** close focused lane/entry checks, compose FX and revised-stay
+consequences, then normal LIVE PostgreSQL/desktop recommendation. Broader gates wait for a checkpoint.

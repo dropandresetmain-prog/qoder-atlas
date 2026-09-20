@@ -588,6 +588,26 @@ test('entry: scoped complete coverage matches the exact journey and visit, while
   assert.equal(dim?.explanations[0]?.reasonCode, 'no_applicable_requirement_complete_coverage');
 });
 
+test('entry: reviewed visit coverage cannot survive a change to purpose or stay dates', () => {
+  const journeyId = id();
+  const world = emptyWorld({ journeys: [journeyRow(journeyId, id())] });
+  const visit = visitRow(journeyId, 'jurisdiction-a');
+  world.intendedVisits.push(visit);
+  world.coverage.push(coverageRow('ENTRY_REQUIREMENT', 'jurisdiction-a', {
+    queryBounds: { jurisdictionId: 'jurisdiction-a', journeyId, visitId: visit.id,
+      purpose: visit.purpose, visitWindow: { ...visit.intended } },
+  }));
+  const verdict = () => entryEvaluator.evaluate(subjectOf(journeyId), {
+    now: NOW, world, effective: effectiveOf(world),
+  }).dimensions.find((dimension) => dimension.dimension === 'entry_feasibility')?.verdict;
+  assert.equal(verdict(), 'PASS');
+  visit.purpose = 'different-purpose';
+  assert.equal(verdict(), 'UNKNOWN');
+  visit.purpose = world.coverage[0]!.queryBounds.purpose as string;
+  visit.intended.end = new Date(Date.parse(visit.intended.end) + 86_400_000).toISOString();
+  assert.equal(verdict(), 'UNKNOWN');
+});
+
 test('entry: malformed scoped coverage fails closed and unscoped jurisdiction coverage remains usable', () => {
   const journeyId = id();
   const world = emptyWorld({ journeys: [journeyRow(journeyId, id())] });

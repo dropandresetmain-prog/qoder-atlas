@@ -154,6 +154,7 @@
     "postgres": [
       "postgres-integration/a3JordanConnectionFoundation.pgtest.ts",
       "postgres-integration/atomicCommit.pgtest.ts",
+      "postgres-integration/a3ReviewedEntryPublication.pgtest.ts",
       "postgres-integration/aitFixtureClone.pgtest.ts",
       "postgres-integration/b1ProductPlanningCoordinator.pgtest.ts",
       "postgres-integration/r3ComposedB1Full.pgtest.ts",
@@ -236,6 +237,7 @@
     "postgresFast": [
       "postgres-integration/a3JordanConnectionFoundation.pgtest.ts",
       "postgres-integration/atomicCommit.pgtest.ts",
+      "postgres-integration/a3ReviewedEntryPublication.pgtest.ts",
       "postgres-integration/b1ProductPlanningCoordinator.pgtest.ts",
       "postgres-integration/r3ComposedB1Full.pgtest.ts",
       "postgres-integration/r4PlanningPreferences.pgtest.ts",

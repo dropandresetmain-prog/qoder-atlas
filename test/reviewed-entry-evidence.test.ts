@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import {
   ReviewedEntryPolicySchema,
   verifyReviewedEntryEvidence,
@@ -13,7 +14,7 @@ const SOURCE = {
   sourceId: 'entry-source',
   url: 'https://authority.example/entry',
   publisher: 'Public authority',
-  contentSha256: 'a'.repeat(64),
+  contentSha256: createHash('sha256').update('sanitized official text', 'utf8').digest('hex'),
 };
 
 function policy(over: Partial<ReviewedEntryPolicy> = {}): ReviewedEntryPolicy {
@@ -86,8 +87,9 @@ test('reviewed entry evidence: preserves exact source provenance and bounded exp
   assert.equal(input.policy.sources[0]!.publisher, SOURCE.publisher);
 });
 
-test('reviewed entry evidence: changed hash, URL or publisher refuses provenance', () => {
+test('reviewed entry evidence: changed content, hash, URL or publisher refuses provenance', () => {
   for (const changed of [
+    { text: 'Different text with the original claimed digest' },
     { contentSha256: 'b'.repeat(64) },
     { url: 'https://authority.example/changed' },
     { publisher: 'Different authority' },
