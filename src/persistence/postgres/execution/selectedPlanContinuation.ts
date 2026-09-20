@@ -68,6 +68,15 @@ async function deriveCanonicalRevisionAccounting(
   const freshScopes = new Map(
     fresh.scopeReads.map((read) => [`${read.scopeKind}:${read.scopeId}`, read]),
   );
+  const planId = prerequisiteAttemptIds.length === 0
+    ? undefined
+    : (await db.query<{ action_plan_id: string }>(
+      `SELECT DISTINCT ai.action_plan_id
+         FROM execution_attempts ea
+         JOIN action_intents ai ON ai.workspace_id = ea.workspace_id AND ai.id = ea.action_intent_id
+        WHERE ea.workspace_id = $1 AND ea.id = ANY($2::uuid[])`,
+      [workspaceId, prerequisiteAttemptIds],
+    )).rows[0]?.action_plan_id;
   const derived: AccountedRevision[] = [];
   for (const base of source.aggregateReads) {
     const current = freshAggregates.get(`${base.aggregateRef.kind}:${base.aggregateRef.id}`);
@@ -96,6 +105,40 @@ async function deriveCanonicalRevisionAccounting(
         prerequisiteAttemptId: change.attempt_id,
       });
       expected += 1;
+    }
+    // Approval-time budget holds for intents on this same plan are intentional
+    // selected-plan side effects, not unrelated world drift. They advance BUDGET
+    // before any attempt exists, so they cannot join through canonical applications.
+    if (expected !== current.revision && base.aggregateRef.kind === 'BUDGET' && planId) {
+      const holds = await db.query<{ before_revision: string | null; after_revision: string }>(
+        `SELECT change.before_revision::text, change.after_revision::text
+           FROM change_records change
+           JOIN action_intents ai
+             ON ai.workspace_id = change.workspace_id
+            AND change.idempotency_key = ('approval:hold:' || ai.id::text || ':' || $3::text)
+          WHERE change.workspace_id = $1
+            AND change.subject_kind = 'BUDGET'
+            AND change.subject_id = $3::uuid
+            AND change.command_namespace = 'BUDGET_HOLD_CREATED'
+            AND ai.action_plan_id = $2::uuid
+            AND change.after_revision > $4
+            AND change.after_revision <= $5
+          ORDER BY change.after_revision ASC`,
+        [workspaceId, planId, base.aggregateRef.id, expected, current.revision],
+      );
+      const anchorAttemptId = prerequisiteAttemptIds[0];
+      if (!anchorAttemptId) return undefined;
+      for (const hold of holds.rows) {
+        if (Number(hold.before_revision) !== expected || Number(hold.after_revision) !== expected + 1) return undefined;
+        derived.push({
+          aggregateRef: base.aggregateRef,
+          beforeRevision: expected,
+          afterRevision: expected + 1,
+          // Plan-level approval hold: anchored to the completed prerequisite that opened continuation.
+          prerequisiteAttemptId: anchorAttemptId,
+        });
+        expected += 1;
+      }
     }
     if (expected !== current.revision) return undefined;
   }
