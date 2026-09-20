@@ -46,6 +46,18 @@ V5.6/V7.2 retain accepted meaning, full relevant population and readable desktop
 - A4: Jordan real sandbox execution, observation and video-ready end-to-end acceptance.
 - A5: repeat both heroes LIVE, final presentation corrections, final gates and freeze.
 
+## Current implementation status
+
+The scope below is unchanged; implementation has advanced:
+
+- A3 is a **CONDITIONAL PASS** after founder UI QC.
+- Selected-plan continuation, protected hotel execution and the controlled four-action seam are focused-proven.
+- Destination hotel planning can use a bounded alternate property when the preferred existing property has no valid quote; replacement requirements are about satisfying the stay window/policy, not preserving property identity.
+- The overnight-required Jordan stage is now derived from boardability at the later planning clock; no application branch forces Narita.
+- A complete four-effect recommendation is current and `AWAITING_AUTHORITY` on the pre-mutation candidate.
+- The real four-action sandbox run remains the missing A4 acceptance proof.
+- Final graph/UI truth defects remain deliberately carried into the bounded post-A4 presentation pass.
+
 ## Decision and triage
 
 **WHAT WE KNOW:** accepted R4 proves Sarah LIVE programme recovery and separate protected
