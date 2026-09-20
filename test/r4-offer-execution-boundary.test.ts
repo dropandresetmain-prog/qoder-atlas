@@ -77,6 +77,16 @@ test('the stay executor only mutates after a durable attempt and reconciles know
   assert.ok(source.indexOf('runExternalStayReconciliation') > 0, 'cycle includes reconciliation');
   assert.ok(source.indexOf('applyPendingCanonicalUpdates(ctx, report)') > 0, 'reconciled success retries canonical application without a second provider dispatch');
   assert.ok(source.includes("selected_plan_canonical_applications"), 'stay candidates require canonical application for external deps');
+  // SPA rows do not carry action_intent_id; intent identity is via execution_attempts.
+  assert.equal(
+    /application\.action_intent_id/.test(source),
+    false,
+    'canonical-application lookup must not reference missing application.action_intent_id',
+  );
+  assert.ok(
+    /ea\.action_intent_id\s*=\s*\$2/.test(source),
+    'canonical-application lookup must join intent identity through execution_attempts',
+  );
 });
 
 test('a refreshed stay quote with changed amount or currency refuses before booking; matching terms carry the approved payment reference', async () => {

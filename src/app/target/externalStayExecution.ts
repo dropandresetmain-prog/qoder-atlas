@@ -463,6 +463,8 @@ async function hasExactCanonicalApplication(
   commandNamespace: string,
   idempotencyKey: string,
 ): Promise<boolean> {
+  // selected_plan_canonical_applications has no action_intent_id column;
+  // intent identity is via execution_attempts.action_intent_id on attempt_id.
   const row = (
     await pool.query(
       `SELECT 1
@@ -474,10 +476,9 @@ async function hasExactCanonicalApplication(
          JOIN execution_attempts ea
            ON ea.workspace_id = application.workspace_id AND ea.id = application.attempt_id
         WHERE application.workspace_id = $1
-          AND application.action_intent_id = $2
+          AND ea.action_intent_id = $2
           AND application.command_namespace = $3
           AND application.idempotency_key = $4
-          AND ea.action_intent_id = $2
         LIMIT 1`,
       [workspaceId, intentId, commandNamespace, idempotencyKey],
     )
