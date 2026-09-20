@@ -8,27 +8,23 @@
 The older R3 status/sequence below is retained as context and is superseded by
 this update where it describes current composition or delivery order.
 
-Current evidence: normal PostgreSQL boot, LIVE Atlas research and Qwen, physical
-Sarah programme recovery, separate protected Atlas sandbox flight execution,
-A1 accepted desktop V5.6/V7.2 and A2 repeated LIVE Sarah acceptance at `f0c79f2412513e3a676737ac32c3c3694c03388a`. Jordan A3 has physically produced one complete LIVE composite strategy that is VIABLE / AWAITING_AUTHORITY; final desktop A3 acceptance and all A4 selected sandbox actions remain pending.
+Current evidence: normal PostgreSQL boot, accepted Sarah LIVE programme recovery, desktop V5.6/V7.2, LIVE/RECORD Atlas + Qwen research, bounded Nuitée research, reviewed entry evidence and layered Frankfurter comparison. Jordan A3 is **CONDITIONAL PASS**: the complete recommendation and operator UI are sufficient to continue, while graph/progression/cost/copy defects remain carried. A4 continuation, protected hotel execution, the controlled four-action seam, destination-hotel robustness and overnight-required progression are focused-proven. The real four-action sandbox run is the active acceptance milestone and is not yet accepted.
 
-Sequence: A0 freeze/diagnose -> A1 strong current-product surfaces plus faithful V5.6/V7.2
--> A2 Sarah LIVE/video-ready -> A3 Jordan multi-domain composition -> A4 Jordan sandbox/video-ready ->
-A5 both heroes LIVE/final freeze. Latest scope is [hero depth](work/ASTRA_HERO_DEPTH_SCOPE.md),
+Sequence: A0/A1/A2 accepted -> A3 conditional pass -> A4 continuation/hotel/controlled seam/progression closure complete -> A4 physical sandbox acceptance -> bounded graph/UI truth pass -> A5 Sarah + Jordan LIVE repeat/final gates/freeze. Latest scope is [hero depth](work/ASTRA_HERO_DEPTH_SCOPE.md),
 which supersedes prior flight-only/ancillary deferrals. Contracts, triage and implementation
 ownership: [A0 convergence](work/ASTRA_A0_CONVERGENCE.md).
 
 | Scope | Current disposition / revisit condition |
 |---|---|
-| Booking identities/budget and per-offer flight/time/cost visibility | Act Now for Jordan; R4 parks reclassified because executable repeatable recovery requires them. |
+| Booking identities/budget and per-offer flight/time/cost visibility | Hero-required protected inputs and execution bindings are integrated for the selected A4 path; physical provider acceptance remains Act Now. |
 | Recent decisions, Activity, Programme/Traveller readability, persistent Reset | A1/A2 accepted; preserve current desktop hero usability. |
 | Healthy-trip traveller change-request planning | Park for Later by founder scope decision; genuine canonical request/planning/progression/authority/resolution gap. Preserve actual assessments; never fake FAIL. Revisit after generalized Sarah/Jordan verticals and deliberate desired-state design. |
 | Programme relocation/cancellation | Act Now for the small typed set required by Sarah/Jordan; retain impact, authority, execution and observation gates. Operations beyond hero needs stay parked; no untyped OTHER mutation. |
 | Non-critical legacy parity | Park for Later; revisit when it materially improves Sarah, Jordan, graph fidelity or submission. Message/export footer controls were inert at the legacy baseline. |
 | Programme importer partial-prefix visibility | Park for Later after focused PG interruption/retry proof (5/5). Partial inventory remains valid and UNKNOWN; identical retry converges without duplicates, another workspace unchanged, no supplier/authority effects. Revisit for explicit import-status/hide-incomplete requirements. |
-| Jordan multi-domain recovery | Act Now: A3 requires replacement flight + Narita overnight + scoped authoritative Japan entry evidence + required Singapore replacement/cancellation consequence + finals viability + Frankfurter/home-currency comparison in one deterministic composite. A4 executes exactly four selected sandbox actions: replacement flight, Narita booking, Singapore replacement booking, then displaced Singapore stay cancellation after replacement confirmation. Transfer/insurance remain reasoning/context only. |
-| Provider restoration | Investigate Now for each hero-required provider: normal boot, live research, downstream use and protected sandbox actions. Unrelated historical adapters remain Park for Later. |
-| Desktop presenter quality and LIVE proof | Act Now across hero-visible graphs, consequences, alternatives, recommendation, authority, progress/provenance and resolution. Mobile is a separate post-hackathon milestone. |
+| Jordan multi-domain recovery | **Act Now: physical A4 acceptance.** Current planner naturally produces the overnight-required four-effect recovery at the final progression stage. Continuation, hotel execution and controlled four-action sequencing are focused-proven. Execute replacement flight → Narita booking → destination replacement booking → displaced-stay cancellation with canonical application/reassessment between actions. |
+| Provider restoration | Hero-required Atlas, Nuitée, Qwen/Model Studio, reviewed entry-source and Frankfurter paths are composed/research-proven; protected Atlas/Nuitée execution is implemented and controlled-test proven. Real four-action sandbox execution remains the missing acceptance evidence. Unrelated historical adapters stay parked. |
+| Desktop presenter quality and LIVE proof | A3 UI is a **conditional pass**. Final bounded pass after A4 must fix V5.6 FAIL→amber truth, progressive edges, Overview focus/Active Change, graph placement, cost wording and recovery-copy compression before A5 recording. Mobile remains post-hackathon. |
 | Reset after external execution | Act Now guard integrated: shared lease and refusal after any external attempt/observation. Retain workspace for reconciliation/audit; repeat external heroes in fresh workspaces. Cleanup/archive workflow remains Park for Later. |
 | Full programme regeneration alignment | Park for Later: current generator drops accepted enrichment. Safe dossier-only correction is implemented; revisit when full source regeneration is required. |
 | Richer direct-attendee/rejected-option labels and reset duration copy | Park for Later until final presentation pass; current Sarah proof is readable and deterministic. Do not fabricate impact identities or promise an exact reset duration. |
@@ -42,6 +38,10 @@ redispatch; provider success alone never resolves a trip.
 This roadmap records current implemented truth, the truth-rebased delivery sequence and
 deferred scope. Detailed contracts live in
 [`RECOVERY_PLANNING_CONTRACT_FREEZE.md`](RECOVERY_PLANNING_CONTRACT_FREEZE.md).
+
+## Historical roadmap below — superseded for A3–A5 sequencing
+
+The material below preserves earlier R1/R2/R3/provider-restoration planning context. It is not the current execution order for the finishing run. Use the delivery update above plus `work/ACTIVE_TASK.md` and `work/A3_A5_FINISHING_IMPLEMENTATION_PLAN.md` for current A4/A5 work.
 
 ## Current baseline
 
