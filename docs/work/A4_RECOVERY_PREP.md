@@ -1,5 +1,7 @@
 # A4 recovery preparation — preserved WIP handoff
 
+> **HISTORICAL / SUPERSEDED.** This file preserves A4 WIP archaeology only. Do not re-run its integration sequence. Continuation, hotel execution, controlled four-action proof and the physical sandbox sequence have all completed; A4 is accepted on `546adf210db8ead343ecdac22b410515665c176a`. Current work begins from `ACTIVE_TASK.md` in A5.
+
 Docs-only. Not acceptance. Do not integrate either WIP lane yet.
 
 ## Authoritative state
