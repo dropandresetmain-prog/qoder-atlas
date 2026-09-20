@@ -684,6 +684,32 @@ test('entry: with complete coverage, an applicable edition that all-PASSes PASSe
   assert.ok(dim?.explanations.some((e) => e.reasonCode === 'requirements_met'));
 });
 
+test('entry: same-reason UNKNOWN across many editions collapses to one explanation with count', () => {
+  const journeyId = id();
+  const travellerId = id();
+  const world = emptyWorld({ journeys: [journeyRow(journeyId, travellerId)] });
+  const visit = visitRow(journeyId, 'jurisdiction-a', { purpose: 'tourism' });
+  world.intendedVisits.push(visit);
+  for (let i = 0; i < 2; i += 1) {
+    const edition = ruleSetVersionRow(id(), 'entry', predicateExpr('traveller.nationality_in', { codes: ['SGP'] }), { editionNumber: 1 });
+    world.ruleSetVersions.push(edition);
+    world.ruleAssignments.push(ruleAssignmentRow(edition.ruleSetId, { jurisdictionId: 'jurisdiction-a' }));
+  }
+  world.coverage.push(coverageRow('ENTRY_REQUIREMENT', 'jurisdiction-a'));
+  const out = entryEvaluator.evaluate(subjectOf(journeyId), { now: NOW, world, effective: effectiveOf(world) });
+  const dim = out.dimensions.find((d) => d.dimension === 'entry_feasibility');
+  assert.equal(dim?.verdict, 'UNKNOWN');
+  const unknowns = dim?.explanations.filter((e) => e.reasonCode === 'passport_not_selected') ?? [];
+  assert.equal(unknowns.length, 1, `same-reason UNKNOWN must not fan out per edition; got ${JSON.stringify(dim?.explanations.map((e) => e.reasonCode))}`);
+  assert.equal(unknowns[0]?.facts.unknownEditionCount, 2);
+  assert.equal(unknowns[0]?.facts.applicableEditionCount, 2);
+  assert.equal(
+    Object.keys(unknowns[0]?.facts ?? {}).some((k) => k.startsWith('editionId.')),
+    false,
+    'shared facts must not enumerate every editionId.N',
+  );
+});
+
 test('entry: a pinned edition is honoured even when it is not the highest-numbered captured edition', () => {
   const journeyId = id();
   const travellerId = id();

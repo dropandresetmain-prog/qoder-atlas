@@ -264,8 +264,10 @@ function evaluateEncounter(world: CapturedWorld, now: Instant, journey: WJourney
   for (const c of coverage.records) boundaries.push(c.expiresAt);
   const jurisdictionSubject: TypedRef = { kind: 'JURISDICTION', id: e.jurisdictionId };
 
+  // Keep shared relatedSubjects bounded: jurisdiction + information versions.
+  // Edition / rule-set identity travels on evidenceRefs (RULE_SET_VERSION) and
+  // on per-edition FAIL explanations — not echoed onto every UNKNOWN leaf.
   const knowledgeRelated: TypedRef[] = [
-    ...lookup.editions.flatMap((a) => [{ kind: 'RULE_SET' as const, id: a.edition.ruleSetId }, a.edition.issuer]),
     ...lookup.informationVersions.map((iv) => ({ kind: 'INFORMATION_VERSION' as const, id: iv.id })),
   ];
   const knowledgeEvidence: EvidenceRef[] = [
@@ -273,10 +275,15 @@ function evaluateEncounter(world: CapturedWorld, now: Instant, journey: WJourney
     ...lookup.informationVersions.flatMap((iv): EvidenceRef[] => [{ kind: 'INFORMATION_VERSION', id: iv.id }, { kind: 'EVIDENCE_RECORD', id: iv.evidenceId, detail: 'information_version' }]),
     ...coverageEvidence(coverage.records),
   ];
-  const knowledgeFacts: Facts = { topic, applicableEditionCount: lookup.editions.length, coverageComplete: coverage.complete };
-  lookup.editions.forEach((a, index) => { knowledgeFacts[`editionId.${index}`] = a.edition.id; });
-  lookup.informationVersions.forEach((iv, index) => { knowledgeFacts[`informationVersionId.${index}`] = iv.id; });
-  coverage.records.forEach((c, index) => { knowledgeFacts[`coverageId.${index}`] = c.id; });
+  // Counts only on shared facts — indexed edition/version catalogs previously
+  // duplicated across every leaf and blew the 256KiB persistence bound.
+  const knowledgeFacts: Facts = {
+    topic,
+    applicableEditionCount: lookup.editions.length,
+    informationVersionCount: lookup.informationVersions.length,
+    coverageRecordCount: coverage.records.length,
+    coverageComplete: coverage.complete,
+  };
   const withKnowledge = (extra: { related?: TypedRef[]; evidence?: EvidenceRef[]; facts?: Facts; uncertainty?: Uncertainty[] } = {}) => ({
     related: [...knowledgeRelated, ...(extra.related ?? [])],
     evidence: [...knowledgeEvidence, ...(extra.evidence ?? [])],
@@ -297,6 +304,10 @@ function evaluateEncounter(world: CapturedWorld, now: Instant, journey: WJourney
 
   const ctx: PredicateContext = { world, now, journeyId: journey.id, travellerId: journey.travellerId, encounter: e };
   const outcomes = lookup.editions.map((a) => evaluateEdition(a, ctx));
+  // Collapse same-reason UNKNOWN across editions into one explanation per
+  // encounter. FAIL stays per-edition (decisive). Prevents O(editions) copies
+  // of the shared knowledge evidence payload.
+  const unknownByReason = new Map<string, { leaves: LeafOutcome[]; sampleEdition: EditionOutcome; editionIds: Set<string> }>();
   for (const o of outcomes) {
     const editionRef: TypedRef = { kind: 'RULE_SET', id: o.applicable.edition.ruleSetId };
     const leafEvidence = o.leaves.flatMap((l) => l.evidence);
@@ -312,16 +323,33 @@ function evaluateEncounter(world: CapturedWorld, now: Instant, journey: WJourney
       for (const [key, value] of Object.entries(leaf.facts)) editionFacts[`decisive.${index}.${key}`] = value;
     });
     if (o.status === 'FAIL') {
-      explanations.push(make('FAIL', 'requirement_not_met', { kind: 'REQUIREMENT', subjectRef: editionRef }, withKnowledge({ related: leafRelated, evidence: leafEvidence, facts: editionFacts })));
+      explanations.push(make('FAIL', 'requirement_not_met', { kind: 'REQUIREMENT', subjectRef: editionRef }, withKnowledge({ related: [...leafRelated, editionRef], evidence: leafEvidence, facts: editionFacts })));
     } else if (o.status === 'UNKNOWN') {
-      const byReason = new Map<string, LeafOutcome[]>();
-      for (const leaf of o.decisive.filter((d) => d.status === 'UNKNOWN')) byReason.set(leaf.reasonCode, [...(byReason.get(leaf.reasonCode) ?? []), leaf]);
-      for (const [reasonCode, leaves] of [...byReason.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-        explanations.push(make('UNKNOWN', reasonCode, { kind: 'MISSING_INFORMATION', subjectRef: editionRef }, withKnowledge({
-          related: leafRelated, evidence: leafEvidence, facts: editionFacts, uncertainty: leaves.flatMap((l) => l.uncertainty),
-        })));
+      for (const leaf of o.decisive.filter((d) => d.status === 'UNKNOWN')) {
+        const entry = unknownByReason.get(leaf.reasonCode) ?? { leaves: [], sampleEdition: o, editionIds: new Set<string>() };
+        entry.leaves.push(leaf);
+        entry.editionIds.add(o.applicable.edition.id);
+        if (!unknownByReason.has(leaf.reasonCode)) entry.sampleEdition = o;
+        unknownByReason.set(leaf.reasonCode, entry);
       }
     }
+  }
+  for (const [reasonCode, group] of [...unknownByReason.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    const o = group.sampleEdition;
+    const editionRef: TypedRef = { kind: 'RULE_SET', id: o.applicable.edition.ruleSetId };
+    const leafRelated = group.leaves.flatMap((l) => l.related);
+    explanations.push(make('UNKNOWN', reasonCode, { kind: 'MISSING_INFORMATION', subjectRef: editionRef }, withKnowledge({
+      related: [...leafRelated, editionRef],
+      evidence: o.leaves.flatMap((l) => l.evidence),
+      facts: {
+        editionId: o.applicable.edition.id,
+        editionNumber: o.applicable.edition.editionNumber,
+        editionStatus: o.applicable.edition.status,
+        unknownEditionCount: group.editionIds.size,
+        decisivePredicates: [...new Set(group.leaves.map((d) => d.predicateId))].sort().join(','),
+      },
+      uncertainty: group.leaves.flatMap((l) => l.uncertainty),
+    })));
   }
 
   const blockedByGaps = lookup.missingEditionIds.length + lookup.uncapturedRuleSetIds.length + lookup.populationAssignmentIds.length > 0;
