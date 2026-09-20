@@ -67,6 +67,13 @@ export const ScenarioEffectSchema = z.discriminatedUnion('effectKind', [
     ]),
   }),
   z.strictObject({
+    /** Candidate-only stay-intent retirement; supplier state stays observed. */
+    effectKind: z.literal('CANCEL_STAY'),
+    journeyItemId: SubjectIdSchema,
+    reservationLineId: SubjectIdSchema,
+    cancellationPenalty: ExactMoneySchema,
+  }),
+  z.strictObject({
     effectKind: z.literal('PROPOSE_ALLOCATION'),
     reservationLineId: SubjectIdSchema,
     travellerId: SubjectIdSchema,

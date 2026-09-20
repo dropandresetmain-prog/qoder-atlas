@@ -37,6 +37,15 @@ export const CONSTRAINT_TYPES: readonly ConstraintTypeRegistration[] = [
     meaning: 'a gap of at least this many hours between arrival and the next departure that spans a local night requires an active stay covering it',
   },
   {
+    registeredType: 'stay_arrival_date_aligned',
+    evaluatorId: 'm6.stay-arrival-date-aligned',
+    operands: {
+      original_stay_item: { kind: 'SUBJECT_REF', required: true, subjectKind: 'JOURNEY_ITEM' },
+      arrival_item: { kind: 'SUBJECT_REF', required: true, subjectKind: 'JOURNEY_ITEM' },
+    },
+    meaning: 'the required destination stay starts on the selected arrival local date and preserves the original stay checkout local date',
+  },
+  {
     registeredType: 'travel_together',
     evaluatorId: 'm6.group',
     operands: { destination_place: { kind: 'SUBJECT_REF', required: false, subjectKind: 'PLACE' } },

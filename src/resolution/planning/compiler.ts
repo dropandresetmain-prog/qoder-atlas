@@ -47,6 +47,12 @@ export interface CompileActionPlanInput {
    * expectedRevisions (executor may still resolve from the stored manifest).
    */
   programmeItemOwnership?: ReadonlyMap<string, string>;
+  /**
+   * Captured ownership for a stay cancellation. This is supplied by the
+   * caller's authoritative world capture; the compiler never guesses it from
+   * an unrelated manifest read.
+   */
+  stayCancellationOwnership?: ReadonlyMap<string, { journeyId: string; reservationId: string }>;
 }
 
 export interface CompileActionPlanResult {
@@ -60,6 +66,7 @@ const INTERNAL_OBJECTIVE_DISPOSITION = 'internal:objective.disposition';
 const INTERNAL_RESERVATION_ALLOCATION = 'internal:reservation.allocation';
 const EXTERNAL_SELECT_OFFER = 'external:offer.select';
 const EXTERNAL_STAY_BOOK = 'external:stay.book';
+const EXTERNAL_STAY_CANCEL = 'external:stay.cancel';
 
 function capabilitySupported(capabilities: readonly CapabilityStatement[] | undefined, ref: string): boolean {
   // Internal executors are always structurally available at compile time; M8
@@ -102,6 +109,7 @@ function intentForEffect(
   effect: ScenarioEffect,
   index: number,
   ownership: ReadonlyMap<string, string> | undefined,
+  stayCancellationOwnership: ReadonlyMap<string, { journeyId: string; reservationId: string }> | undefined,
 ): TypedResult<ActionIntent> {
   const id = randomUUID();
   const base = {
@@ -173,6 +181,50 @@ function intentForEffect(
         expectedObservations: ['EXTERNAL_PROVIDER:stay_booking_confirmation'],
         offerFingerprint: effect.offerId,
         costEstimate: effect.offerPrice,
+      });
+    }
+    case 'CANCEL_STAY': {
+      const owner = stayCancellationOwnership?.get(effect.reservationLineId);
+      const journeyRead = owner ? strategy.baseManifest.aggregateReads.find(
+        (read) => read.aggregateRef.kind === 'JOURNEY' && read.aggregateRef.id === owner.journeyId,
+      ) : undefined;
+      const reservationRead = owner ? strategy.baseManifest.aggregateReads.find(
+        (read) => read.aggregateRef.kind === 'RESERVATION' && read.aggregateRef.id === owner.reservationId,
+      ) : undefined;
+      if (!owner || !journeyRead || !reservationRead) {
+        return conflict(typedConflict(
+          'STALE_AGGREGATE_REVISION',
+          'CANCEL_STAY requires captured owning Journey and Reservation revisions',
+          [{ kind: 'RESERVATION_LINE', id: effect.reservationLineId }],
+        ));
+      }
+      return ok({
+        ...base,
+        operationNamespace: 'provider.stay',
+        logicalOperationKey: `stay-cancel:${owner.journeyId}:${owner.reservationId}:${effect.reservationLineId}`,
+        requestFingerprint: fingerprint({ effect, strategyVersion: strategy.strategyVersion }),
+        capabilityRef: EXTERNAL_STAY_CANCEL,
+        subjectRefs: [
+          { kind: 'JOURNEY_ITEM', id: effect.journeyItemId },
+          { kind: 'RESERVATION_LINE', id: effect.reservationLineId },
+          { kind: 'JOURNEY', id: owner.journeyId },
+          { kind: 'RESERVATION', id: owner.reservationId },
+        ],
+        expectedRevisions: [
+          { aggregateRef: { kind: 'JOURNEY', id: owner.journeyId }, expectedRevision: journeyRead.revision },
+          { aggregateRef: { kind: 'RESERVATION', id: owner.reservationId }, expectedRevision: reservationRead.revision },
+        ],
+        preconditions: [
+          `basisAssessment:${strategy.basisAssessmentId}`,
+          `strategyVersion:${strategy.strategyVersion}`,
+          `cancellationPenalty:${effect.cancellationPenalty.currency}:${effect.cancellationPenalty.amount}`,
+        ],
+        requiredAuthorityScopes: ['journey.stay.cancel'],
+        expectedObservations: ['EXTERNAL_PROVIDER:stay_cancellation_confirmation'],
+        // This cost estimate is the evidenced cancellation-policy ceiling for
+        // authority review. It does not state a charge, refund, payment, or
+        // supplier-observed financial outcome.
+        costEstimate: effect.cancellationPenalty,
       });
     }
     case 'PROPOSE_ALLOCATION': {
@@ -353,7 +405,7 @@ export function compileActionPlan(input: CompileActionPlanInput): TypedResult<Co
   const intents: ActionIntent[] = [];
   for (let i = 0; i < strategy.scenarioChange.effects.length; i += 1) {
     const effect = strategy.scenarioChange.effects[i]!;
-    const built = intentForEffect(planId, strategy, effect, i, input.programmeItemOwnership);
+    const built = intentForEffect(planId, strategy, effect, i, input.programmeItemOwnership, input.stayCancellationOwnership);
     if (!built.ok) return built;
     if (!capabilitySupported(input.capabilities, built.value.capabilityRef)) {
       return conflict(typedConflict(

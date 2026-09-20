@@ -76,6 +76,11 @@ export function effectChangedRefs(effect: ScenarioEffect): TypedRef[] {
         { kind: 'JOURNEY', id: effect.journeyId },
         { kind: 'OFFER', id: effect.offerId },
       ];
+    case 'CANCEL_STAY':
+      return [
+        { kind: 'JOURNEY_ITEM', id: effect.journeyItemId },
+        { kind: 'RESERVATION_LINE', id: effect.reservationLineId },
+      ];
     case 'PROPOSE_ALLOCATION': {
       const refs: TypedRef[] = [
         { kind: 'RESERVATION_LINE', id: effect.reservationLineId },
