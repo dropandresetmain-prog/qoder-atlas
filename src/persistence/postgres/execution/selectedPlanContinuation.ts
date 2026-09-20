@@ -238,14 +238,19 @@ export async function recordSelectedPlanCanonicalApplication(
     source: { kind: 'EXTERNAL_PROVIDER'; observationId: string } | { kind: 'INTERNAL_COMMAND' };
   },
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const attempt = await db.query<{ id: string }>(
-    `SELECT ea.id
+  const attempt = await db.query<{ id: string; capability_ref: string }>(
+    `SELECT ea.id, ai.capability_ref
        FROM execution_attempts ea
        JOIN action_intents ai ON ai.workspace_id = ea.workspace_id AND ai.id = ea.action_intent_id
       WHERE ea.workspace_id = $1 AND ea.id = $2 AND ai.action_plan_id = $3 AND ea.action_intent_id = $4`,
     [input.workspaceId, input.attemptId, input.actionPlanId, input.actionIntentId],
   );
-  if (!attempt.rows[0]) return { ok: false, reason: 'CANONICAL_APPLICATION_ATTEMPT_MISMATCH' };
+  const storedAttempt = attempt.rows[0];
+  if (!storedAttempt) return { ok: false, reason: 'CANONICAL_APPLICATION_ATTEMPT_MISMATCH' };
+  const requiresProviderObservation = storedAttempt.capability_ref.startsWith('external:');
+  if (requiresProviderObservation !== (input.source.kind === 'EXTERNAL_PROVIDER')) {
+    return { ok: false, reason: 'CANONICAL_APPLICATION_SOURCE_KIND_MISMATCH' };
+  }
   if (input.source.kind === 'EXTERNAL_PROVIDER') {
     const observation = await db.query<{ id: string }>(
       `SELECT id FROM execution_observations

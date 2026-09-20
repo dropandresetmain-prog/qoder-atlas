@@ -638,26 +638,28 @@ export async function createPreparedExecutionAttempt(
       // in-progress/not-yet-attempted prerequisite blocks until it resolves.
       const deps = await client.query<{ from_action_intent_id: string; satisfied: boolean; failed: boolean }>(
         `SELECT d.from_action_intent_id,
-                bool_or(ea.status IN ('OBSERVED_SUCCESS', 'COMPLETED') OR (
-                  ea.status = 'RECONCILED' AND EXISTS (
-                    SELECT 1 FROM selected_plan_continuation_checkpoints checkpoint
-                     WHERE checkpoint.workspace_id = d.workspace_id
-                       AND checkpoint.next_action_intent_id = d.to_action_intent_id
-                       AND checkpoint.prerequisite_receipts @> jsonb_build_array(
-                         jsonb_build_object('attemptId', ea.id, 'actionIntentId', d.from_action_intent_id)
-                       )
-                       AND EXISTS (
-                         SELECT 1
-                           FROM jsonb_array_elements(checkpoint.prerequisite_receipts) receipt
-                           JOIN command_receipts canonical_receipt
-                             ON canonical_receipt.workspace_id = checkpoint.workspace_id
-                            AND canonical_receipt.command_namespace = receipt->'canonicalReceipt'->>'commandNamespace'
-                            AND canonical_receipt.idempotency_key = receipt->'canonicalReceipt'->>'idempotencyKey'
-                          WHERE receipt->>'attemptId' = ea.id::text
-                            AND receipt->>'actionIntentId' = d.from_action_intent_id::text
-                       )
+                bool_or(
+                  ea.status IN ('OBSERVED_SUCCESS', 'COMPLETED', 'RECONCILED')
+                  AND (
+                    -- Existing internal commands have their canonical receipt
+                    -- observation path. Externally owned actions require the
+                    -- A4 immutable observation→canonical-application bridge.
+                    EXISTS (
+                      SELECT 1 FROM action_intents prerequisite_intent
+                       WHERE prerequisite_intent.workspace_id = d.workspace_id
+                         AND prerequisite_intent.id = d.from_action_intent_id
+                         AND prerequisite_intent.capability_ref NOT LIKE 'external:%'
+                    )
+                    OR EXISTS (
+                      SELECT 1 FROM selected_plan_canonical_applications application
+                      JOIN command_receipts canonical_receipt
+                        ON canonical_receipt.workspace_id = application.workspace_id
+                       AND canonical_receipt.command_namespace = application.command_namespace
+                       AND canonical_receipt.idempotency_key = application.idempotency_key
+                       WHERE application.workspace_id = d.workspace_id AND application.attempt_id = ea.id
+                    )
                   )
-                )) AS satisfied,
+                ) AS satisfied,
                 bool_or(ea.status IN ('OBSERVED_FAILURE', 'FAILED')) AS failed
            FROM action_dependencies d
            LEFT JOIN execution_attempts ea

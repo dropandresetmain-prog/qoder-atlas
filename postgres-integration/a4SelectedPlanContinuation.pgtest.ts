@@ -128,7 +128,7 @@ async function setup() {
   });
   assert.equal(evaluated.ok, true, JSON.stringify(evaluated));
   if (!evaluated.ok) throw new Error('source strategy evaluation failed');
-  assert.equal(evaluated.value.strategy.viability, 'VIABLE', JSON.stringify(evaluated.value.strategy.viabilityDecisions));
+  assert.equal(evaluated.value.strategy.viability, 'VIABLE', JSON.stringify(evaluated.value.viabilityDecisions));
   const compiled = compileActionPlan({ strategy: evaluated.value.strategy, now: NOW });
   assert.equal(compiled.ok, true, !compiled.ok ? compiled.conflict.message : '');
   if (!compiled.ok) throw new Error('plan compilation failed');
@@ -154,7 +154,46 @@ async function setup() {
       requirementRole: 'CASE_OWNER', now: NOW, issuerPrincipalId,
     });
   }
-  return { pool, seed, uow, principalId, journeyId, otherJourneyId, itemId: item.journeyItemId, otherItemId: otherItem.journeyItemId, publisherOrganisationId, legalEvidenceId, registry, capture, baseWorld, scenarioChange, plan };
+  return {
+    pool, seed, uow, principalId, issuerPrincipalId, travellerId: traveller.travellerId,
+    journeyId, otherJourneyId, itemId: item.journeyItemId, otherItemId: otherItem.journeyItemId,
+    publisherOrganisationId, legalEvidenceId, registry, capture, baseWorld, scenarioChange, plan,
+  };
+}
+
+async function persistExternalDependencyPlan(ctx: Awaited<ReturnType<typeof setup>>) {
+  const planId = randomUUID();
+  const firstId = randomUUID();
+  const secondId = randomUUID();
+  const plan = {
+    ...ctx.plan,
+    id: planId,
+    intents: ctx.plan.intents.map((intent, index) => ({
+      ...intent,
+      id: index === 0 ? firstId : secondId,
+      actionPlanId: planId,
+      operationNamespace: 'provider:a4-continuation-fixture',
+      logicalOperationKey: `a4-external-${index}-${randomUUID()}`,
+      requestFingerprint: `${index}`.padStart(64, '0'),
+      capabilityRef: 'external:continuation-fixture',
+      expectedObservations: ['EXTERNAL_PROVIDER:continuation-fixture'],
+    })),
+    dependencies: [{ fromActionIntentId: firstId, toActionIntentId: secondId }],
+  };
+  assertOk(await persistActionPlan(ctx.uow(), {
+    workspaceId: ctx.seed.workspaceId, actorPrincipalId: ctx.seed.actorId, idempotencyKey: randomUUID(),
+    plan, recoveryStrategyId: ctx.scenarioChange.recoveryStrategyId,
+  }));
+  for (const intent of plan.intents) {
+    await seedStoredExecutionAuthority({
+      pool: ctx.pool, workspaceId: ctx.seed.workspaceId, actorId: ctx.seed.actorId,
+      principalId: ctx.principalId, planId, intentId: intent.id,
+      scope: await loadRequiredAuthorityScopesOrFail(ctx.pool, ctx.seed.workspaceId, intent.id),
+      representedPartyRef: { kind: 'TRAVELLER', id: ctx.travellerId }, requirementRole: 'CASE_OWNER',
+      now: NOW, issuerPrincipalId: ctx.issuerPrincipalId,
+    });
+  }
+  return plan;
 }
 
 async function prepareAndApplyFirst(ctx: Awaited<ReturnType<typeof setup>>, terminal: 'OBSERVED_SUCCESS' | 'OUTCOME_UNKNOWN' = 'OBSERVED_SUCCESS') {
