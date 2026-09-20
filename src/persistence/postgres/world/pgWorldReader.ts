@@ -389,6 +389,11 @@ export class PgWorldReader {
 
     // -------------------------------------------------------------- geography
     const placeIds = uniq([
+      // A proposed stay can name an existing canonical place before it is
+      // connected to a Journey. Keep an explicit PLACE focus inside the same
+      // workspace capture so its jurisdiction and knowledge evidence are
+      // read and recorded without discovering unrelated places.
+      ...request.focus.filter((f) => f.kind === 'PLACE').map((f) => f.id),
       ...journeyItems.flatMap((i) => [i.desiredOriginPlaceId, i.desiredDestinationPlaceId, i.intendedPlaceId, i.intendedLocationPlaceId]),
       ...services.flatMap((s) => [str(s.origin_place_id), str(s.destination_place_id)]),
       ...programmeItems.map((p) => str(p.place_id)),
