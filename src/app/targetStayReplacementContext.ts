@@ -13,7 +13,8 @@ import {
   type PlanningToolProvenance,
 } from '../contracts/v2/planning/planningTool.ts';
 import type { Instant } from '../domain/v2/shared/time.ts';
-import { InstantIntervalSchema } from '../domain/v2/shared/time.ts';
+import { compareInstants, InstantIntervalSchema } from '../domain/v2/shared/time.ts';
+import { normalizeExtractedTemporal } from '../ingest/temporal.ts';
 import type { ProposalCandidate } from '../resolution/planning/proposer.ts';
 import {
   type HotelPlanningContext,
@@ -82,37 +83,16 @@ function localParts(instant: Instant, timeZone: string): {
   }
 }
 
-/** Resolve a local wall-clock value through the runtime's IANA timezone data. */
+/** Resolve a local wall-clock value through the repository's deterministic temporal normalizer. */
 function localDateTimeToInstant(
   date: string,
   clock: Pick<ReturnType<typeof localParts> & object, 'hour' | 'minute' | 'second' | 'millisecond'>,
   timeZone: string,
 ): Instant | undefined {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
-  if (!match) return undefined;
-  const target = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), clock.hour, clock.minute, clock.second, clock.millisecond);
-  if (!Number.isFinite(target)) return undefined;
-  let guess = target;
-  for (let i = 0; i < 5; i += 1) {
-    const shown = localParts(new Date(guess).toISOString() as Instant, timeZone);
-    if (!shown) return undefined;
-    const shownAsUtc = Date.UTC(Number(shown.date.slice(0, 4)), Number(shown.date.slice(5, 7)) - 1,
-      Number(shown.date.slice(8, 10)), shown.hour, shown.minute, shown.second, shown.millisecond);
-    const next = target - (shownAsUtc - guess);
-    if (next === guess) break;
-    guess = next;
-  }
-  const candidates = [guess, guess - 3_600_000, guess + 3_600_000, guess - 7_200_000, guess + 7_200_000]
-    .filter((value, index, values) => values.indexOf(value) === index)
-    .filter((value) => {
-      const shown = localParts(new Date(value).toISOString() as Instant, timeZone);
-      return shown?.date === date && shown.hour === clock.hour && shown.minute === clock.minute
-        && shown.second === clock.second && shown.millisecond === clock.millisecond;
-    });
-  // A gap has no match and a fall-back wall clock can have two. Both are UNKNOWN.
-  if (candidates.length !== 1) return undefined;
-  const output = new Date(candidates[0]!).toISOString();
-  return output;
+  return normalizeExtractedTemporal(
+    `${date}T${String(clock.hour).padStart(2, '0')}:${String(clock.minute).padStart(2, '0')}:${String(clock.second).padStart(2, '0')}`,
+    timeZone,
+  ) as Instant | undefined;
 }
 
 function sameRef(a: ExternalRef, b: ExternalRef): boolean {
@@ -160,8 +140,9 @@ function validBinding(binding: StayReplacementBinding): boolean {
  * The returned function is pure and read-only with respect to the captured world.
  */
 export function createStayReplacementContextResolver(binding: StayReplacementBinding): StayReplacementContextResolver {
-  return ({ candidate, world, resolvedOffers }): StayReplacementContext | undefined => {
+  return ({ candidate, world, resolvedOffers, now }): StayReplacementContext | undefined => {
     if (!validBinding(binding)) return undefined;
+    if (compareInstants(binding.provenance.observedAt, now) > 0) return undefined;
     // The line id is intentionally never treated as an item id; resolve the stay only from its allocation.
     const lineMatches = world.reservationLines.filter((line) => line.id === binding.reservationLineId);
     if (lineMatches.length !== 1) return undefined;
@@ -209,9 +190,12 @@ export function createStayReplacementContextResolver(binding: StayReplacementBin
     if (!originalArrival?.end.value || !originalStay?.start.value || !originalStay.end.value) return undefined;
     const placeId = originalStay.startPlaceId;
     const place = placeId ? world.places.find((candidatePlace) => candidatePlace.id === placeId) : undefined;
+    const arrivalPlaceId = originalArrival.endPlaceId;
+    const arrivalPlace = arrivalPlaceId ? world.places.find((candidatePlace) => candidatePlace.id === arrivalPlaceId) : undefined;
     if (!place || !place.externalRefs || place.externalRefs.filter((ref) => sameRef(ref, binding.propertyExternalRef)).length !== 1
-      || selectedService.destinationPlaceId !== place.id
-      || !world.placeJurisdictions.some((membership) => membership.placeId === place.id && membership.jurisdictionId === visit.jurisdictionId)) return undefined;
+      || !arrivalPlace || selectedService.destinationPlaceId !== arrivalPlace.id
+      || !world.placeJurisdictions.some((membership) => membership.placeId === place.id && membership.jurisdictionId === visit.jurisdictionId)
+      || !world.placeJurisdictions.some((membership) => membership.placeId === arrivalPlace.id && membership.jurisdictionId === visit.jurisdictionId)) return undefined;
     const candidateWorld = structuredClone(world);
     const candidateArrivalItem = candidateWorld.journeyItems.find((item) => item.id === arrivalItem.id);
     if (!candidateArrivalItem) return undefined;
@@ -238,8 +222,8 @@ export function createStayReplacementContextResolver(binding: StayReplacementBin
     if (!replacementStart) return undefined;
     const stayWindow = InstantIntervalSchema.safeParse({ start: replacementStart, end: originalStay.end.value });
     if (!stayWindow.success || Date.parse(stayWindow.data.start) >= Date.parse(stayWindow.data.end)) return undefined;
-    if (Date.parse(stayWindow.data.start) < Date.parse(candidateArrival.end.value)) return undefined;
-    if (visit.intended.start > stayWindow.data.start || visit.intended.end < stayWindow.data.end) return undefined;
+    if (compareInstants(visit.intended.start, stayWindow.data.start) > 0
+      || compareInstants(visit.intended.end, stayWindow.data.end) < 0) return undefined;
 
     const query: HotelSearchQuery = {
       location: { externalRef: binding.propertyExternalRef },
