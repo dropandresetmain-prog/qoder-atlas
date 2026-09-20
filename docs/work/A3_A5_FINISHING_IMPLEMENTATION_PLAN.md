@@ -9,13 +9,16 @@ Use it for **execution order, checkpoint ownership, model routing and stop condi
 Read in this order before implementation:
 
 1. `docs/work/ACTIVE_TASK.md`
-2. this plan
-3. `docs/work/ASTRA_HERO_DEPTH_SCOPE.md`
-4. `docs/work/ASTRA_A3_LIVE_PROGRESS.md`
-5. `docs/work/A4_RECOVERY_PREP.md`
-6. `docs/work/ASTRA_A4_SELECTED_PLAN_CONTINUATION.md`
-7. `docs/ROADMAP.md`
-8. `docs/CAPABILITIES_AND_LIMITATIONS.md`
+2. `docs/work/A5_FOUNDER_QC_RECONCILIATION.md`
+3. `docs/work/A5_1_FOUNDER_SARAH_QC_NOTES.md` (founder evidence; do not rewrite history)
+4. this plan
+5. `docs/work/ASTRA_HERO_DEPTH_SCOPE.md`
+6. `docs/work/A4_PHYSICAL_SANDBOX_ACCEPTANCE.md`
+7. `docs/SCENARIOS.md`
+8. `docs/ROADMAP.md`
+9. `docs/CAPABILITIES_AND_LIMITATIONS.md`
+
+Older A3/A4 progress/prep documents remain historical evidence and must not override the accepted A4 result or the post-founder-QC A5 reconciliation.
 
 Older audits and plans are historical/supporting evidence where they conflict with these files.
 
