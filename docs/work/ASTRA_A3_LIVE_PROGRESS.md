@@ -71,3 +71,9 @@ retrieval timestamps, and reviewed source notes preserve outstanding arrival for
 Focused UI43/43, evidence13/13, entry8/8 and existing-visit2/2 pass; TypeScript passes.
 One focused evidence failure (empty optional timing object) was fixed and passed alone.
 No A3 complete recommendation or A4 selected execution is claimed yet.
+
+## Bounded candidate-capacity correction
+
+World2 boot b6c2b9c physically showed52/67 and no attention, then D1 remained safe and D2/D3 opened the same Case2e15c71d-ff21-54ec-ae49-445dc71adbc4. LIVE Qwen, Atlas, Nuitée, official entry and destination replacement search succeeded. Attemptcabd29d2-8fea-5d3b-a009-4381a763f2ee completed03:32:19Z with16 rejected candidates. No A3 acceptance.
+
+Act Now:12 base flights plus4 partial overnight candidates consumed the16-candidate cap before full replacement composition. Repeated equivalent hotel queries also consumed local request slots before dispatch deduplication. The fix retains all query-to-flight bindings while counting unique requests, and prioritizes complete composites over intermediate fragments within the unchanged cap. Flight-only alternatives remain visible. A generalized NZD/2030 fixture now exercises both1 and12 flights;24 focused tests and TypeScript pass. LIVE rerun pending.

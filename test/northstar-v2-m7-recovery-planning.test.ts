@@ -1479,7 +1479,8 @@ test('CANCEL_STAY retires only intent and an arrival-aligned replacement is requ
   assert.ok(intent.preconditions.includes('cancellationPenalty:NZD:50.00'));
 });
 
-test('hotel planning combines overnight and destination-stay replacement only with a captured cancellation policy', async () => {
+for (const offerCount of [1, 12]) {
+test(`hotel planning combines overnight and destination-stay replacement with captured policy (${offerCount} flights)`, async () => {
   const { world, journey, travellerId, placeId, arrival, visit } = overnightStayWorld();
   const originPlaceId = arrival.desiredOriginPlaceId!;
   const departure = world.journeyItems.find((item) => item.id !== arrival.id)!;
@@ -1532,7 +1533,7 @@ test('hotel planning combines overnight and destination-stay replacement only wi
   const before = structuredClone(world);
   const replacementItemId = id();
   const planning = createHotelCompanionPlanning({
-    world, failing, now: NOW, resolveAirport, passengers: { adults: 1 },
+    world, failing, now: NOW, resolveAirport, passengers: { adults: 1 }, maxOffersPerCorridor: offerCount,
     hotel: {
       transport: async () => { throw new Error('focused test supplies normalized research results'); },
       resolveContext: ({ candidate, gap }) => ({
@@ -1555,7 +1556,7 @@ test('hotel planning combines overnight and destination-stay replacement only wi
   const corridor = transportCorridors(world, failing, { resolveAirport, passengers: { adults: 1 } }).corridors[0]!;
   const flight: PlanningToolResult = {
     requestId: transportRequestId(corridor), capability: 'FLIGHT', operation: 'flight.search', status: 'SUCCEEDED',
-    normalizedEvidence: { offers: [{ offerId: 'late flight', segments: [{ origin: { system: 'IATA', value: 'ORG' }, destination: { system: 'IATA', value: 'DST' }, departure: '2030-06-03T04:00:00.000Z', arrival: '2030-06-03T08:00:00.000Z' }], totalPrice: { amount: 100, currency: 'NZD' }, availability: 'AVAILABLE' }] },
+    normalizedEvidence: { offers: Array.from({ length: offerCount }, (_, index) => ({ offerId: `late flight ${index}`, segments: [{ origin: { system: 'IATA', value: 'ORG' }, destination: { system: 'IATA', value: 'DST' }, departure: '2030-06-03T04:00:00.000Z', arrival: '2030-06-03T08:00:00.000Z' }], totalPrice: { amount: 100, currency: 'NZD' }, availability: 'AVAILABLE' })) },
     provenance: { mode: 'REPLAY', observedAt: NOW, sourceRefs: [] }, uncertainty: [],
   };
   const roundTwo = await planning.nextRound({ completedRound: 1, results: [flight] });
@@ -1586,7 +1587,7 @@ test('hotel planning combines overnight and destination-stay replacement only wi
     provenance: { mode: 'REPLAY', observedAt: NOW, sourceRefs: [`quote-${index}`] }, uncertainty: [],
   }));
   const results = [...allBeforeQuotes, ...quoteResults];
-  const materializedTransport = materializeTransportOffers({ world, failing, toolResults: results, now: NOW, resolveAirport, passengers: { adults: 1 } });
+  const materializedTransport = materializeTransportOffers({ world, failing, toolResults: results, now: NOW, resolveAirport, passengers: { adults: 1 }, maxOffersPerCorridor: offerCount });
   const candidates = await planning.proposer.propose({
     workspaceId: world.workspaceId, recoveryCaseId: id(), now: NOW, failing, world: materializedTransport.world,
     effective: effectiveOf(materializedTransport.world), domain: 'TRANSPORT', evidence: { domainId: 'TRANSPORT', toolResults: results, evidenceRefs: [] }, preferences: [],
@@ -1596,7 +1597,9 @@ test('hotel planning combines overnight and destination-stay replacement only wi
   assert.ok(full, 'only one candidate joins the selected flight, overnight stay, cancellation, and replacement');
   if (!full) return;
   const hotelTerms = planning.materialize(results);
-  assert.equal(hotelTerms.quotedStays.filter((quote) => quote.replacement !== undefined).length, 1);
+  assert.equal(hotelTerms.quotedStays.filter((quote) => quote.replacement !== undefined).length, offerCount, 'deduplicated research stays bound to every applicable flight');
+  assert.ok(candidates.length <= 16);
+  assert.equal(candidates.filter((candidate) => candidate.effects.length === 1).length, offerCount, 'base flight alternatives remain available');
   assert.equal(hotelTerms.quotedStays.find((quote) => quote.replacement)?.replacement?.cancellationPenalty.amount, '50');
   assert.equal(hotelTerms.quotedStays.find((quote) => quote.replacement)?.replacement?.cancellationPenaltyBasis, 'PROVIDER_POLICY');
   const replacementEffect = full.effects.find((effect) => effect.effectKind === 'ADD_JOURNEY_STAY' && effect.replacesReservationLineId);
@@ -1657,3 +1660,5 @@ test('hotel planning combines overnight and destination-stay replacement only wi
   assert.equal((await planning.nextRound({ completedRound: 2, results: [flight, policy, ...wrongReplacementSearch] })).length, 1, 'a returned property outside the captured reference cannot become a replacement quote');
   assert.deepEqual(world, before, 'planning retains canonical supplier state and journey intent');
 });
+
+}

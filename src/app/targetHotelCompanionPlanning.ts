@@ -352,7 +352,6 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
     context: HotelPlanningContext,
     replacement?: StayReplacementContext,
   ): void => {
-    if (out.length >= budget.maxRequests) return;
     const place = world.places.find((candidatePlace) => candidatePlace.id === context.placeId);
     const window = InstantIntervalSchema.safeParse(context.stayWindow);
     const provenance = PlanningToolProvenanceSchema.safeParse(context.provenance);
@@ -370,9 +369,11 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
     });
     if (!request.success) return;
     const fingerprint = planningToolRequestFingerprint(request.data);
+    const alreadyQueued = out.some((queued) => planningToolRequestFingerprint(queued) === fingerprint);
+    if (!alreadyQueued && out.length >= budget.maxRequests) return;
     const binding: SearchBinding = { context, fingerprint, request: request.data, ...(replacement ? { replacement } : {}) };
     searches.set(fingerprint, [...(searches.get(fingerprint) ?? []), binding]);
-    out.push(request.data);
+    if (!alreadyQueued) out.push(request.data);
   };
 
   const searchRequests = async (results: readonly PlanningToolResult[]): Promise<PlanningToolRequest[]> => {
@@ -399,9 +400,11 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
           id: stableId('hotel-context', replacement.stayElementId), capability: 'HOTEL', operation: 'hotel.context', parameters: { stayElementId: replacement.stayElementId },
           purpose: 'Research the captured stay cancellation policy before a replacement proposal', evidenceGapCode: 'stay_cancellation_policy', round: 2,
         });
-        if (!contextRequest.success || out.length >= budget.maxRequests) continue;
+        if (!contextRequest.success) continue;
+        const alreadyQueued = out.some((request) => request.id === contextRequest.data.id);
+        if (!alreadyQueued && out.length >= budget.maxRequests) continue;
         replacementContexts.set(contextRequest.data.id, [...(replacementContexts.get(contextRequest.data.id) ?? []), { replacement, contextRequest: contextRequest.data }]);
-        out.push(contextRequest.data);
+        if (!alreadyQueued) out.push(contextRequest.data);
         queueSearch(out, base.world, replacement.replacement, replacement);
       }
     }
@@ -427,7 +430,8 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
       for (const rate of outcome.rates.filter((candidate) => candidate.availability !== 'UNKNOWN' && propertyIds.has(candidate.propertyId)).slice(0, maxRates ?? 0)) {
         const request = PlanningToolRequestSchema.parse({
           id: stableId('hotel-quote', JSON.stringify({ rateId: rate.rateId })), capability: 'HOTEL', operation: 'hotel.quote', parameters: { rateId: rate.rateId },
-          purpose: 'Confirm accommodation terms for an uncovered overnight itinerary gap', evidenceGapCode: 'overnight_accommodation', round: 3,
+          purpose: bindings.some((binding) => binding.replacement) ? 'Confirm replacement accommodation terms' : 'Confirm accommodation terms for an uncovered overnight itinerary gap',
+          evidenceGapCode: bindings.some((binding) => binding.replacement) ? 'stay_replacement' : 'overnight_accommodation', round: 3,
         });
         const fingerprint = planningToolRequestFingerprint(request);
         const rateBindings = bindings.map((binding) => ({ ...binding, rate, quoteRequestId: request.id }));
@@ -502,7 +506,10 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
       const replacementQuotes = materialized.quotedStays.filter((quote): quote is CapturedHotelQuote & { replacement: NonNullable<CapturedHotelQuote['replacement']> } => quote.replacement !== undefined);
       const companionByBase = new Map(companions.value.resolvedStayOffers.map((entry) => [entry.baseCandidateKey, entry.candidateKey]));
       const companionByKey = new Map(companions.value.candidates.map((candidate) => [candidate.key, candidate]));
-      const output = [...companions.value.candidates];
+      // Keep base flight alternatives, but allocate the bounded extra slots to
+      // complete plans before partial overnight fragments. Otherwise a full
+      // flight result set can consume every slot before destination repair.
+      const output = [...candidates];
       const emitted = new Set(output.map((candidate) => candidate.key));
       const replacementCap = Math.min(maxCombined ?? 0, Math.max(0, MAX_CANDIDATES_PER_PROPOSER - output.length));
       let replacementCount = 0;
@@ -534,6 +541,13 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
         emitted.add(key);
         output.push(parsed.data);
         replacementCount += 1;
+      }
+      for (const candidate of companions.value.candidates) {
+        if (output.length >= MAX_CANDIDATES_PER_PROPOSER) break;
+        if (!emitted.has(candidate.key)) {
+          output.push(candidate);
+          emitted.add(candidate.key);
+        }
       }
       return output;
     },
