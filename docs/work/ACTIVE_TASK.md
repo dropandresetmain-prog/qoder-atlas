@@ -1,7 +1,8 @@
 # ACTIVE TASK — A2 ACCEPTED / A3 IN PROGRESS
 
 - Goal: one generalized PostgreSQL engine, two rich desktop hero recoveries. [Hard scope lock](ASTRA_HERO_DEPTH_SCOPE.md).
-- Primary: `integration/astra-post-r4` in `C:/Dev/qoder-atlas/.worktrees/astra-post-r4` @ `9a43a870621a90e6c0c394c9ec1338ec26a4faab` (docs recovery-prep; WIP lanes inspected against `d602879`).
+- Finishing execution plan: [A3–A5 finishing implementation plan](A3_A5_FINISHING_IMPLEMENTATION_PLAN.md). New implementation agents must read it before starting A3/A4/A5 work.
+- Primary: `integration/astra-post-r4` in `C:/Dev/qoder-atlas/.worktrees/astra-post-r4`. Verify current HEAD before opening a new finishing lane; do not rely on a copied SHA in this ledger.
 - Immutable R4 base: `2baf1f6df484319e131590d37a0b026222324d03`.
 - A3 LIVE progress base: `eca447d804debd4e704df9ef48db08b50f1dfcb8`. [Actual A3 LIVE progress](ASTRA_A3_LIVE_PROGRESS.md) records normal provider/PG/browser evidence and source-complete baseline; acceptance remains pending.
 - A4 preserved WIP handoff: [A4_RECOVERY_PREP.md](A4_RECOVERY_PREP.md) — docs-only; do not integrate WIP lanes yet.
