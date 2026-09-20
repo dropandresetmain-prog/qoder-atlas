@@ -11,6 +11,9 @@
 
 **A4 HERO PROGRESSION CLOSURE PASS**
 
+- Final tip: `40bae0b00efd6f02fda0af1f50cf618703ec5756`
+- Branch: `finish/a4-destination-hotel-robustness`
+
 ## Preservation (hotel robustness)
 
 - SHA: `74ac4e7810e6acf63ae9fbeec27a1d36d3e3d9bf`
