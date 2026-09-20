@@ -237,6 +237,21 @@ function optionsHtml(m: CaseWorkspaceModel): string {
       <p class="cw-status" data-test="recovery-controls-status" role="status"></p>
     </div>`);
   }
+  if (m.noPlan && m.consideredPreview.length > 0) {
+    const rows = m.consideredPreview.map((candidate) => {
+      const evidence = [candidate.reason, ...candidate.movements, candidate.costLine].filter(Boolean).join(' ');
+      return `<li><strong>${escapeHtml(candidate.label)}</strong> — ${escapeHtml(evidence)}</li>`;
+    }).join('');
+    const omitted = m.considered.length - m.consideredPreview.length;
+    const note = omitted > 0
+      ? `<p class="meta">Showing ${m.consideredPreview.length} of ${m.considered.length} considered options. Open the full list below for the rest.</p>`
+      : '';
+    parts.push(`<div class="panel cw-rejection-preview" data-test="rejected-summary">
+      <h3>Why the automatic options stopped</h3>
+      <ul class="cw-considered">${rows}</ul>
+      ${note}
+    </div>`);
+  }
   if (m.considered.length > 0) {
     const rows = m.considered.map((c) => `<li><strong>${escapeHtml(c.label)}</strong> — ${escapeHtml(c.reason)}${c.movements.length > 0 ? `<br><span class="meta">${c.movements.map(escapeHtml).join('; ')}</span>` : ''}${c.unchangedNote ? `<br><span class="meta">${escapeHtml(c.unchangedNote)}</span>` : ''}</li>`).join('');
     parts.push(details('other-options', `${CASE_COPY.otherOptionsConsidered} (${m.considered.length})`, `<ul class="cw-considered">${rows}</ul>`));

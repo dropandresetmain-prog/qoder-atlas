@@ -274,6 +274,48 @@ describe('Case planning activity provider evidence', () => {
   });
 });
 
+describe('Case no-plan rejection evidence', () => {
+  test('shows a bounded default summary while retaining the full considered disclosure', () => {
+    const candidates = Array.from({ length: 4 }, (_, index) => ({
+      candidateKey: `opaque-candidate-${index}`,
+      domain: { label: 'Transport', code: 'TRANSPORT' },
+      proposer: { label: 'Transport proposer', code: 'proposer.transport-offer' },
+      disposition: { label: 'Rejected by deterministic evaluation', code: 'REJECTED_DETERMINISTIC' },
+      reasons: ['Not viable', 'Unresolved fail'],
+      outcomeDelta: [{
+        subject: { label: 'Jordan', ref: 'JOURNEY:jordan' },
+        direction: { label: 'Unchanged', code: 'UNCHANGED' },
+        baseline: 'FAIL', candidate: 'FAIL',
+      }],
+      costComparison: {
+        status: 'AVAILABLE', homeCurrency: 'USD',
+        totalHomeAmount: { amount: '418.75', currency: 'USD' },
+        lines: [], selectedFxEvidence: [], comparedAt: generatedAt,
+      },
+    }));
+    const view = caseView({
+      planningEvidence: {
+        phase: 'DECISION_TIME', asOf: generatedAt, attemptRef: 'attempt-no-plan', coordinatorVersion: 'coordinator-1',
+        outcome: { label: 'No viable recovery found', code: 'NO_RECOVERY_FOUND' },
+        domains: [], tools: [], modelActivities: [], viableStrategies: [], candidates,
+      },
+    } as Partial<RecoveryCaseView>);
+    const model = presentCaseWorkspace(view);
+    assert.equal(model.considered.length, 4);
+    assert.equal(model.consideredPreview.length, 3);
+    assert.match(model.consideredPreview[0]!.costLine ?? '', /Compared cost: USD 418\.75/);
+
+    const html = renderProductRecoveryCase(view);
+    assert.match(html, /data-test="rejected-summary"/);
+    assert.match(html, /Why the automatic options stopped/);
+    assert.match(html, /Jordan: does not work → does not work/);
+    assert.match(html, /Compared cost: USD 418\.75/);
+    assert.match(html, /Other options considered \(4\)/);
+    assert.match(html, /Showing 3 of 4 considered options/);
+    assert.doesNotMatch(primaryVisibleText(html), /opaque-candidate|proposer\.transport-offer/);
+  });
+});
+
 describe('duplicate option cards (F)', () => {
   const repeated = [1, 2, 3].flatMap((attempt) => [
     strategy(1, attempt * 10 + 1, '05:00', 'p'),

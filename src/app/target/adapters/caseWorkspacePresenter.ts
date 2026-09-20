@@ -105,6 +105,8 @@ export interface CaseRejectedModel {
   readonly label: string;
   readonly reason: string;
   readonly movements: readonly string[];
+  /** Decision-time cost comparison, when the planner captured one. */
+  readonly costLine?: string;
   readonly unchangedNote?: string;
 }
 
@@ -136,6 +138,8 @@ export interface CaseWorkspaceModel {
   readonly recommended?: CaseOptionModel;
   readonly alternatives: readonly CaseOptionModel[];
   readonly considered: readonly CaseRejectedModel[];
+  /** A small default summary; the full considered list stays in its disclosure. */
+  readonly consideredPreview: readonly CaseRejectedModel[];
   readonly showFindRecovery: boolean;
   readonly noPlan: boolean;
   readonly approval?: {
@@ -534,14 +538,21 @@ function buildConsidered(view: RecoveryCaseView, shownStrategyRefs: ReadonlySet<
     if (candidate.disposition.code === 'RECOMMENDED') continue;
     const changed = candidate.outcomeDelta.filter((d) => d.direction.code !== 'UNCHANGED');
     const unchanged = candidate.outcomeDelta.length - changed.length;
+    // Keep an unchanged FAIL → FAIL result visible when it is the only
+    // decision-time delta. It is the strongest typed fact available for a
+    // rejected candidate; hiding it leaves only the generic disposition.
+    const movements = changed.length > 0 ? changed : candidate.outcomeDelta.slice(0, 5);
     const reason = candidate.reasons.map(plain).find((r): r is string => r !== undefined)
       ?? REJECTION_SENTENCE[candidate.disposition.code ?? ''] ?? 'This option was not chosen.';
     out.push({
       label: CANDIDATE_LABEL[candidate.domain.code ?? ''] ?? 'Another option',
       reason: sentence(reason),
-      movements: changed.slice(0, 5).map((d) =>
+      movements: movements.map((d) =>
         `${plain(d.subject.label) ?? 'Part of the trip'}: ${deltaWord(d.baseline)} → ${deltaWord(d.candidate)}`),
-      ...(unchanged > 0 ? { unchangedNote: `${unchanged} other ${unchanged === 1 ? 'check was' : 'checks were'} unchanged.` } : {}),
+      ...(candidate.costComparison?.status === 'AVAILABLE'
+        ? { costLine: `Compared cost: ${candidate.costComparison.totalHomeAmount.currency} ${candidate.costComparison.totalHomeAmount.amount}` }
+        : {}),
+      ...(changed.length > 0 && unchanged > 0 ? { unchangedNote: `${unchanged} other ${unchanged === 1 ? 'check was' : 'checks were'} unchanged.` } : {}),
     });
   }
   return out;
@@ -983,6 +994,7 @@ export function presentCaseWorkspace(view: RecoveryCaseView): CaseWorkspaceModel
   const considered = phase === 'awaiting_approval' || phase === 'no_plan' || phase === 'executing' || phase === 'recovered'
     ? buildConsidered(view, shown)
     : [];
+  const consideredPreview = phase === 'no_plan' ? considered.slice(0, 3) : [];
 
   const happened = whatHappened(view, name);
   const stake = plain(view.criticalCommitment);
@@ -1062,6 +1074,7 @@ export function presentCaseWorkspace(view: RecoveryCaseView): CaseWorkspaceModel
     ...(recommended ? { recommended } : {}),
     alternatives,
     considered,
+    consideredPreview,
     showFindRecovery: phase === 'disrupted',
     noPlan: phase === 'no_plan',
     ...(approval ? { approval } : {}),
