@@ -186,8 +186,8 @@ The disruption should be PROGRESSIVE:
 - then ZG053 becomes impossible
 - Northstar continues recalculating as evidence changes
 - a later same-night recovery may temporarily remain feasible
-- further delay eventually eliminates the last sensible same-night option
-- traveller must overnight near Narita
+- later progression eventually eliminates the last sensible same-night option; in the accepted proof this occurs because the scenario planning clock has passed those departures, not because application logic fabricates another delay
+- traveller must overnight near Narita once no boardable non-overnight recovery remains
 
 The **product-level** recovery problem includes:
 - replacement NRT→SIN flight
@@ -203,6 +203,8 @@ composite recommendation through the normal PostgreSQL runtime. The candidate wo
 replacement flight, Narita overnight stay, scoped authoritative Japan entry evidence, the
 required Singapore stay replacement/cancellation consequence, Frankfurter/home-currency cost
 comparison and finals viability. Transfer and insurance remain bounded reasoning/evidence only.
+
+**A4 physical acceptance evidence:** accepted on product SHA `546adf210db8ead343ecdac22b410515665c176a`. The selected protected sequence executed flight → Narita book → destination replacement book → displaced destination cancel; provider outcomes were observed/reconciled and canonically applied; final whole-trip assessment was CURRENT/PASS and the Case resolved. The destination replacement property may differ from the original property when a bounded valid provider quote satisfies the required stay window and policy.
 
 **Required A4 execution:** the selected protected ActionPlan executes four supported sandbox
 actions: replacement flight, Narita hotel booking, Singapore replacement hotel booking, and
@@ -277,7 +279,7 @@ Stable cast and programme: Jordan Hale (`ait-draft-09`); hard finals showcase
 | **delay_2_tight** | Further delay; NRT connection becomes tight but still theoretically makeable. | **VIABLE_TIGHT** / watch |
 | **zg053_impossible** | Upstream delay makes ZG053 impossible; missed-connection signal; airline may still suggest same-night options. | Onward leg **failed**; recovery search opens |
 | **same_night_temp** | Scoot **TR875** (NRT→SIN evening → arrive SIN ~05:20) still feasible for the evening showcase under 150. Jordan is not bound to the morning lab. | Same-night recovery **temporarily VIABLE** |
-| **same_night_killed** | Further delay / misconnect eliminates last sensible same-night option. Overnight near Narita is required as known trip context. | Same-night **NOT_VIABLE** |
+| **same_night_killed** | Progression reaches a point where the last sensible same-night option is no longer boardable. The accepted A4 proof uses the later scenario planning clock; no extra synthetic delay is required just to force overnight. | Same-night **NOT_VIABLE**; overnight required |
 | **overnight_context** | Narita hotel options and landside-entry needs are composed into the candidate world; scoped authoritative entry evidence must support the overnight. Insurance remains context/evidence only. | Required composite dependency; no broad immigration/claims platform |
 | **airline_morning** | Airline-default inventory includes Scoot **TR867** (~12:30→20:45); Northstar also sees TR885 (~08:20→14:35). | TR867 fails the 20:45 finals buffer; TR885 clears it under 150 |
 | **northstar_morning** | Northstar ranks boardable next-morning flight inventory; TR885 or a current equivalent may be the transport component, but it is viable only as part of the complete flight + Narita stay + entry + Singapore-stay + finals candidate. | Complete composite must be **VIABLE** |
