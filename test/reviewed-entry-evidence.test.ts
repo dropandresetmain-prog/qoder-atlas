@@ -145,3 +145,40 @@ test('reviewed entry evidence: unknown predicate cannot become a reviewed policy
   if (!result.ok) assert.equal(result.reason, 'unsupported_predicate');
   assert.equal(ReviewedEntryPolicySchema.safeParse(unknown).success, false);
 });
+
+test('reviewed entry evidence: malformed policy or context timestamps refuse without throwing', () => {
+  const malformedPolicy = {
+    ...policy(),
+    effectiveWindow: { start: 'not-an-instant', end: '2030-07-01T00:00:00.000Z' },
+  } as ReviewedEntryPolicy;
+  assert.doesNotThrow(() => {
+    const result = verify({ policy: malformedPolicy });
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.reason, 'invalid_policy');
+  });
+
+  const malformedContext = {
+    ...context(),
+    visitWindow: { start: '2030-06-20T00:00:00.000Z', end: 'not-an-instant' },
+  } as ReviewedEntryEvidenceContext;
+  assert.doesNotThrow(() => {
+    const result = verify({ context: malformedContext });
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.reason, 'invalid_context');
+  });
+});
+
+test('reviewed entry evidence: expired policy refuses while future-effective policy remains eligible', () => {
+  const expired = verify({
+    policy: policy({ effectiveWindow: { start: '2030-05-01T00:00:00.000Z', end: '2030-05-31T00:00:00.000Z' } }),
+    context: context({ visitWindow: { start: '2030-05-20T00:00:00.000Z', end: '2030-05-22T00:00:00.000Z' } }),
+  });
+  assert.equal(expired.ok, false);
+  if (!expired.ok) assert.equal(expired.reason, 'expired_policy');
+
+  const futurePolicy = verify({
+    policy: policy({ effectiveWindow: { start: '2030-07-01T00:00:00.000Z', end: '2030-08-01T00:00:00.000Z' } }),
+    context: context({ visitWindow: { start: '2030-07-20T00:00:00.000Z', end: '2030-07-22T00:00:00.000Z' } }),
+  });
+  assert.equal(futurePolicy.ok, true);
+});

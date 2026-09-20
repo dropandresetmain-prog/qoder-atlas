@@ -90,7 +90,7 @@ const officialDocumentEvidenceSchema = z.strictObject({
   url: reviewedHttpsUrl,
   observedAt: InstantSchema,
   contentSha256: z.string().regex(SHA256),
-  text: z.string().min(1),
+  text: z.string().min(1).max(1_048_576),
 });
 
 export type ReviewedEntryEvidenceFailureReason =
@@ -99,6 +99,7 @@ export type ReviewedEntryEvidenceFailureReason =
   | 'unsupported_predicate'
   | 'invalid_context'
   | 'invalid_now'
+  | 'expired_policy'
   | 'scope_mismatch'
   | 'invalid_document_evidence'
   | 'missing_source_evidence'
@@ -191,19 +192,32 @@ function expiresAt(policy: ReviewedEntryPolicy, documents: readonly OfficialDocu
 export function verifyReviewedEntryEvidence(
   input: VerifyReviewedEntryEvidenceInput,
 ): ReviewedEntryEvidenceVerification {
-  const policyResult = ReviewedEntryPolicySchema.safeParse(input.policy);
+  let policyResult: ReturnType<typeof ReviewedEntryPolicySchema.safeParse>;
+  try {
+    policyResult = ReviewedEntryPolicySchema.safeParse(input.policy);
+  } catch {
+    return failure('invalid_policy');
+  }
   if (!policyResult.success) return policyFailure(policyResult.error.issues.map((issue) => issue.message));
 
   const nowResult = InstantSchema.safeParse(input.now);
   if (!nowResult.success) return failure('invalid_now');
-  const contextResult = ReviewedEntryEvidenceContextSchema.safeParse(input.context);
+  let contextResult: ReturnType<typeof ReviewedEntryEvidenceContextSchema.safeParse>;
+  try {
+    contextResult = ReviewedEntryEvidenceContextSchema.safeParse(input.context);
+  } catch {
+    return failure('invalid_context');
+  }
   if (!contextResult.success) return failure('invalid_context');
-  const documentsResult = z.array(officialDocumentEvidenceSchema).safeParse(input.actualOfficialDocumentEvidence);
+  const documentsResult = z.array(officialDocumentEvidenceSchema).max(MAX_LIST_ITEMS).safeParse(input.actualOfficialDocumentEvidence);
   if (!documentsResult.success) return failure('invalid_document_evidence');
 
   const policy = policyResult.data;
   const context = contextResult.data;
   const documents = documentsResult.data;
+  if (Date.parse(nowResult.data) >= Date.parse(policy.effectiveWindow.end)) {
+    return failure('expired_policy');
+  }
   if (
     policy.countryCode !== context.countryCode
     || !policy.purposes.includes(context.purpose)
