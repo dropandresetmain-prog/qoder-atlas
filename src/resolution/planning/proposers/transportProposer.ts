@@ -117,6 +117,8 @@ export function exactPriceOf(amount: number, currency: string): ExactMoney | und
 
 /** A normalized offer correlated to the journey item it was researched for. */
 export interface CorrelatedOffer {
+  /** The exact flight.search request that supplied this offer. */
+  requestId: string;
   journeyItemId: string;
   journeyId: string;
   rawOfferId: string;
@@ -203,6 +205,7 @@ export function correlatedTransportOffers(input: {
       const price = exactPriceOf(offer.totalPrice.amount, offer.totalPrice.currency);
       if (!price) continue; // a price we cannot represent exactly is not proposed
       correlated.push({
+        requestId,
         journeyItemId: corridor.journeyItemId,
         journeyId: corridor.journeyId,
         rawOfferId: offer.offerId,

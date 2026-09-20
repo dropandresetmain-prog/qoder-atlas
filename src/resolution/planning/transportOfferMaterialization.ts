@@ -97,13 +97,13 @@ export function materializeTransportOffers(input: TransportPassengerSource & {
     now: input.now,
     maxOffersPerCorridor: input.maxOffersPerCorridor ?? 6,
   });
-  const corridorByItem = new Map(corridors.map((corridor) => [corridor.journeyItemId, corridor]));
+  const corridorByRequest = new Map(corridors.map((corridor) => [transportRequestId(corridor), corridor]));
   const resultByRequest = new Map(input.toolResults.map((result) => [result.requestId, result]));
   const capturedServices: WTransportService[] = [];
   const resolvedOffers: ResolvedOffer[] = [];
   for (const offer of correlated.offers) {
-    const corridor = corridorByItem.get(offer.journeyItemId);
-    const result = corridor ? resultByRequest.get(transportRequestId(corridor)) : undefined;
+    const corridor = corridorByRequest.get(offer.requestId);
+    const result = resultByRequest.get(offer.requestId);
     if (!corridor || !result || result.status !== 'SUCCEEDED') continue;
     const service = materializeOffer(offer, result, corridor);
     if (!service) continue;

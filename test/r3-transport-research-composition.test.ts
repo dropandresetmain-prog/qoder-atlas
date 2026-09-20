@@ -32,17 +32,24 @@ import {
   transportRequestId,
 } from '../src/resolution/planning/transportCorridors.ts';
 import { materializeTransportOffers } from '../src/resolution/planning/transportOfferMaterialization.ts';
+import { correlatedTransportOffers } from '../src/resolution/planning/proposers/transportProposer.ts';
 import { createPlanningToolTransport } from '../src/resolution/planning/replayPlanningTransport.ts';
 import { AtlasFlightAdapter } from '../src/providers/atlas/adapter.ts';
 import { FileRecordingStore } from '../src/providers/recordingStore.ts';
 import { dispatchToolRequest } from '../src/app/dispatch.ts';
 import { dimension, explain } from '../src/resolution/evaluation/explain.ts';
+import { connectionEvaluator } from '../src/resolution/evaluation/evaluators/connection.ts';
+import { createM6Registry } from '../src/resolution/evaluation/registry.ts';
+import { projectEffectiveWorld } from '../src/resolution/world/effectiveItinerary.ts';
+import { evaluateRecoveryStrategy } from '../src/resolution/scenarios/evaluate.ts';
+import { ScenarioChangeSchema } from '../src/contracts/v2/scenario/scenarioChange.ts';
 import type { FailingSubject } from '../src/resolution/planning/proposer.ts';
 import type { TypedRef } from '../src/domain/v2/shared/identity.ts';
 import type { AssessmentResult } from '../src/contracts/v2/assessment/assessmentManifest.ts';
 import { AssessmentResultSchema } from '../src/contracts/v2/assessment/assessmentManifest.ts';
 import { emptyWorld, id } from './support/m6World.ts';
-import type { WJourney, WJourneyItem, WPlace } from '../src/resolution/world/world.ts';
+import type { WConstraintDefinition, WJourney, WJourneyItem, WPlace, WTransportService } from '../src/resolution/world/world.ts';
+import type { PlanningToolResult } from '../src/contracts/v2/planning/planningTool.ts';
 
 const ORIGIN_PLACE = 'place-origin';
 const DEST_PLACE = 'place-dest';
@@ -242,6 +249,95 @@ describe('R3 transport research composition', () => {
     assert.ok(
       materialized.capturedServices.length > 0,
       'resolver-only arm must still materialize researched offers into the planning world',
+    );
+  });
+
+  test('a canonical failed connection widens only its downstream corridor to the next local day', () => {
+    const travellerId = id();
+    const journey = journeyRow(id(), travellerId);
+    const upstreamOrigin = id();
+    const hub = id();
+    const destination = id();
+    const inbound = transportItem(journey.id);
+    inbound.orderKey = '010';
+    inbound.desiredOriginPlaceId = upstreamOrigin;
+    inbound.desiredDestinationPlaceId = hub;
+    inbound.intendedWindow = { start: '2030-01-01T08:00:00.000Z', end: '2030-01-01T12:30:00.000Z' };
+    const onward = transportItem(journey.id);
+    onward.orderKey = '020';
+    onward.desiredOriginPlaceId = hub;
+    onward.desiredDestinationPlaceId = destination;
+    onward.intendedWindow = { start: '2030-01-01T10:00:00.000Z', end: '2030-01-01T14:00:00.000Z' };
+    const upstreamService: WTransportService = {
+      id: id(), revision: 1, mode: 'AIR', operator: 'carrier', originPlaceId: upstreamOrigin, destinationPlaceId: hub,
+      published: { departure: { value: '2030-01-01T08:00:00.000Z', observedAt: NOW, evidenceId: null }, arrival: { value: '2030-01-01T12:30:00.000Z', observedAt: NOW, evidenceId: null } },
+      estimated: { departure: null, arrival: null }, actual: { departure: null, arrival: null },
+    };
+    inbound.selectedServiceId = upstreamService.id;
+    const connectionConstraint: WConstraintDefinition = {
+      id: id(), revision: 1, registeredType: 'minimum_connection_minutes', hardness: 'HARD', owner: { kind: 'JOURNEY', id: journey.id }, provenanceEvidenceId: null,
+      operands: [{ key: 'minutes', kind: 'NUMBER', subject: null, text: null, number: '60', boolean: null, instant: null, localDate: null }],
+    };
+    const world = emptyWorld({
+      travellers: [{ id: travellerId, revision: 1, lifecycleStatus: 'ACTIVE' }], journeys: [journey], journeyItems: [inbound, onward], transportServices: [upstreamService], constraints: [connectionConstraint],
+      places: [
+        { id: upstreamOrigin, revision: 1, name: 'Upstream', placeType: 'AIRPORT', timeZone: 'America/Los_Angeles', hasCoordinates: true },
+        { id: hub, revision: 1, name: 'Hub', placeType: 'AIRPORT', timeZone: 'Pacific/Auckland', hasCoordinates: true },
+        { id: destination, revision: 1, name: 'Destination', placeType: 'AIRPORT', timeZone: 'Asia/Singapore', hasCoordinates: true },
+      ],
+    });
+    const subject: TypedRef = { kind: 'JOURNEY', id: journey.id };
+    const connection = connectionEvaluator.evaluate(subject, { now: NOW, world, effective: projectEffectiveWorld(world) });
+    assert.equal(connection.dimensions[0]?.verdict, 'FAIL', 'the canonical M6 evaluator supplies the extension gate');
+    const assessment = AssessmentResultSchema.parse({
+      id: id(), kind: 'VIABILITY', evaluatedAt: NOW, manifest: world.manifest,
+      subjects: [{ subjectRef: subject, role: 'PRIMARY' }], overallVerdict: 'FAIL', dimensions: connection.dimensions,
+    });
+    const resolveAirport = (placeId: string) => ({ system: 'IATA', value: placeId });
+    const failing: FailingSubject[] = [{ subject, assessment }];
+    const widened = transportCorridors(world, failing, { resolveAirport, passengers: { adults: 1 } });
+    const onwardCorridors = widened.corridors.filter((corridor) => corridor.journeyItemId === onward.id);
+    // The hub is UTC+13 here: the upstream arrival is 01:30 on Jan 2 while
+    // the intended onward departure was Jan 1 locally. Jan 1 is impossible.
+    assert.deepEqual(onwardCorridors.map((corridor) => corridor.departureDate), ['2030-01-02', '2030-01-03']);
+    assert.equal(new Set(onwardCorridors.map(transportRequestId)).size, 2, 'each bounded date has its own correlation identity');
+
+    const resultFor = (corridor: typeof onwardCorridors[number], rawOfferId: string): PlanningToolResult => ({
+      requestId: transportRequestId(corridor), capability: 'FLIGHT', operation: 'flight.search', status: 'SUCCEEDED',
+      normalizedEvidence: { offers: [{ offerId: rawOfferId, segments: [{ origin: corridor.origin, destination: corridor.destination, departure: `${corridor.departureDate}T12:00:00.000Z`, arrival: `${corridor.departureDate}T14:00:00.000Z` }], totalPrice: { amount: 100, currency: 'USD' }, availability: 'AVAILABLE' }] },
+      provenance: { mode: 'REPLAY', observedAt: NOW, sourceRefs: [] }, uncertainty: [],
+    });
+    const results = onwardCorridors.map((corridor, index) => resultFor(corridor, `offer-${index}`));
+    const correlated = correlatedTransportOffers({ corridors: widened.corridors, toolResults: results, now: NOW, maxOffersPerCorridor: 6 });
+    assert.deepEqual(correlated.offers.map((offer) => offer.requestId).sort(), results.map((result) => result.requestId).sort());
+    const materialized = materializeTransportOffers({ world, failing, toolResults: results, now: NOW, resolveAirport, passengers: { adults: 1 } });
+    assert.equal(materialized.capturedServices.length, 2, 'both date-specific results materialize through their own corridor');
+    assert.equal(world.transportServices.length, 1, 'research did not mutate the canonical world');
+
+    const unboardableService: WTransportService = {
+      ...upstreamService, id: id(), originPlaceId: hub, destinationPlaceId: destination,
+      published: { departure: { value: '2030-01-01T11:00:00.000Z', observedAt: NOW, evidenceId: null }, arrival: { value: '2030-01-01T13:00:00.000Z', observedAt: NOW, evidenceId: null } },
+    };
+    const candidateWorld = structuredClone(world);
+    candidateWorld.transportServices.push(unboardableService);
+    const unboardableOfferId = id();
+    const rejected = evaluateRecoveryStrategy({
+      recoveryCaseId: id(), basisAssessmentId: assessment.id, baseWorld: candidateWorld, baseManifest: candidateWorld.manifest, now: NOW,
+      scenarioChange: ScenarioChangeSchema.parse({
+        id: id(), recoveryStrategyId: id(), strategyVersion: 1, basisAssessmentId: assessment.id,
+        affectedSubjectRefs: [subject], effects: [{ effectKind: 'SELECT_OFFER', journeyItemId: onward.id, offerId: unboardableOfferId, offerPrice: { amount: '100.00', currency: 'USD' } }],
+      }),
+      resolvedOffers: [{ offerId: unboardableOfferId, transportServiceId: unboardableService.id }], resolveSubjectRefs: [subject], registry: createM6Registry(),
+    });
+    assert.equal(rejected.ok, true);
+    if (!rejected.ok) return;
+    assert.equal(rejected.value.strategy.viability, 'NOT_VIABLE', 'RC-6 rejects a selected service that leaves the connection unboardable');
+
+    const ordinary = transportCorridors(world, [failingJourney(journey.id)], { resolveAirport, passengers: { adults: 1 } });
+    assert.deepEqual(
+      ordinary.corridors.filter((corridor) => corridor.journeyItemId === onward.id).map((corridor) => corridor.departureDate),
+      ['2030-01-01'],
+      'a generic non-connection failure keeps the original one-date search',
     );
   });
 });
