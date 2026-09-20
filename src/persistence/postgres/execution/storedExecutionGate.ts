@@ -30,6 +30,7 @@ import { assessManifestCurrentness } from '../../../resolution/world/currentness
 import { compareExactMoney } from '../../../domain/v2/shared/money.ts';
 import type { CapabilityKind } from '../../../resolution/execution/capability.ts';
 import { observedProgrammeRevisionFromPrerequisites } from './programmeRevisionRefresh.ts';
+import { loadCurrentSelectedPlanContinuation } from './selectedPlanContinuation.ts';
 
 export { DISPATCH_ACTION_KIND };
 export const INTERNAL_PROGRAMME_SCHEDULE_CAPABILITY = 'internal:programme.schedule';
@@ -41,6 +42,8 @@ export interface StoredActionIntentRow {
   operationNamespace: string;
   logicalOperationKey: string;
   requestFingerprint: string;
+  sourceEffectIndex: number | null;
+  sourceEffectFingerprint: string | null;
   capabilityRef: string;
   subjectRefs: TypedRef[];
   expectedRevisions: { aggregateRef: TypedRef; expectedRevision: number }[];
@@ -71,6 +74,42 @@ const BLOCKING_STATUSES = new Set([
 ]);
 type Queryable = Pick<Pool | PoolClient, 'query'>;
 
+/**
+ * A selected-plan checkpoint may explain stale original strategy reads only
+ * when its freshly captured manifest is still current and every recorded
+ * prerequisite has a durable terminal success plus the exact canonical receipt
+ * applied after provider observation. It never exempts a Journey generally.
+ */
+async function continuationExplainsCurrentness(
+  pool: Pool | PoolClient, workspaceId: string, intent: StoredActionIntentRow, now: Instant,
+): Promise<boolean> {
+  if (!intent.sourceEffectFingerprint) return false;
+  const checkpoint = await loadCurrentSelectedPlanContinuation(pool, workspaceId, intent.id, now);
+  if (!checkpoint || !checkpoint.residualEffectFingerprints.includes(intent.sourceEffectFingerprint)) return false;
+  const state = await new PgCurrentStateReader(pool).loadFor(workspaceId, checkpoint.freshManifest);
+  if (!assessManifestCurrentness(checkpoint.freshManifest, state, now).current) return false;
+  for (const receipt of checkpoint.prerequisites) {
+    const actual = await pool.query<{ action_intent_id: string; status: string }>(
+      `SELECT ea.action_intent_id, ea.status
+         FROM execution_attempts ea
+         JOIN action_intents ai ON ai.workspace_id = ea.workspace_id AND ai.id = ea.action_intent_id
+         JOIN selected_plan_canonical_applications application
+           ON application.workspace_id = ea.workspace_id AND application.attempt_id = ea.id
+         JOIN command_receipts cr ON cr.workspace_id = ea.workspace_id
+          AND cr.command_namespace = application.command_namespace
+          AND cr.idempotency_key = application.idempotency_key
+          AND cr.command_namespace = $4 AND cr.idempotency_key = $5
+        WHERE ea.workspace_id = $1 AND ea.id = $2 AND ai.action_plan_id = $3`,
+      [workspaceId, receipt.attemptId, intent.actionPlanId,
+        receipt.canonicalReceipt.commandNamespace, receipt.canonicalReceipt.idempotencyKey],
+    );
+    const row = actual.rows[0];
+    if (!row || row.action_intent_id !== receipt.actionIntentId || row.status !== receipt.status
+      || !['OBSERVED_SUCCESS', 'COMPLETED', 'RECONCILED'].includes(row.status)) return false;
+  }
+  return true;
+}
+
 function parseJsonArray<T>(value: unknown): T[] {
   if (Array.isArray(value)) return value as T[];
   if (typeof value !== 'string') return [];
@@ -85,13 +124,13 @@ function parseJsonArray<T>(value: unknown): T[] {
 export async function loadStoredIntent(db: Queryable, workspaceId: string, intentId: string): Promise<StoredActionIntentRow | undefined> {
   const result = await db.query<{
     id: string; action_plan_id: string; plan_version: number; operation_namespace: string;
-    logical_operation_key: string | null; request_fingerprint: string | null; capability_ref: string;
+    logical_operation_key: string | null; request_fingerprint: string | null; source_effect_index: number | null; source_effect_fingerprint: string | null; capability_ref: string;
     subject_refs: unknown; expected_revisions: unknown; preconditions: unknown;
     offer_fingerprint: string | null; cost_amount: string | null; cost_currency: string | null;
     limits: unknown; required_authority_scopes: unknown;
   }>(
     `SELECT i.id, i.action_plan_id, p.plan_version, i.operation_namespace,
-            i.logical_operation_key, i.request_fingerprint, i.capability_ref,
+            i.logical_operation_key, i.request_fingerprint, i.source_effect_index, i.source_effect_fingerprint, i.capability_ref,
             i.subject_refs, i.expected_revisions, i.preconditions, i.offer_fingerprint,
             i.cost_amount::text AS cost_amount, i.cost_currency, i.limits,
             i.required_authority_scopes
@@ -105,7 +144,8 @@ export async function loadStoredIntent(db: Queryable, workspaceId: string, inten
   return {
     id: row.id, actionPlanId: row.action_plan_id, planVersion: row.plan_version,
     operationNamespace: row.operation_namespace, logicalOperationKey: row.logical_operation_key,
-    requestFingerprint: row.request_fingerprint, capabilityRef: row.capability_ref,
+    requestFingerprint: row.request_fingerprint, sourceEffectIndex: row.source_effect_index,
+    sourceEffectFingerprint: row.source_effect_fingerprint, capabilityRef: row.capability_ref,
     subjectRefs: parseJsonArray<TypedRef>(row.subject_refs),
     expectedRevisions: parseJsonArray(row.expected_revisions),
     preconditions: parseJsonArray<string>(row.preconditions),
@@ -470,6 +510,10 @@ export async function evaluateStoredExecutionGate(
   const state = await new PgCurrentStateReader(pool).loadFor(params.workspaceId, manifest);
   const currentness = assessManifestCurrentness(manifest, state, params.now);
   if (!currentness.current) {
+    if (await continuationExplainsCurrentness(pool, params.workspaceId, intent, params.now)) {
+      // The checkpoint is a new exact currentness boundary for the remaining
+      // selected effect. Assessment/authority/budget checks below still run.
+    } else {
     // Narrow exemption: a dependent intent may see AGGREGATE_ADVANCED /
     // SCOPE_ADVANCED vs the original strategy base manifest when a same-plan
     // prerequisite already observed a Programme mutation (schedule updates
@@ -540,6 +584,7 @@ export async function evaluateStoredExecutionGate(
     }
     if (unexplained.length > 0) {
       return { allowed: false, reason: 'STALE_BASE', detail: JSON.stringify(currentness.reasons) };
+    }
     }
   }
 
