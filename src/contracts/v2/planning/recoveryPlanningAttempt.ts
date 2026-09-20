@@ -64,6 +64,14 @@ export const PlanningEvidenceRecordSchema = z.strictObject({
 });
 export type PlanningEvidenceRecord = z.infer<typeof PlanningEvidenceRecordSchema>;
 
+/** A typed desired-state field that this planner cannot yet evaluate safely. */
+export const RequestPlanningIssueSchema = z.strictObject({
+  code: z.string().regex(/^[a-z][a-z0-9_]*$/),
+  description: z.string().min(1).max(1024),
+  domain: RecoveryDomainIdSchema,
+});
+export type RequestPlanningIssue = z.infer<typeof RequestPlanningIssueSchema>;
+
 /**
  * Why a material candidate ended where it did. Closed so the persisted record
  * can never imply a rejected candidate was recommended, or that a viable one
@@ -120,6 +128,7 @@ export const RecoveryPlanningAttemptSchema = z.strictObject({
   coordinatorVersion: z.string().min(1),
   domains: z.array(RecoveryDomainDecisionSchema).default([]),
   evidence: z.array(PlanningEvidenceRecordSchema).default([]),
+  requestIssues: z.array(RequestPlanningIssueSchema).default([]),
   materialCandidates: z.array(MaterialCandidateEvidenceSchema).default([]),
   /** Viable strategies promoted to RecoveryStrategy rows during this attempt. */
   viableStrategyRefs: z.array(SubjectIdSchema).default([]),
@@ -168,11 +177,8 @@ export type RecoveryPlanningResult = z.infer<typeof RecoveryPlanningResultSchema
 export interface RecoveryPlanningInput {
   recoveryCaseId: SubjectId;
   reason: RecoveryPlanningReason;
-  /**
-   * A submitted desired future state. It accompanies a truthful current
-   * assessment and is bound into the attempt and world-currentness manifest.
-   */
-  requestBasis?: ChangeRequestPlanningBasis;
+  /** Canonical request identity. The coordinator loads all request content. */
+  changeRequestId?: SubjectId;
 }
 
 /**

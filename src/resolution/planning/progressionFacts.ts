@@ -75,6 +75,8 @@ export interface ObservedProgressionFacts {
    * falls back to the gate's own denial reason.
    */
   currentAssessmentVerdict?: 'PASS' | 'FAIL' | 'UNKNOWN';
+  /** True only for an accepted canonical request with no attempt on this basis. */
+  requestedChangePending?: boolean;
 }
 
 /**
@@ -102,6 +104,7 @@ export function toProgressionInput(facts: ObservedProgressionFacts): RecoveryPro
         // proposal awaiting authority is the owner flag's call (per basis).
         : isUnreconciledExecution(reason))),
     currentStillFailing: facts.currentAssessmentVerdict === undefined ? reason === 'BLOCKING_FAIL' : facts.currentAssessmentVerdict === 'FAIL',
+    requestedChangePending: facts.requestedChangePending === true,
     recoveryRemainsPossible: facts.recoveryRemainsPossible,
   };
 }

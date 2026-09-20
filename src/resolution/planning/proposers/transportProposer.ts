@@ -41,10 +41,9 @@ import type { RecoveryDomainId } from '../../../contracts/v2/planning/recoveryDo
 import type { TypedRef } from '../../../domain/v2/shared/identity.ts';
 import type { ExactMoney } from '../../../domain/v2/shared/money.ts';
 import { ExactMoneySchema, currencyExponent, type CurrencyCode } from '../../../domain/v2/shared/money.ts';
-import { compareInstants, type Instant } from '../../../domain/v2/shared/time.ts';
+import type { Instant } from '../../../domain/v2/shared/time.ts';
 import type { ResolvedOffer } from '../../scenarios/overlay.ts';
 import type { ProposalCandidate } from '../proposer.ts';
-import type { RequestPlanningContext } from '../changeRequestConstraints.ts';
 import {
   transportCorridors,
   transportRequestId,
@@ -273,6 +272,7 @@ export function createTransportProposer(options: TransportProposerOptions): Doma
         resolveAirport: options.resolveAirport,
         ...(options.passengers ? { passengers: options.passengers } : {}),
         ...(options.passengersFor ? { passengersFor: options.passengersFor } : {}),
+        ...(input.requestContext ? { requestContext: input.requestContext } : {}),
       });
       const { offers } = correlatedTransportOffers({
         corridors,
@@ -284,9 +284,6 @@ export function createTransportProposer(options: TransportProposerOptions): Doma
       const candidates: ProposalCandidate[] = [];
       const emitted = new Set<string>();
       for (const c of offers) {
-        const requestCodes = satisfiedRequestConstraints(input.requestContext, c);
-        const hard = input.requestContext?.constraints.filter((constraint) => constraint.domain === 'TRANSPORT' && constraint.mode === 'HARD') ?? [];
-        if (hard.some((constraint) => !requestCodes.includes(constraint.code))) continue;
         const key = `${TRANSPORT_PROPOSER_ID}:${c.journeyItemId}:${c.offerKey}`;
         if (emitted.has(key)) continue;
         emitted.add(key);
@@ -308,28 +305,11 @@ export function createTransportProposer(options: TransportProposerOptions): Doma
               subjectRef: { kind: 'OFFER', id: c.offerKey },
             },
           ],
-          satisfiedRequestConstraintCodes: requestCodes,
         });
       }
       return candidates;
     },
   };
-}
-
-/** Deterministic offer-to-request comparison; absence is never treated as a match. */
-function satisfiedRequestConstraints(context: RequestPlanningContext | undefined, candidate: CorrelatedOffer): string[] {
-  if (!context) return [];
-  const target = context.basis.desiredTarget;
-  const first = candidate.offer.segments[0];
-  const last = candidate.offer.segments[candidate.offer.segments.length - 1];
-  if (!first || !last) return [];
-  const satisfied = new Set<string>();
-  if (target.arriveBy && compareInstants(last.arrival, target.arriveBy) <= 0) satisfied.add('request_arrive_by');
-  if (target.departAfter && compareInstants(first.departure, target.departAfter) >= 0) satisfied.add('request_depart_after');
-  if (target.transport?.preferDirect === true && candidate.segmentCount === 1) satisfied.add('request_prefer_direct');
-  if (target.transport?.earliestDeparture && compareInstants(first.departure, target.transport.earliestDeparture) >= 0) satisfied.add('request_earliest_departure');
-  if (target.transport?.latestDeparture && compareInstants(first.departure, target.transport.latestDeparture) <= 0) satisfied.add('request_latest_departure');
-  return [...satisfied].sort();
 }
 
 /** Factual, provider-neutral route summary for a rationale (no fabrication). */

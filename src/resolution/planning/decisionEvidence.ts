@@ -224,6 +224,7 @@ export interface AssemblePlanningAttemptInput {
   recoveryCaseId: SubjectId;
   basisAssessmentId: SubjectId;
   requestBasis?: import('../../contracts/v2/planning/changeRequestPlanning.ts').ChangeRequestPlanningBasis;
+  requestIssues?: import('../../contracts/v2/planning/recoveryPlanningAttempt.ts').RequestPlanningIssue[];
   basisManifest: WorldSnapshotManifest;
   startedAt: Instant;
   completedAt: Instant;
@@ -248,6 +249,7 @@ export function assemblePlanningAttempt(
     recoveryCaseId: input.recoveryCaseId,
     basisAssessmentId: input.basisAssessmentId,
     ...(input.requestBasis ? { requestBasis: input.requestBasis } : {}),
+    requestIssues: input.requestIssues ?? [],
     basisManifest: input.basisManifest,
     startedAt: input.startedAt,
     completedAt: input.completedAt,

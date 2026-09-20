@@ -48,6 +48,7 @@ import {
 } from '../../persistence/postgres/commands/r1PlanningAttemptCommands.ts';
 import { evaluateRecoveryCaseResolution } from './recoveryCaseResolution.ts';
 import { ensureOriginalCaseGraph } from './originalCaseGraphCapture.ts';
+import { loadCaseRequest } from './requestPlanningState.ts';
 
 /** Upper bound on cases inspected per wake; the report says when it truncated. */
 export const PROGRESSION_CANDIDATE_LIMIT = 200;
@@ -198,19 +199,23 @@ async function progressCase(ctx: ProgressionPassContext, row: { id: string; life
     if (!cleared.ok) throw new Error(`attention supersede: ${cleared.conflict.kind}: ${cleared.conflict.message}`);
   }
 
+  const caseRequest = await loadCaseRequest(ctx.pool, ctx.workspaceId, row.id);
+  if (!caseRequest.ok) throw new Error(`${caseRequest.code}: ${caseRequest.message}`);
+  const requestBasis = caseRequest.basis;
   const gate = await evaluateRecoveryCaseResolution(ctx.pool, { workspaceId: ctx.workspaceId, recoveryCaseId: row.id, now });
-  const attempt = await findRecoveryPlanningAttemptForBasis(ctx.pool, ctx.workspaceId, row.id, basis.assessmentId);
+  const attempt = await findRecoveryPlanningAttemptForBasis(ctx.pool, ctx.workspaceId, row.id, basis.assessmentId, requestBasis);
   const result = decideProgressionFromFacts({
     recoveryCaseId: row.id as SubjectId,
     basisAssessmentId: basis.assessmentId as SubjectId,
     gate,
     // A plan already produced for THIS basis that still awaits a human approval is
     // pending authority; a plan for an older basis, or one already approved, is not.
-    authorityOrExecutionPending: basis.verdict === 'FAIL' && attempt?.outcome === 'AWAITING_AUTHORITY'
+    authorityOrExecutionPending: attempt?.outcome === 'AWAITING_AUTHORITY'
       && await approvalStillOutstanding(ctx.pool, ctx.workspaceId, attempt.attempt.viableStrategyRefs),
     // One planning attempt per basis: a settled attempt for this basis is never redone.
-    recoveryRemainsPossible: basis.verdict === 'FAIL' && attempt === undefined,
+    recoveryRemainsPossible: (basis.verdict === 'FAIL' || requestBasis !== undefined) && attempt === undefined,
     currentAssessmentVerdict: basis.verdict,
+    requestedChangePending: requestBasis !== undefined && attempt === undefined,
   });
   outcome.decision = result.decision;
   outcome.reasonCode = result.reasonCode;
@@ -234,7 +239,11 @@ async function progressCase(ctx: ProgressionPassContext, row: { id: string; life
 
     case 'REPLAN': {
       const anyAttempt = await findLatestRecoveryPlanningAttemptForCase(ctx.pool, ctx.workspaceId, row.id);
-      const planned = await ctx.planner.planCase({ recoveryCaseId: row.id as SubjectId, reason: anyAttempt ? 'REASSESSMENT' : 'CASE_OPENED' });
+      const planned = await ctx.planner.planCase({
+        recoveryCaseId: row.id as SubjectId,
+        reason: anyAttempt ? 'REASSESSMENT' : 'CASE_OPENED',
+        ...(requestBasis ? { changeRequestId: requestBasis.changeRequestId as SubjectId } : {}),
+      });
       outcome.dispatch = 'PLANNED';
       outcome.detail = `planning outcome ${planned.outcome}`
         + (planned.basisAssessmentId && planned.basisAssessmentId !== basis.assessmentId ? ' (planned against a newer basis)' : '');

@@ -11,6 +11,7 @@ import type { ResolvedOffer } from '../scenarios/overlay.ts';
 import type { CapturedWorld, WTransportService } from '../world/world.ts';
 import type { FailingSubject } from './proposer.ts';
 import { correlatedTransportOffers, type TransportCorrelatedOffer } from './proposers/transportProposer.ts';
+import type { RequestPlanningContext } from './changeRequestConstraints.ts';
 import {
   transportCorridors,
   transportRequestId,
@@ -85,11 +86,13 @@ export function materializeTransportOffers(input: TransportPassengerSource & {
   now: Instant;
   resolveAirport: AirportResolver;
   maxOffersPerCorridor?: number;
+  requestContext?: RequestPlanningContext;
 }): MaterializedTransportOffers {
   const { corridors } = transportCorridors(input.world, input.failing, {
     resolveAirport: input.resolveAirport,
     ...(input.passengers ? { passengers: input.passengers } : {}),
     ...(input.passengersFor ? { passengersFor: input.passengersFor } : {}),
+    ...(input.requestContext ? { requestContext: input.requestContext } : {}),
   });
   const correlated = correlatedTransportOffers({
     corridors,

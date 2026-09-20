@@ -54,8 +54,6 @@ export const ProposalCandidateSchema = z.strictObject({
   affectedSubjectRefs: z.array(TypedRefSchema).min(1).max(64),
   rationale: z.string().min(1).max(2048),
   assumptions: z.array(StrategyAssumptionSchema).max(16).default([]),
-  /** Deterministic request constraint codes this candidate satisfies. */
-  satisfiedRequestConstraintCodes: z.array(z.string().regex(/^[a-z][a-z0-9_]*$/)).max(32).optional(),
 });
 export type ProposalCandidate = z.infer<typeof ProposalCandidateSchema>;
 

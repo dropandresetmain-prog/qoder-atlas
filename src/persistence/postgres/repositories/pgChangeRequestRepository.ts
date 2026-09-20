@@ -21,6 +21,7 @@ export class PgChangeRequestRepository implements ChangeRequestReadRepository {
       journey_id: string;
       lifecycle_status: string;
       revision: number;
+      content_revision: number;
       intent_kind: string;
       urgency: string;
       desired_target: unknown;
@@ -31,7 +32,7 @@ export class PgChangeRequestRepository implements ChangeRequestReadRepository {
       targets: { role: string; kind: string; id: string }[];
     }>(
       `SELECT r.id, r.requester_principal_id, r.represented_traveller_id, r.journey_id, r.lifecycle_status,
-              h.revision, v.intent_kind, v.urgency, v.desired_target, v.funding_declaration,
+              h.revision, v.revision AS content_revision, v.intent_kind, v.urgency, v.desired_target, v.funding_declaration,
               v.source_utterance, v.source_record_id, v.submitted_at,
               COALESCE((
                 SELECT jsonb_agg(jsonb_build_object('role', t.target_role, 'kind', t.target_kind, 'id', t.target_id)
@@ -56,6 +57,7 @@ export class PgChangeRequestRepository implements ChangeRequestReadRepository {
       journeyId: row.journey_id,
       lifecycle: row.lifecycle_status,
       revision: Number(row.revision),
+      contentRevision: Number(row.content_revision),
       sourceRecordId: row.source_record_id,
       sourceUtterance: row.source_utterance,
       submittedAt: row.submitted_at.toISOString(),

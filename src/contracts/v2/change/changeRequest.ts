@@ -111,7 +111,10 @@ export const ChangeRequestRecordSchema = z.strictObject({
   representedTravellerId: Uuid,
   journeyId: Uuid,
   lifecycle: ChangeRequestLifecycleSchema,
+  /** Aggregate-head revision used for lifecycle CAS/currentness. */
   revision: z.number().int().min(1),
+  /** Immutable submitted-content revision selected by this record. */
+  contentRevision: z.number().int().min(1),
   sourceRecordId: Uuid,
   sourceUtterance: z.string(),
   submittedAt: InstantSchema,

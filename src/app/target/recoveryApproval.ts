@@ -33,6 +33,7 @@ import { compileActionPlan, type CapabilityStatement } from '../../resolution/pl
 import { resolveOfferExecutionInputsForStrategy } from '../../persistence/postgres/execution/providerExecutionInputs.ts';
 import { holdBudgetForIntent } from '../../persistence/postgres/commands/m8AuthorityCommands.ts';
 import { PgAggregateHeadReader } from '../../persistence/postgres/pgAggregateHeadReader.ts';
+import { assessManifestCurrentness } from '../../resolution/world/currentness.ts';
 import type { ExactMoney } from '../../domain/v2/shared/money.ts';
 import { deterministicUuid, RUNTIME_ID_NAMESPACES } from './deterministicId.ts';
 import { advanceCasePhase } from './recoveryPlanning.ts';
@@ -228,6 +229,13 @@ export async function approveRecoveryStrategy(
   if (blocker) return { ok: false, error: applicationError(blocker.code as ApplicationError['code'], blocker.message) };
 
   // 1. Plan: the persisted, versioned execution basis (compile once per strategy).
+  // Currentness is checked even when a plan already exists: retries must never
+  // mint authority for a request withdrawn after plan compilation.
+  const currentState = await new PgCurrentStateReader(ctx.pool).loadFor(ctx.workspaceId, strategy.baseManifest);
+  const currentness = assessManifestCurrentness(strategy.baseManifest, currentState, now);
+  if (!currentness.current) {
+    return { ok: false, error: applicationError('STRATEGY_BASE_STALE', `strategy base manifest is no longer current: ${currentness.reasons.map((reason) => reason.kind).join(',')}`) };
+  }
   let planId: string;
   let intentIds: string[];
   const existing = await existingPlan(ctx.pool, ctx.workspaceId, strategy.id);
@@ -235,7 +243,6 @@ export async function approveRecoveryStrategy(
     planId = existing.planId;
     intentIds = existing.intentIds;
   } else {
-    const currentState = await new PgCurrentStateReader(ctx.pool).loadFor(ctx.workspaceId, strategy.baseManifest);
     const compiled = compileActionPlan({
       strategy,
       now,

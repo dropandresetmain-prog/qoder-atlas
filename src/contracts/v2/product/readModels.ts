@@ -1094,6 +1094,11 @@ export const ApplicationErrorCodeSchema = z.enum([
   // R4-F2f additive: a REPLAY/SIMULATED-researched option needs a fresh live provider quote first.
   'FRESH_PROVIDER_QUOTE_REQUIRED',
   'BUDGET_UNAVAILABLE',
+  'REQUEST_NOT_FOUND',
+  'REQUEST_NOT_LINKED',
+  'REQUEST_CASE_SCOPE_MISMATCH',
+  'REQUEST_NOT_ACCEPTED',
+  'MULTIPLE_CASE_REQUESTS',
 ]);
 export type ApplicationErrorCode = z.infer<typeof ApplicationErrorCodeSchema>;
 

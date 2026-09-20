@@ -88,7 +88,7 @@ import {
 import { selectRecommendation, type CandidateComparisonFacts } from './comparator.ts';
 import { satisfiedPreferenceCodes } from './preferenceMatching.ts';
 import { comparisonFactsFromEvidence, planningOutcomeOf } from './planningSelection.ts';
-import type { RequestPlanningContext } from './changeRequestConstraints.ts';
+import { evaluateRequestConstraints, type RequestPlanningContext } from './changeRequestConstraints.ts';
 
 /**
  * A proposer bound to the single recovery domain it serves. The binding accepts
@@ -351,21 +351,6 @@ export async function runRecoveryPlanning(
         }));
       }
       for (const candidate of accepted) {
-        const hardRequestConstraints = basis.requestContext?.constraints.filter((constraint) => constraint.mode === 'HARD') ?? [];
-        const satisfiedRequestConstraintCodes = candidate.satisfiedRequestConstraintCodes ?? [];
-        const unsatisfiedHardConstraints = hardRequestConstraints
-          .filter((constraint) => !satisfiedRequestConstraintCodes.includes(constraint.code))
-          .map((constraint) => constraint.code);
-        if (unsatisfiedHardConstraints.length > 0) {
-          rejectedEvidence.push(materialCandidateFromValidationRejection({
-            candidateKey: candidate.key,
-            proposerId: proposer.id,
-            domainId: domain.domainId,
-            validationReasonCodes: unsatisfiedHardConstraints.map((code) => `hard_request_constraint_unsatisfied:${code}`),
-            evidenceRefs: domainEvidenceRefs,
-          }));
-          continue;
-        }
         const strategyId = deps.minters.mintStrategyId(candidate.key);
         const scenarioChange = ScenarioChangeSchema.parse({
           id: deps.minters.mintScenarioChangeId(strategyId),
@@ -376,6 +361,19 @@ export async function runRecoveryPlanning(
           basisAssessmentId,
           ...(basis.requestContext ? { requestBasis: basis.requestContext.basis } : {}),
         });
+        const requestConstraintResult = basis.requestContext
+          ? evaluateRequestConstraints({ context: basis.requestContext, scenarioChange, world: planningWorld, resolvedOffers })
+          : { satisfiedCodes: [] as readonly string[], unsatisfiedHardCodes: [] as readonly string[] };
+        if (requestConstraintResult.unsatisfiedHardCodes.length > 0) {
+          rejectedEvidence.push(materialCandidateFromValidationRejection({
+            candidateKey: candidate.key,
+            proposerId: proposer.id,
+            domainId: domain.domainId,
+            validationReasonCodes: requestConstraintResult.unsatisfiedHardCodes.map((code) => `hard_request_constraint_unsatisfied:${code}`),
+            evidenceRefs: domainEvidenceRefs,
+          }));
+          continue;
+        }
         const evaluatedResult = evaluateRecoveryStrategy({
           recoveryCaseId, strategyId, strategyVersion: nextVersion,
           baseWorld: planningWorld, baseManifest: world.manifest, basisAssessmentId,
@@ -394,7 +392,7 @@ export async function runRecoveryPlanning(
           continue;
         }
         if (evaluatedResult.value.strategy.viability === 'STALE_BASE') anyStale = true;
-        evaluated.push({ candidateKey: candidate.key, proposerId: proposer.id, domainId: domain.domainId, result: evaluatedResult.value, satisfiedRequestConstraintCodes });
+        evaluated.push({ candidateKey: candidate.key, proposerId: proposer.id, domainId: domain.domainId, result: evaluatedResult.value, satisfiedRequestConstraintCodes: requestConstraintResult.satisfiedCodes });
         if (evaluatedResult.value.strategy.viability === 'VIABLE') nextVersion += 1;
       }
     }
@@ -459,6 +457,7 @@ export async function runRecoveryPlanning(
     recoveryCaseId,
     basisAssessmentId,
     ...(basis.requestContext ? { requestBasis: basis.requestContext.basis } : {}),
+    requestIssues: basis.requestContext?.unresolved ?? [],
     basisManifest: world.manifest,
     startedAt: deps.minters.startedAt,
     completedAt: now,

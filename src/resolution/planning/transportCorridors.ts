@@ -22,6 +22,7 @@ import type { ExternalRef } from '../../contracts/capabilities.ts';
 import { PlanningToolRequestSchema, type PlanningToolRequest } from '../../contracts/v2/planning/planningTool.ts';
 import type { CapturedWorld, WJourneyItem, WPlace } from '../world/world.ts';
 import type { FailingSubject } from './proposer.ts';
+import type { RequestPlanningContext } from './changeRequestConstraints.ts';
 
 /** Resolves a place id to a provider airport ExternalRef, or undefined. INJECTED — this module never hardcodes an airport code or ref system. Fail-closed: undefined means "no honest airport for this place". */
 export type AirportResolver = (placeId: string) => ExternalRef | undefined;
@@ -121,6 +122,7 @@ export interface TransportPassengerSource {
 
 export interface TransportCorridorOpts extends TransportPassengerSource {
   resolveAirport: AirportResolver;
+  requestContext?: RequestPlanningContext;
 }
 
 export interface TransportCorridor {
@@ -283,7 +285,14 @@ export function transportCorridors(
     }
     let departureDate: string;
     try {
-      departureDate = localDateAtTimeZone(item.intendedWindow.start, originPlace.timeZone);
+      const requestTarget = opts.requestContext?.basis.journeyId === item.journeyId
+        ? opts.requestContext.basis.desiredTarget
+        : undefined;
+      const lowerBound = [requestTarget?.departAfter, requestTarget?.transport?.earliestDeparture]
+        .filter((value): value is string => value !== undefined)
+        .sort((a, b) => Date.parse(b) - Date.parse(a))[0];
+      const requestedDeparture = lowerBound ?? requestTarget?.transport?.latestDeparture;
+      departureDate = localDateAtTimeZone(requestedDeparture ?? item.intendedWindow.start, originPlace.timeZone);
     } catch {
       gaps.push({ journeyItemId: item.id, reasonCode: 'no_departure_window' });
       continue;

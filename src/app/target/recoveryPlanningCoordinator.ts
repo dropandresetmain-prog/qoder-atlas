@@ -76,6 +76,7 @@ import {
 } from '../../contracts/v2/planning/recoveryDomain.ts';
 import { blockingDimensionCodes } from '../../resolution/planning/coordinatorCore.ts';
 import { deriveRequestPlanningContext, type RequestPlanningContext } from '../../resolution/planning/changeRequestConstraints.ts';
+import { loadCaseRequest } from './requestPlanningState.ts';
 
 export const R1_COORDINATOR_VERSION = 'r1-coordinator/1';
 export const R1_COMPARATOR_VERSION = 'r1-comparator/1';
@@ -279,9 +280,23 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
       if (!status) return { ok: false, error: applicationError('CASE_NOT_FOUND', `recovery case ${input.recoveryCaseId} does not exist`) };
       if (TERMINAL.has(status)) return { ok: false, error: applicationError('CASE_NOT_OPEN', `recovery case ${input.recoveryCaseId} is ${status}`) };
 
+      const canonicalRequest = await loadCaseRequest(
+        deps.pool,
+        deps.workspaceId,
+        input.recoveryCaseId,
+        input.changeRequestId,
+        { requireAccepted: input.changeRequestId !== undefined },
+      );
+      if (!canonicalRequest.ok) {
+        return { ok: false, error: applicationError(canonicalRequest.code, canonicalRequest.message) };
+      }
+      if (canonicalRequest.request && !canonicalRequest.basis) {
+        return { ok: false, error: applicationError('REQUEST_NOT_ACCEPTED', `change request ${canonicalRequest.request.id} is ${canonicalRequest.request.lifecycle}, expected ACCEPTED_FOR_PLANNING`) };
+      }
+
       let basis: BasisCapture | undefined;
       try {
-        basis = await capturePlanningBasis(deps, input.recoveryCaseId, now, input.requestBasis);
+        basis = await capturePlanningBasis(deps, input.recoveryCaseId, now, canonicalRequest.basis);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return { ok: false, error: applicationError('UNKNOWN_VIABILITY', message) };
@@ -328,7 +343,9 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
         });
       }
       const transportResearch = transportPlanning
-        ? transportCorridors(basis.world, [...basis.failing, ...(basis.requestContext?.requestedSubjects.map((subject) => ({ subject })) ?? [])], { resolveAirport: resolveAirport!, ...passengerSource! })
+        ? transportCorridors(basis.world, [...basis.failing, ...(basis.requestContext?.requestedSubjects.map((subject) => ({ subject })) ?? [])], {
+          resolveAirport: resolveAirport!, ...passengerSource!, ...(basis.requestContext ? { requestContext: basis.requestContext } : {}),
+        })
           .corridors.map((corridor) => flightSearchRequestFor(corridor, { round: 1 }))
         : [];
 
@@ -413,6 +430,7 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
                 resolveAirport: resolveAirport!,
                 ...passengerSource!,
                 ...(transportPlanning.maxOffersPerCorridor ? { maxOffersPerCorridor: transportPlanning.maxOffersPerCorridor } : {}),
+                ...(domainBasis.requestContext ? { requestContext: domainBasis.requestContext } : {}),
               });
               capturedOfferServices.push(...materialized.capturedServices);
               capturedResolvedOffers.push(...materialized.resolvedOffers);

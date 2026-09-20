@@ -67,6 +67,8 @@ export interface RecoveryProgressionInput {
   authorityOrExecutionPending: boolean;
   /** The current settled assessment still FAILs for a required subject. */
   currentStillFailing: boolean;
+  /** A canonical accepted desired change still needs its first planning attempt. */
+  requestedChangePending?: boolean;
   /**
    * Recovery remains possible: the case is not in a terminal/no-safe-recovery
    * state and a further planning basis could plausibly help.
@@ -119,6 +121,14 @@ export function decideRecoveryProgression(
       ...base,
       decision: 'WAIT',
       reasonCode: 'authority_or_execution_pending',
+    });
+  }
+
+  if (input.requestedChangePending && input.recoveryRemainsPossible) {
+    return RecoveryProgressionResultSchema.parse({
+      ...base,
+      decision: 'REPLAN',
+      reasonCode: 'accepted_request_requires_planning',
     });
   }
 

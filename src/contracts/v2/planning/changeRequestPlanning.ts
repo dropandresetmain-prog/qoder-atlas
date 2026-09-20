@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { SubjectIdSchema } from '../../../domain/v2/shared/identity.ts';
 import { ChangeRequestUrgencySchema, DesiredChangeTargetSchema } from '../change/changeRequest.ts';
+import type { ChangeRequestRecord } from '../change/changeRequest.ts';
 
 /**
  * Immutable request metadata carried beside a truthful current-world
@@ -19,3 +20,17 @@ export const ChangeRequestPlanningBasisSchema = z.strictObject({
   desiredTarget: DesiredChangeTargetSchema,
 });
 export type ChangeRequestPlanningBasis = z.infer<typeof ChangeRequestPlanningBasisSchema>;
+
+/** Build planning context only from a canonical accepted request read. */
+export function planningBasisFromChangeRequest(request: ChangeRequestRecord): ChangeRequestPlanningBasis {
+  return ChangeRequestPlanningBasisSchema.parse({
+    changeRequestId: request.id,
+    journeyId: request.journeyId,
+    representedTravellerId: request.representedTravellerId,
+    contentRevision: request.contentRevision,
+    lifecycleRevision: request.revision,
+    lifecycle: request.lifecycle,
+    urgency: request.urgency,
+    desiredTarget: request.desiredTarget,
+  });
+}

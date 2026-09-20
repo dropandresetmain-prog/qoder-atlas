@@ -2,6 +2,12 @@ import type { ComparatorPreference } from '../../contracts/v2/planning/strategyR
 import type { ChangeRequestPlanningBasis } from '../../contracts/v2/planning/changeRequestPlanning.ts';
 import type { RecoveryDomainId } from '../../contracts/v2/planning/recoveryDomain.ts';
 import type { TypedRef } from '../../domain/v2/shared/identity.ts';
+import type { ScenarioChange } from '../../contracts/v2/scenario/scenarioChange.ts';
+import type { CapturedWorld } from '../world/world.ts';
+import type { ResolvedOffer } from '../scenarios/overlay.ts';
+import { applyScenarioOverlay } from '../scenarios/overlay.ts';
+import { projectEffectiveWorld } from '../world/effectiveItinerary.ts';
+import { compareInstants } from '../../domain/v2/shared/time.ts';
 
 export interface RequestConstraint {
   code: string;
@@ -66,5 +72,58 @@ export function deriveRequestPlanningContext(input: {
     unresolved,
     domains,
     comparatorPreferences,
+  };
+}
+
+export interface RequestConstraintEvaluation {
+  satisfiedCodes: readonly string[];
+  unsatisfiedHardCodes: readonly string[];
+}
+
+/**
+ * Evaluate request constraints from the validated scenario overlay. Proposers
+ * cannot self-attest satisfaction: the selected effective item/service is the
+ * only source for hard filtering and soft ranking.
+ */
+export function evaluateRequestConstraints(input: {
+  context: RequestPlanningContext;
+  scenarioChange: ScenarioChange;
+  world: CapturedWorld;
+  resolvedOffers: readonly ResolvedOffer[];
+}): RequestConstraintEvaluation {
+  const overlay = applyScenarioOverlay({
+    baseWorld: input.world,
+    scenarioChange: input.scenarioChange,
+    resolvedOffers: input.resolvedOffers,
+  });
+  if (!overlay.ok) {
+    return {
+      satisfiedCodes: [],
+      unsatisfiedHardCodes: input.context.constraints.filter((value) => value.mode === 'HARD').map((value) => value.code),
+    };
+  }
+
+  const effective = projectEffectiveWorld(overlay.value.proposedWorld);
+  const selectedItemIds = new Set(input.scenarioChange.effects.flatMap((effect) => effect.effectKind === 'SELECT_OFFER' ? [effect.journeyItemId] : []));
+  const journey = effective.journeys.find((value) => value.journeyRef.id === input.context.basis.journeyId);
+  const selected = journey?.items.filter((item) => selectedItemIds.has(item.itemRef.id) && item.kind === 'TRANSPORT') ?? [];
+  const satisfied = new Set<string>();
+  const target = input.context.basis.desiredTarget;
+  for (const item of selected) {
+    if (target.arriveBy && item.end.value && compareInstants(item.end.value, target.arriveBy) <= 0) satisfied.add('request_arrive_by');
+    if (target.departAfter && item.start.value && compareInstants(item.start.value, target.departAfter) >= 0) satisfied.add('request_depart_after');
+    if (target.transport?.earliestDeparture && item.start.value && compareInstants(item.start.value, target.transport.earliestDeparture) >= 0) satisfied.add('request_earliest_departure');
+    if (target.transport?.latestDeparture && item.start.value && compareInstants(item.start.value, target.transport.latestDeparture) <= 0) satisfied.add('request_latest_departure');
+    if (target.transport?.preferDirect === true && item.serviceRef) {
+      const service = overlay.value.proposedWorld.transportServices.find((value) => value.id === item.serviceRef!.id);
+      if (service?.researchedOffer?.segments.length === 1) satisfied.add('request_prefer_direct');
+    }
+  }
+  const satisfiedCodes = [...satisfied].sort();
+  return {
+    satisfiedCodes,
+    unsatisfiedHardCodes: input.context.constraints
+      .filter((value) => value.mode === 'HARD' && !satisfied.has(value.code))
+      .map((value) => value.code),
   };
 }
