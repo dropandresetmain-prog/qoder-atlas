@@ -7,7 +7,7 @@ import { renderProductRecoveryCase } from '../src/ui/screens/product-recovery-ca
 import { renderProductOperatorOverview } from '../src/ui/screens/product-operator-overview.ts';
 import { buildOverviewGraphModel } from '../src/ui/overview-graph/model.ts';
 import {
-  decisionActionState, decisionCosts, decisionOptions, groupedResearch, rejectionSummary, sameStrategy, sumDisplayedMoney,
+  decisionActionState, decisionCosts, decisionOptions, groupedResearch, sameStrategy, sumDisplayedMoney,
 } from '../src/ui/caseDecisionPresentation.ts';
 
 const at = '2032-04-03T08:00:00.000Z';
