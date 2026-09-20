@@ -4,6 +4,9 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { sharedTestPool } from './harness.ts';
 import { beginSeed, commitSeed, seedChildSubject, seedExternalConnection, seedJourney, seedOrganisation, seedPlace, seedRootSubject, seedTraveller, seedTrip, takeSeedEvidence } from './m3Seed.ts';
+import { seedCredential } from './m2Seed.ts';
+import { seedJurisdiction } from './m4Seed.ts';
+import { seedJourneyItem } from './m2Seed.ts';
 import { PgUnitOfWork, type ExecuteOutcome } from '../src/persistence/postgres/pgUnitOfWork.ts';
 import { attachObservedStay, type ObservedStayAttachmentParams } from '../src/persistence/postgres/commands/observedStayCommands.ts';
 
@@ -21,7 +24,7 @@ function mustOk<T>(outcome: ExecuteOutcome<T>): T {
   return outcome.value;
 }
 
-async function setup(options: { externalId?: string; recordState?: 'UNVERIFIED' | 'QUARANTINED_UNKNOWN' } = {}) {
+async function setup(options: { externalId?: string; recordState?: 'UNVERIFIED' | 'QUARANTINED_UNKNOWN'; existingJourneyItem?: boolean } = {}) {
   const pool = await sharedTestPool();
   const seed = await beginSeed(pool, 'A4 observed stay fixture');
   const organisationId = await seedOrganisation(seed);
@@ -29,6 +32,18 @@ async function setup(options: { externalId?: string; recordState?: 'UNVERIFIED' 
   const tripId = await seedTrip(seed, { lifecycleStatus: 'ACTIVE' });
   const journeyId = await seedJourney(seed, { tripId, travellerId: traveller.travellerId, lifecycleStatus: 'DRAFT' });
   const placeId = await seedPlace(seed, { name: 'A4 Stay Place' });
+  const jurisdictionId = await seedJurisdiction(seed, { name: 'A4 Stay Jurisdiction' });
+  const credential = await seedCredential(seed, { travellerId: traveller.travellerId, issuerCountry: 'SG', expiryDate: '2040-01-01' });
+  const existingVisitId = randomUUID();
+  await seed.client.query(
+    `INSERT INTO intended_visits
+       (workspace_id,id,journey_id,jurisdiction_id,purpose,intended_start,intended_end,created_by_actor_id)
+     VALUES ($1,$2,$3,$4,'BUSINESS',$5,$6,$7)`,
+    [seed.workspaceId, existingVisitId, journeyId, jurisdictionId, '2030-01-01T00:00:00Z', '2030-01-06T00:00:00Z', seed.actorId],
+  );
+  const existingJourneyItem = options.existingJourneyItem
+    ? await seedJourneyItem(seed, { journeyId, kind: 'TRANSPORT', orderKey: 'existing-transport' })
+    : undefined;
   const connectionId = await seedExternalConnection(seed, organisationId);
   const externalId = options.externalId ?? `booking-${randomUUID()}`;
   const externalRecordId = randomUUID();
@@ -42,7 +57,7 @@ async function setup(options: { externalId?: string; recordState?: 'UNVERIFIED' 
     );
   }
   await commitSeed(seed);
-  return { pool, seed, organisationId, travellerId: traveller.travellerId, journeyId, placeId, connectionId, externalId, externalRecordId };
+  return { pool, seed, organisationId, travellerId: traveller.travellerId, journeyId, placeId, jurisdictionId, credentialId: credential.credentialId, credentialVersionId: credential.versionId, existingVisitId, existingJourneyItemId: existingJourneyItem?.journeyItemId, connectionId, externalId, externalRecordId };
 }
 
 function input(f: Awaited<ReturnType<typeof setup>>, idempotencyKey: string, externalId = f.externalId): ObservedStayAttachmentParams {
@@ -65,6 +80,40 @@ function input(f: Awaited<ReturnType<typeof setup>>, idempotencyKey: string, ext
     },
     journeyItem: { intendedPlaceId: f.placeId, requiredNights: 3, orderKey: 'approved-stay-order-1' },
     booking: { placeId: f.placeId, stayInterval: { start: STAY_START, end: STAY_END }, status: 'CONFIRMED' },
+  };
+}
+
+function approvedProposedVisit(f: Awaited<ReturnType<typeof setup>>) {
+  const visitId = randomUUID();
+  return {
+    kind: 'PROPOSED' as const,
+    visit: {
+      id: visitId,
+      journeyId: f.journeyId,
+      jurisdictionId: f.jurisdictionId,
+      purpose: 'BUSINESS',
+      intendedDates: { start: STAY_START, end: STAY_END },
+      transitIntent: false,
+    },
+    credentialSelection: {
+      id: randomUUID(),
+      credentialId: f.credentialId,
+      credentialVersionId: f.credentialVersionId,
+      scopeIntendedVisitIds: [visitId],
+    },
+  };
+}
+
+function approvedExistingVisit(f: Awaited<ReturnType<typeof setup>>) {
+  return {
+    kind: 'EXISTING' as const,
+    visitId: f.existingVisitId,
+    credentialSelection: {
+      id: randomUUID(),
+      credentialId: f.credentialId,
+      credentialVersionId: f.credentialVersionId,
+      scopeIntendedVisitIds: [f.existingVisitId],
+    },
   };
 }
 
@@ -108,6 +157,37 @@ describe('A4 atomic observed stay attachment', () => {
     assert.equal(first.reservationId.length, 36);
   });
 
+  test('persists an approved proposed visit and selected credential atomically, then replays without duplicates', async () => {
+    const f = await setup();
+    const uow = () => new PgUnitOfWork(f.pool, f.seed.workspaceId);
+    const params = { ...input(f, randomUUID()), approvedVisit: approvedProposedVisit(f) };
+    const first = mustOk(await attachObservedStay(uow(), params));
+    const replay = mustOk(await attachObservedStay(uow(), params));
+    assert.deepEqual(replay, first);
+    const rows = await f.pool.query<{ visits: string; selections: string; scoped: string }>(
+      `SELECT
+         (SELECT COUNT(*) FROM intended_visits WHERE workspace_id=$1 AND journey_id=$2)::text AS visits,
+         (SELECT COUNT(*) FROM credential_selections WHERE workspace_id=$1 AND journey_id=$2)::text AS selections,
+         (SELECT COUNT(*) FROM credential_selection_visits csv JOIN credential_selections cs ON cs.workspace_id=csv.workspace_id AND cs.id=csv.selection_id WHERE csv.workspace_id=$1 AND cs.journey_id=$2)::text AS scoped`,
+      [f.seed.workspaceId, f.journeyId],
+    );
+    assert.deepEqual(rows.rows[0], { visits: '2', selections: '1', scoped: '1' });
+  });
+
+  test('binds an existing Journey visit only after ownership validation', async () => {
+    const f = await setup();
+    const uow = () => new PgUnitOfWork(f.pool, f.seed.workspaceId);
+    const first = mustOk(await attachObservedStay(uow(), { ...input(f, randomUUID()), approvedVisit: approvedExistingVisit(f) }));
+    const rows = await f.pool.query<{ visits: string; selections: string }>(
+      `SELECT
+         (SELECT COUNT(*) FROM intended_visits WHERE workspace_id=$1 AND journey_id=$2)::text AS visits,
+         (SELECT COUNT(*) FROM credential_selections WHERE workspace_id=$1 AND journey_id=$2)::text AS selections`,
+      [f.seed.workspaceId, f.journeyId],
+    );
+    assert.equal(first.journeyItemId.length, 36);
+    assert.deepEqual(rows.rows[0], { visits: '1', selections: '1' });
+  });
+
   test('rolls back the complete graph when provider identity is quarantined', async () => {
     const f = await setup({ externalId: 'quarantined-provider-booking', recordState: 'QUARANTINED_UNKNOWN' });
     const staleInput = input(f, randomUUID());
@@ -141,5 +221,25 @@ describe('A4 atomic observed stay attachment', () => {
     assert.equal(missingOrder.ok, false);
     if (!missingOrder.ok) assert.match(missingOrder.conflict.message, /orderKey/);
     assert.equal((await f.pool.query('SELECT COUNT(*) FROM journey_items WHERE workspace_id=$1 AND journey_id=$2', [f.seed.workspaceId, f.journeyId])).rows[0].count, '0');
+  });
+
+  test('rolls back approved visit and credential selection when later stay attachment fails', async () => {
+    const f = await setup({ existingJourneyItem: true });
+    const uow = () => new PgUnitOfWork(f.pool, f.seed.workspaceId);
+    const failed = await attachObservedStay(uow(), {
+      ...input(f, randomUUID()),
+      journeyItem: { ...input(f, randomUUID()).journeyItem, id: f.existingJourneyItemId },
+      approvedVisit: approvedProposedVisit(f),
+    });
+    assert.equal(failed.ok, false);
+    const counts = await f.pool.query<{ visits: string; selections: string; reservations: string; links: string }>(
+      `SELECT
+         (SELECT COUNT(*) FROM intended_visits WHERE workspace_id=$1 AND journey_id=$2)::text AS visits,
+         (SELECT COUNT(*) FROM credential_selections WHERE workspace_id=$1 AND journey_id=$2)::text AS selections,
+         (SELECT COUNT(*) FROM reservations WHERE workspace_id=$1)::text AS reservations,
+         (SELECT COUNT(*) FROM external_record_links WHERE workspace_id=$1)::text AS links`,
+      [f.seed.workspaceId, f.journeyId],
+    );
+    assert.deepEqual(counts.rows[0], { visits: '1', selections: '0', reservations: '0', links: '0' });
   });
 });
