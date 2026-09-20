@@ -9,10 +9,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
+import { buildNuiteeStayDispatcher, buildNuiteeStayReconcileLookup } from '../src/app/target/externalStayExecution.ts';
+import { capabilityOk } from '../src/contracts/envelope.ts';
+import type { CapabilityMeta } from '../src/contracts/envelope.ts';
 
 const ROOT = resolve(import.meta.dirname, '..');
-const CONSEQUENTIAL = /\.(createOrder|payOrder|submitCancellation)\s*\(/;
-const ALLOWED = new Set(['src/app/target/externalOfferExecution.ts']);
+// A capability wrapper may forward a method reference without dispatching it.
+// Only an awaited invocation can move the provider boundary.
+const CONSEQUENTIAL = /\bawait\s+[\w.]+\.(createOrder|payOrder|submitCancellation|bookStay|cancelStay)\s*\(/;
+const ALLOWED = new Set([
+  'src/app/target/externalOfferExecution.ts',
+  'src/app/target/externalStayExecution.ts',
+]);
 // The retired SQLite-root composition keeps its own executor; it is not reachable from the PG target boot.
 const LEGACY = new Set(['src/app/providerExecution.ts', 'src/app/compose.ts', 'src/providers/atlas/transactionAdapter.ts']);
 
@@ -51,6 +59,74 @@ test('the external execution module only mutates after the stored gate and durab
   assert.ok(worker.indexOf("to: 'DISPATCHING'") < worker.indexOf('await params.dispatcher(claim'), 'DISPATCHING is committed before the dispatcher runs');
   // N1: the provider order reference is durably checkpointed BEFORE the pay call.
   assert.ok(source.indexOf('control.checkpointRequestRef(') > mutate && source.indexOf('control.checkpointRequestRef(') < source.indexOf('deps.transactions.payOrder('), 'orderRef checkpoint precedes payOrder');
+});
+
+test('the stay executor only mutates after a durable attempt and reconciles known success into canonical state', () => {
+  const source = readFileSync(join(ROOT, 'src/app/target/externalStayExecution.ts'), 'utf8');
+  const prepare = source.indexOf('createPreparedExecutionAttempt(ctx.uow()');
+  const dispatch = source.indexOf('worker.dispatchClaimed(');
+  const book = source.indexOf('hotel.bookStay(');
+  const cancel = source.indexOf('hotel.cancelStay(');
+  assert.ok(prepare > 0 && dispatch > prepare, 'a durable PREPARED attempt precedes stay dispatch');
+  assert.ok(book > 0 && cancel > 0, 'stay mutations are confined to this executor');
+  assert.ok(source.indexOf('applyPendingCanonicalUpdates(ctx,canonical)') > 0, 'reconciled success retries canonical application without a second provider dispatch');
+});
+
+test('a refreshed stay quote with changed amount or currency refuses before booking; matching terms carry the approved payment reference', async () => {
+  const meta = (): CapabilityMeta => ({ providerId: 'nuitee', mode: 'RECORD', requestedAt: '2030-01-01T00:00:00.000Z' });
+  const inputs = {
+    ready: true as const,
+    binding: {
+      id: 'binding', recoveryStrategyId: 'strategy', journeyId: 'journey', action: 'BOOK' as const, providerId: 'nuitee',
+      providerRateId: 'rate-1', quoteHandle: 'quoted-1', quotedAmount: '100.00', quotedCurrency: 'USD',
+    },
+    travellerId: 'traveller', guestNames: ['Jane Connection'],
+  };
+  for (const quotedPrice of [{ amount: 101, currency: 'USD' }, { amount: 100, currency: 'PHP' }]) {
+    let books = 0;
+    const hotel = {
+      quoteRate: async () => capabilityOk({ status: 'QUOTED' as const, quoteId: 'fresh-quote', quotedPrice }, meta()),
+      bookStay: async () => { books += 1; throw new Error('booking must not be reached'); },
+      retrieveBooking: async () => { throw new Error('retrieval must not be reached'); },
+    } as never;
+    const result = await buildNuiteeStayDispatcher(hotel, inputs, { amount: 100, currency: 'USD' }, 'intent-1', 'sandbox-payment')({} as never, { checkpointRequestRef: async () => true });
+    assert.deepEqual(result, { kind: 'FAILURE', error: 'stay_quote_changed: re-enter authority' });
+    assert.equal(books, 0);
+  }
+  let passedPaymentRef: string | undefined;
+  const hotel = {
+    quoteRate: async () => capabilityOk({ status: 'QUOTED' as const, quoteId: 'fresh-quote', quotedPrice: { amount: 100, currency: 'USD' } }, meta()),
+    bookStay: async (request: { paymentRef?: string }) => {
+      passedPaymentRef = request.paymentRef;
+      return capabilityOk({ confirmed: true, bookingId: 'booking-1', totalPrice: { amount: 100, currency: 'USD' }, provenance: 'LIVE' as const }, meta());
+    },
+    retrieveBooking: async () => capabilityOk({ bookingId: 'booking-1', status: 'CONFIRMED' as const }, meta()),
+  } as never;
+  const result = await buildNuiteeStayDispatcher(hotel, inputs, { amount: 100, currency: 'USD' }, 'intent-1', 'sandbox-payment')({} as never, { checkpointRequestRef: async () => true });
+  assert.equal(result.kind, 'SUCCESS');
+  assert.equal(passedPaymentRef, 'sandbox-payment');
+});
+
+test('an ambiguous stay client-reference lookup stays unknown for zero or multiple matches and cannot redispatch', async () => {
+  const meta = (): CapabilityMeta => ({ providerId: 'nuitee', mode: 'RECORD', requestedAt: '2030-01-01T00:00:00.000Z' });
+  for (const bookings of [[], [
+    { bookingId: 'booking-1', clientReference: 'ns-stay-test' },
+    { bookingId: 'booking-2', clientReference: 'ns-stay-test' },
+  ]]) {
+    let lookups = 0;
+    let mutations = 0;
+    const pool = { query: async () => ({ rows: [{ request_ref: 'nuitee:clientref:ns-stay-test' }] }) } as never;
+    const hotel = {
+      findBookingsByClientReference: async () => { lookups += 1; return capabilityOk({ bookings }, meta()); },
+      retrieveBooking: async () => { throw new Error('ambiguous result must not retrieve'); },
+      bookStay: async () => { mutations += 1; throw new Error('reconciliation never books'); },
+      cancelStay: async () => { mutations += 1; throw new Error('reconciliation never cancels'); },
+    } as never;
+    const result = await buildNuiteeStayReconcileLookup(pool, hotel)({ workspaceId: 'workspace', id: 'attempt' } as never);
+    assert.deepEqual(result, { kind: 'STILL_UNKNOWN' });
+    assert.equal(lookups, 1);
+    assert.equal(mutations, 0);
+  }
 });
 
 import { requiredAuthorityScope } from '../src/persistence/postgres/execution/storedExecutionGate.ts';

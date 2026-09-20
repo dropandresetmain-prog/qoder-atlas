@@ -9,6 +9,7 @@ import { seedJurisdiction } from './m4Seed.ts';
 import { seedJourneyItem } from './m2Seed.ts';
 import { PgUnitOfWork, type ExecuteOutcome } from '../src/persistence/postgres/pgUnitOfWork.ts';
 import { attachObservedStay, type ObservedStayAttachmentParams } from '../src/persistence/postgres/commands/observedStayCommands.ts';
+import { applyObservedStayCancellation } from '../src/persistence/postgres/commands/observedStayCancellationCommands.ts';
 
 const OBSERVED_AT = '2030-01-01T00:00:00.000Z';
 const STAY_START = '2030-01-02T15:00:00.000Z';
@@ -241,5 +242,68 @@ describe('A4 atomic observed stay attachment', () => {
       [f.seed.workspaceId, f.journeyId],
     );
     assert.deepEqual(counts.rows[0], { visits: '1', selections: '0', reservations: '0', links: '0' });
+  });
+
+  test('records a confirmed provider cancellation atomically, then replays without advancing canonical state again', async () => {
+    const f = await setup();
+    const uow = () => new PgUnitOfWork(f.pool, f.seed.workspaceId);
+    const attached = mustOk(await attachObservedStay(uow(), input(f, randomUUID())));
+    const cancellation = {
+      workspaceId: f.seed.workspaceId,
+      actorPrincipalId: f.seed.actorId,
+      idempotencyKey: randomUUID(),
+      journeyId: f.journeyId,
+      expectedJourneyRevision: attached.journeyRevision,
+      reservationId: attached.reservationId,
+      expectedReservationRevision: attached.reservationRevision,
+      journeyItemId: attached.journeyItemId,
+      reservationLineId: attached.reservationLineId,
+      observedAt: '2030-01-01T01:00:00.000Z',
+      evidenceId: takeSeedEvidence(f.seed),
+    };
+    const first = mustOk(await applyObservedStayCancellation(uow(), cancellation));
+    const replay = mustOk(await applyObservedStayCancellation(uow(), cancellation));
+    assert.deepEqual(replay, first);
+    const state = await f.pool.query<{ observed_status: string; lifecycle_status: string }>(
+      `SELECT rl.observed_status,ji.lifecycle_status
+         FROM reservation_lines rl
+         JOIN journey_items ji ON ji.workspace_id=rl.workspace_id
+         JOIN reservation_allocations ra ON ra.workspace_id=rl.workspace_id AND ra.line_id=rl.id AND ra.journey_item_id=ji.id
+        WHERE rl.workspace_id=$1 AND rl.id=$2 AND ji.id=$3`,
+      [f.seed.workspaceId, attached.reservationLineId, attached.journeyItemId],
+    );
+    assert.deepEqual(state.rows, [{ observed_status: 'CANCELLED', lifecycle_status: 'DROPPED' }]);
+  });
+
+  test('refuses a cancellation whose requested item is not allocated to the reservation, without partial writes', async () => {
+    const f = await setup();
+    const uow = () => new PgUnitOfWork(f.pool, f.seed.workspaceId);
+    const attached = mustOk(await attachObservedStay(uow(), input(f, randomUUID())));
+    const rejected = await applyObservedStayCancellation(uow(), {
+      workspaceId: f.seed.workspaceId,
+      actorPrincipalId: f.seed.actorId,
+      idempotencyKey: randomUUID(),
+      journeyId: f.journeyId,
+      expectedJourneyRevision: attached.journeyRevision,
+      reservationId: attached.reservationId,
+      expectedReservationRevision: attached.reservationRevision,
+      journeyItemId: randomUUID(),
+      reservationLineId: attached.reservationLineId,
+      observedAt: '2030-01-01T01:00:00.000Z',
+      evidenceId: takeSeedEvidence(f.seed),
+    });
+    assert.equal(rejected.ok, false);
+    if (!rejected.ok) assert.match(rejected.conflict.message, /own exactly one/i);
+    const state = await f.pool.query<{ observed_status: string; lifecycle_status: string; journey_revision: string; reservation_revision: string }>(
+      `SELECT rl.observed_status,ji.lifecycle_status,jh.revision::text AS journey_revision,rh.revision::text AS reservation_revision
+         FROM reservation_lines rl
+         JOIN journey_items ji ON ji.workspace_id=rl.workspace_id
+         JOIN reservation_allocations ra ON ra.workspace_id=rl.workspace_id AND ra.line_id=rl.id AND ra.journey_item_id=ji.id
+         JOIN aggregate_heads jh ON jh.workspace_id=rl.workspace_id AND jh.aggregate_id=ji.journey_id
+         JOIN aggregate_heads rh ON rh.workspace_id=rl.workspace_id AND rh.aggregate_id=rl.reservation_id
+        WHERE rl.workspace_id=$1 AND rl.id=$2 AND ji.id=$3`,
+      [f.seed.workspaceId, attached.reservationLineId, attached.journeyItemId],
+    );
+    assert.deepEqual(state.rows, [{ observed_status: 'CONFIRMED', lifecycle_status: 'PLANNED', journey_revision: String(attached.journeyRevision), reservation_revision: String(attached.reservationRevision) }]);
   });
 });

@@ -128,7 +128,7 @@ async function setup() {
   });
   assert.equal(evaluated.ok, true, JSON.stringify(evaluated));
   if (!evaluated.ok) throw new Error('source strategy evaluation failed');
-  assert.equal(evaluated.value.strategy.viability, 'VIABLE', JSON.stringify(evaluated.value.strategy.viabilityDecisions));
+  assert.equal(evaluated.value.strategy.viability, 'VIABLE', JSON.stringify(evaluated.value.viabilityDecisions));
   const compiled = compileActionPlan({ strategy: evaluated.value.strategy, now: NOW });
   assert.equal(compiled.ok, true, !compiled.ok ? compiled.conflict.message : '');
   if (!compiled.ok) throw new Error('plan compilation failed');
