@@ -20,6 +20,10 @@ test('target FX reader maps persisted organisation observations for the layered 
   const rates = await reader.ratesFor('USD', 'SGD');
   assert.equal(rates.length, 1);
   assert.equal(rates[0]?.id, observationId);
-  assert.equal(rates[0]?.authority, 'AUTHORITATIVE');
+  assert.equal(rates[0]?.authority, 'CONNECTED');
   assert.equal(rates[0]?.validUntil, '2026-12-31T00:00:00.000Z');
+  const explicitlyBound = createPgBudgetFxRateReader(pool, seed.workspaceId, {
+    sourceAuthorities: { 'org-budget-source': 'AUTHORITATIVE' },
+  });
+  assert.equal((await explicitlyBound.ratesFor('USD', 'SGD'))[0]?.authority, 'AUTHORITATIVE');
 });

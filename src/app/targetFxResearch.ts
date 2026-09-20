@@ -1,14 +1,16 @@
 /**
  * Provider-neutral FX composition for the PostgreSQL target.
  *
- * Organisation FX observations remain first-class authoritative evidence in
- * PostgreSQL. Frankfurter is only a dated CONNECTED supplement; the existing
+ * Organisation FX observations remain first-class persisted evidence in
+ * PostgreSQL. They default to CONNECTED unless an explicit source-authority
+ * binding says otherwise. Frankfurter is only a dated CONNECTED supplement; the existing
  * LayeredFxRateResolver and deterministic selector retain ownership of
  * freshness, authority and future-rate handling.
  */
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AppConfig } from '../config/config.ts';
+import type { FactAuthority } from '../domain/common.ts';
 import { FxRateEvidenceSchema, type FxRateEvidence } from '../engine/fx.ts';
 import { LayeredFxRateResolver } from './fxResolver.ts';
 import { FrankfurterFxAdapter } from '../providers/frankfurter/adapter.ts';
@@ -28,17 +30,20 @@ export interface TargetFxResearch {
     family: 'FX';
     providerId: 'frankfurter';
     mode: AppConfig['adapterMode'];
-    budgetAuthority: 'AUTHORITATIVE';
+    budgetDefaultAuthority: 'CONNECTED';
     supplementAuthority: 'CONNECTED';
+    authoritativeSourceIds: readonly string[];
   };
 }
 
 export interface TargetFxResearchOptions {
   recordingStore?: RecordingStore;
+  /** Explicit source authority binding; unlisted persisted sources stay CONNECTED. */
+  sourceAuthorities?: Readonly<Record<string, FactAuthority>>;
 }
 
-/** Map a persisted organisation FX observation into the existing resolver evidence shape. */
-export function mapPgFxObservation(hit: FxObservationHit): FxRateEvidence | undefined {
+/** Map a persisted FX observation into the existing resolver evidence shape. */
+export function mapPgFxObservation(hit: FxObservationHit, authority: FactAuthority = 'CONNECTED'): FxRateEvidence | undefined {
   const rate = Number(hit.rate);
   const parsed = FxRateEvidenceSchema.safeParse({
     id: hit.observationId,
@@ -46,7 +51,7 @@ export function mapPgFxObservation(hit: FxObservationHit): FxRateEvidence | unde
     homeCurrency: hit.quoteCurrency,
     rate,
     sourceId: hit.sourceId,
-    authority: 'AUTHORITATIVE',
+    authority,
     observedAt: hit.asOf,
     ...(hit.expiresAt ? { validUntil: hit.expiresAt } : {}),
   });
@@ -54,12 +59,18 @@ export function mapPgFxObservation(hit: FxObservationHit): FxRateEvidence | unde
 }
 
 /** Read all persisted evidence for a pair; temporal selection remains downstream. */
-export function createPgBudgetFxRateReader(pool: Pool, workspaceId: string): TargetFxBudgetRates {
+export function createPgBudgetFxRateReader(
+  pool: Pool,
+  workspaceId: string,
+  options: { sourceAuthorities?: Readonly<Record<string, FactAuthority>> } = {},
+): TargetFxBudgetRates {
   const queries = new PgArrangementReadQueries(pool);
   return {
     async ratesFor(baseCurrency, homeCurrency) {
       const rows = await queries.fxObservationsForPair(workspaceId, baseCurrency, homeCurrency);
-      return rows.map(mapPgFxObservation).filter((rate): rate is FxRateEvidence => rate !== undefined);
+      return rows
+        .map((row) => mapPgFxObservation(row, options.sourceAuthorities?.[row.sourceId] ?? 'CONNECTED'))
+        .filter((rate): rate is FxRateEvidence => rate !== undefined);
     },
   };
 }
@@ -89,7 +100,7 @@ export function composeTargetFxResearch(
   workspaceId: string,
   options: TargetFxResearchOptions = {},
 ): TargetFxResearch {
-  const budgetRates = createPgBudgetFxRateReader(pool, workspaceId);
+  const budgetRates = createPgBudgetFxRateReader(pool, workspaceId, options);
   const frankfurter = new FrankfurterFxAdapter({
     mode: config.adapterMode,
     store: options.recordingStore ?? recordingStore(config, cwd),
@@ -109,8 +120,12 @@ export function composeTargetFxResearch(
       family: 'FX',
       providerId: 'frankfurter',
       mode: config.adapterMode,
-      budgetAuthority: 'AUTHORITATIVE',
+      budgetDefaultAuthority: 'CONNECTED',
       supplementAuthority: 'CONNECTED',
+      authoritativeSourceIds: Object.entries(options.sourceAuthorities ?? {})
+        .filter(([, authority]) => authority === 'AUTHORITATIVE')
+        .map(([sourceId]) => sourceId)
+        .sort(),
     },
   };
 }

@@ -19,7 +19,7 @@ function hit(overrides: Partial<Parameters<typeof mapPgFxObservation>[0]> = {}) 
   };
 }
 
-test('PG FX observations map to authoritative resolver evidence without inventing dates', () => {
+test('PG FX observations default to CONNECTED and retain explicit authority bindings', () => {
   const mapped = mapPgFxObservation(hit());
   assert.deepEqual(mapped, {
     id: 'fx-observation-1',
@@ -27,9 +27,10 @@ test('PG FX observations map to authoritative resolver evidence without inventin
     homeCurrency: 'SGD',
     rate: 1.2703,
     sourceId: 'org-budget-source',
-    authority: 'AUTHORITATIVE',
+    authority: 'CONNECTED',
     observedAt: '2026-08-25T00:00:00.000Z',
   });
+  assert.equal(mapPgFxObservation(hit(), 'AUTHORITATIVE')?.authority, 'AUTHORITATIVE');
   assert.equal(mapPgFxObservation(hit({ rate: 'not-a-rate' })), undefined);
 });
 
@@ -56,10 +57,11 @@ test('target FX composition keeps PG budget evidence when Frankfurter replay is 
     process.cwd(),
     db,
     WORKSPACE,
-    { recordingStore },
+    { recordingStore, sourceAuthorities: { 'org-budget-source': 'AUTHORITATIVE' } },
   );
   const rates = await composed.resolver.ratesFor('USD', 'SGD');
   assert.equal(rates.length, 1);
   assert.equal(rates[0]?.authority, 'AUTHORITATIVE');
+  assert.deepEqual(composed.metadata.authoritativeSourceIds, ['org-budget-source']);
   assert.equal(composed.metadata.supplementAuthority, 'CONNECTED');
 });
