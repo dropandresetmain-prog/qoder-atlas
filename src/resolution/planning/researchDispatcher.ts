@@ -25,6 +25,7 @@ import type { CapabilityFamily } from '../../operational/strategy.ts';
 import {
   dedupePlanningToolRequests,
   planningToolRequestFingerprint,
+  PlanningToolRequestSchema,
   DEFAULT_PLANNING_RESEARCH_BUDGET,
   type PlanningBudgetExceeded,
   type PlanningResearchBudget,
@@ -43,11 +44,24 @@ import {
  */
 export type PlanningToolTransport = (request: PlanningToolRequest) => Promise<PlanningToolResult>;
 
+/**
+ * Optional bounded continuation for a completed research round. The callback
+ * receives every normalized result gathered so far, so a later read can be
+ * derived from an earlier read (for example, quote a rate returned by search).
+ * The dispatcher, rather than the callback, owns round and request budgets.
+ */
+export type NextResearchRound = (input: {
+  completedRound: number;
+  results: readonly PlanningToolResult[];
+}) => readonly PlanningToolRequest[] | Promise<readonly PlanningToolRequest[]>;
+
 export interface DispatchResearchInput {
   /** Read requests grouped by 1-based research round; the array index + 1 is the round. */
   rounds: readonly (readonly PlanningToolRequest[])[];
   transport: PlanningToolTransport;
   budget?: PlanningResearchBudget;
+  /** Optional bounded continuation; generated requests join the next static round. */
+  nextRound?: NextResearchRound;
 }
 
 export type DispatchResearchOutcome =
@@ -88,9 +102,38 @@ export async function dispatchResearch(input: DispatchResearchInput): Promise<Di
     };
   }
 
-  for (let i = 0; i < input.rounds.length; i += 1) {
-    const round = i + 1;
-    const unique = dedupePlanningToolRequests(input.rounds[i]!).filter(
+  let round = 1;
+  let dynamicRequests: readonly PlanningToolRequest[] = [];
+  while (round <= input.rounds.length || dynamicRequests.length > 0) {
+    if (round > budget.maxRounds) {
+      return {
+        ok: false,
+        evidence,
+        results,
+        refusal: {
+          kind: 'PLANNING_BUDGET_EXCEEDED',
+          budget: { maxRounds: budget.maxRounds, maxRequests: budget.maxRequests },
+          attemptedRound: round,
+          attemptedRequests: dispatched + 1,
+        },
+      };
+    }
+
+    const staticRequests = input.rounds[round - 1] ?? [];
+    // Static requests retain their historical first-seen order; generated
+    // requests are appended and then deduplicated against the whole basis.
+    const generated = dynamicRequests.map((request) => {
+      const parsed = PlanningToolRequestSchema.safeParse(request);
+      if (!parsed.success) {
+        throw new Error(
+          `nextRound generated invalid planning request for round ${round}: ${parsed.error.issues
+            .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+            .join('; ')}`,
+        );
+      }
+      return parsed.data;
+    });
+    const unique = dedupePlanningToolRequests([...staticRequests, ...generated]).filter(
       (request) => !seen.has(planningToolRequestFingerprint(request)),
     );
     for (const request of unique) {
@@ -114,6 +157,24 @@ export async function dispatchResearch(input: DispatchResearchInput): Promise<Di
       evidence.push(toEvidenceRecord(request, result));
       results.push(result);
     }
+
+    const hadRoundInput = staticRequests.length > 0 || dynamicRequests.length > 0;
+    if (!hadRoundInput) {
+      // Preserve the static dispatcher’s ability to skip an empty round and
+      // continue to a later static round. With no later work, stop cleanly.
+      round += 1;
+      continue;
+    }
+    if (input.nextRound && round < budget.maxRounds) {
+      const generatedNext = await input.nextRound({ completedRound: round, results: [...results] });
+      if (!Array.isArray(generatedNext)) {
+        throw new Error(`nextRound must return an array for round ${round + 1}`);
+      }
+      dynamicRequests = generatedNext;
+    } else {
+      dynamicRequests = [];
+    }
+    round += 1;
   }
 
   return { ok: true, evidence, results, dispatched };

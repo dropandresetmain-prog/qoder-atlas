@@ -166,6 +166,197 @@ test('dispatcher: an external FAILED read is recorded as visible failure data, n
   assert.equal(record.provenance.mode, 'REPLAY');
 });
 
+test('dispatcher: nextRound chains normalized flight results into hotel search and quote reads', async () => {
+  const flight = request({ id: 'flight-1' });
+  const calls: string[] = [];
+  const outcome = await dispatchResearch({
+    rounds: [[flight]],
+    budget: { maxRounds: 3, maxRequests: 6 },
+    transport: async (req) => {
+      calls.push(req.operation);
+      return resultFor(req, {
+        normalizedEvidence: req.operation === 'flight.search'
+          ? { offers: [{ offerId: 'offer-1' }] }
+          : req.operation === 'hotel.search'
+            ? { rates: [{ rateId: 'rate-1' }] }
+            : { status: 'QUOTED', quoteId: 'quote-1' },
+      });
+    },
+    nextRound: ({ completedRound, results }) => {
+      if (completedRound === 1) {
+        assert.equal(results[0]?.operation, 'flight.search');
+        return [request({
+          id: 'hotel-search-1',
+          capability: 'HOTEL',
+          operation: 'hotel.search',
+          parameters: { checkInDate: '2030-06-02', checkOutDate: '2030-06-03' },
+          purpose: 'find the required overnight accommodation',
+          evidenceGapCode: 'overnight_accommodation',
+          round: 2,
+        })];
+      }
+      if (completedRound === 2) {
+        assert.equal(results[1]?.operation, 'hotel.search');
+        return [request({
+          id: 'hotel-quote-1',
+          capability: 'HOTEL',
+          operation: 'hotel.quote',
+          parameters: { rateId: 'rate-1' },
+          purpose: 'confirm the researched overnight rate',
+          evidenceGapCode: 'overnight_rate',
+          round: 3,
+        })];
+      }
+      return [];
+    },
+  });
+
+  assert.equal(outcome.ok, true);
+  if (!outcome.ok) return;
+  assert.deepEqual(calls, ['flight.search', 'hotel.search', 'hotel.quote']);
+  assert.equal(outcome.results.length, 3);
+  assert.equal(outcome.evidence.length, 3);
+  assert.equal(outcome.results[2]?.normalizedEvidence && (outcome.results[2].normalizedEvidence as { status: string }).status, 'QUOTED');
+});
+
+test('dispatcher: dynamic follow-up respects maxRequests and preserves prior evidence', async () => {
+  const calls: string[] = [];
+  const outcome = await dispatchResearch({
+    rounds: [[request({ id: 'flight-1' })]],
+    budget: { maxRounds: 3, maxRequests: 2 },
+    transport: async (req) => {
+      calls.push(req.operation);
+      return resultFor(req);
+    },
+    nextRound: ({ completedRound }) => completedRound === 1
+      ? [request({ id: 'hotel-search-1', capability: 'HOTEL', operation: 'hotel.search', round: 2 })]
+      : [request({ id: 'hotel-quote-1', capability: 'HOTEL', operation: 'hotel.quote', parameters: { rateId: 'rate-1' }, round: 3 })],
+  });
+
+  assert.equal(outcome.ok, false);
+  if (outcome.ok) return;
+  assert.equal(outcome.refusal.kind, 'PLANNING_BUDGET_EXCEEDED');
+  assert.equal(outcome.refusal.attemptedRound, 3);
+  assert.equal(outcome.refusal.attemptedRequests, 3);
+  assert.equal(outcome.evidence.length, 2);
+  assert.deepEqual(calls, ['flight.search', 'hotel.search']);
+});
+
+test('dispatcher: dynamic requests merge with the next static round', async () => {
+  const calls: string[] = [];
+  const outcome = await dispatchResearch({
+    rounds: [
+      [request({ id: 'flight-1' })],
+      [request({
+        id: 'static-context-1',
+        capability: 'HOTEL',
+        operation: 'hotel.context',
+        parameters: { stayElementId: 'stay-1' },
+        round: 2,
+      })],
+    ],
+    budget: { maxRounds: 3, maxRequests: 6 },
+    transport: async (req) => {
+      calls.push(req.operation);
+      return resultFor(req);
+    },
+    nextRound: ({ completedRound }) => completedRound === 1
+      ? [request({ id: 'dynamic-search-1', capability: 'HOTEL', operation: 'hotel.search', round: 2 })]
+      : [],
+  });
+
+  assert.equal(outcome.ok, true);
+  if (!outcome.ok) return;
+  assert.deepEqual(calls, ['flight.search', 'hotel.context', 'hotel.search']);
+  assert.equal(outcome.dispatched, 3);
+});
+
+test('dispatcher: nextRound cannot dispatch beyond maxRounds', async () => {
+  let callbackCalls = 0;
+  const calls: string[] = [];
+  const outcome = await dispatchResearch({
+    rounds: [[request({ id: 'flight-1' })]],
+    budget: { maxRounds: 2, maxRequests: 4 },
+    transport: async (req) => {
+      calls.push(req.operation);
+      return resultFor(req);
+    },
+    nextRound: ({ completedRound }) => {
+      callbackCalls += 1;
+      return [request({
+        id: `follow-up-${completedRound}`,
+        capability: 'HOTEL',
+        operation: 'hotel.search',
+        round: completedRound + 1,
+      })];
+    },
+  });
+
+  assert.equal(outcome.ok, true);
+  if (!outcome.ok) return;
+  assert.equal(callbackCalls, 1);
+  assert.deepEqual(calls, ['flight.search', 'hotel.search']);
+});
+
+test('dispatcher: duplicate dynamic follow-ups do not create another transport call', async () => {
+  const first = request({ id: 'flight-1' });
+  let callbackCalls = 0;
+  let transportCalls = 0;
+  const outcome = await dispatchResearch({
+    rounds: [[first]],
+    budget: { maxRounds: 3, maxRequests: 4 },
+    transport: async (req) => {
+      transportCalls += 1;
+      return resultFor(req);
+    },
+    nextRound: ({ completedRound }) => {
+      callbackCalls += 1;
+      if (completedRound === 1) return [request({ id: 'duplicate-flight', round: 2 })];
+      return [];
+    },
+  });
+
+  assert.equal(outcome.ok, true);
+  if (!outcome.ok) return;
+  assert.equal(callbackCalls, 2);
+  assert.equal(transportCalls, 1);
+  assert.equal(outcome.dispatched, 1);
+});
+
+test('dispatcher: empty static rounds preserve later static work', async () => {
+  const calls: string[] = [];
+  const outcome = await dispatchResearch({
+    rounds: [[], [request({ id: 'later-static', round: 2 })]],
+    transport: async (req) => {
+      calls.push(req.id);
+      return resultFor(req);
+    },
+  });
+
+  assert.equal(outcome.ok, true);
+  if (!outcome.ok) return;
+  assert.deepEqual(calls, ['later-static']);
+  assert.equal(outcome.dispatched, 1);
+});
+
+test('dispatcher: malformed consequential dynamic request is rejected before transport', async () => {
+  let transportCalls = 0;
+  const outcome = dispatchResearch({
+    rounds: [[request({ id: 'flight-1' })]],
+    transport: async (req) => {
+      transportCalls += 1;
+      return resultFor(req);
+    },
+    nextRound: () => [{
+      ...request({ id: 'bad-follow-up', round: 2 }),
+      operation: 'flight.book',
+    } as never],
+  });
+
+  await assert.rejects(outcome, /nextRound generated invalid planning request/);
+  assert.equal(transportCalls, 1, 'the malformed follow-up never reaches transport');
+});
+
 test('toEvidenceRecord: carries a bounded factual summary and the canonical fingerprint, no wire payload', () => {
   const req = request();
   const record = toEvidenceRecord(req, resultFor(req));
