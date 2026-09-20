@@ -3,10 +3,12 @@
 ## Post-R4 delivery update — 2026-09-20
 
 **R4 ACCEPTED — SARAH LIVE VERTICAL + PRODUCT PARITY READY** at
-`2baf1f6df484319e131590d37a0b026222324d03`. Forward work is on
-`integration/astra-post-r4`, never an older R4 base or a direct merge to main.
-The older R3 status/sequence below is retained as context and is superseded by
-this update where it describes current composition or delivery order.
+`2baf1f6df484319e131590d37a0b026222324d03`. Current A5 implementation truth is
+`finish/a5-final-truth-repeat-freeze @ 372a664041897ddb173aa12612307c759e060bc3`;
+current planning reconciliation lives on `docs/a5-founder-qc-reconcile`. Do not
+restart from `main` or an older R4/A4 working branch. The older R3 status/sequence
+below is retained as context and is superseded by this update where it describes
+current composition or delivery order.
 
 Current evidence: normal PostgreSQL boot, accepted Sarah LIVE programme recovery, desktop V5.6/V7.2, LIVE/RECORD Atlas + Qwen research, bounded Nuitée research, reviewed entry evidence and Frankfurter comparison. Jordan A3 is a **CONDITIONAL PASS** for presentation. A4 is now **PHYSICALLY ACCEPTED** on `546adf210db8ead343ecdac22b410515665c176a`: the selected Atlas flight ticketed, Narita and destination replacement stays confirmed, the displaced destination stay cancelled, canonical state advanced between actions, final whole-trip assessment passed and the Case resolved.
 
