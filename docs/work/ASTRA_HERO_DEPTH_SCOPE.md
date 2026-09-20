@@ -46,6 +46,19 @@ V5.6/V7.2 retain accepted meaning, full relevant population and readable desktop
 - A4: Jordan real sandbox execution, observation and video-ready end-to-end acceptance.
 - A5: repeat both heroes LIVE, final presentation corrections, final gates and freeze.
 
+## Current acceptance status
+
+The founder acceptance contract below remains in force. Implementation status is now:
+
+- A3 recommendation/UI: **CONDITIONAL PASS**.
+- A4 selected-plan continuation: implemented and physically proven.
+- A4 protected Atlas/Nuitée execution: physically proven through the selected four-action sequence.
+- A4 physical sandbox: **ACCEPTED** @ `546adf210db8ead343ecdac22b410515665c176a`.
+- Final Jordan whole-trip assessment: **CURRENT / PASS**; Case **RESOLVED / RECOVERED**.
+- A5 is now the only active finishing milestone: bounded presentation truth fixes, Sarah + Jordan repeat, final gates and freeze.
+
+The actual A4 execution used replacement flight → Narita booking → destination replacement booking → displaced destination cancellation, with observation/reconciliation, canonical application and reassessment between actions. The destination replacement property was allowed to differ from the baseline property when a valid bounded alternate quote satisfied the required stay window.
+
 ## Decision and triage
 
 **WHAT WE KNOW:** accepted R4 proves Sarah LIVE programme recovery and separate protected
