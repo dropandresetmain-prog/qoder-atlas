@@ -21,7 +21,9 @@ import {
 const e = escapeHtml;
 const list = (items: readonly string[]): string => `<ul class="cw-compact-list">${items.map((item) => `<li>${e(item)}</li>`).join('')}</ul>`;
 const raw = (value: unknown): string => `<pre class="cw-raw">${e(JSON.stringify(value, null, 2) ?? '')}</pre>`;
-function region(name: string, html: string): string { return `<div data-poll-region="${name}">${html}</div>`; }
+function region(name: string, html: string, extraClass = ''): string {
+  return `<div data-poll-region="${name}"${extraClass ? ` class="${extraClass}"` : ''}>${html}</div>`;
+}
 function details(key: string, summary: string, body: string): string {
   return `<details class="cw-details" data-region-key="${e(key)}" data-test="${e(key)}"><summary>${e(summary)}</summary>${body}</details>`;
 }
@@ -75,20 +77,32 @@ function changesHtml(strategy: RecoveryStrategyView): string {
 }
 function costHtml(candidate: PlanningCandidateView | undefined, key: string): string {
   const cost = decisionCosts(candidate?.costComparison);
-  if (cost.unavailable) return `<p class="cw-muted" data-test="cost-unavailable">${e(cost.unavailable)}</p>`;
+  if (cost.unavailable) {
+    const detail = cost.unavailable;
+    const compared = detail.toLowerCase().includes('could not be compared')
+      ? detail
+      : `Cost could not be compared: ${detail}`;
+    return `<p class="cw-muted" data-test="cost-unavailable">${e(compared)}</p>`;
+  }
   const rows = (lines: typeof cost.spend, category: 'spend' | 'exposure' | 'other'): string => lines.map((line) => `<tr>
     <td>${e(decisionText(line.kind.label, 'Comparison item'))}${category === 'exposure' ? '<br>Potential loss · estimate only' : category === 'spend' ? '<br>Proposed expenditure' : '<br>Other recorded comparison item'}</td>
     <td>${e(decisionMoney(line.providerAmount))}</td><td>${e(decisionMoney(line.homeAmount))}</td></tr>`).join('');
   const fx = cost.comparison?.selectedFxEvidence ?? [];
+  const exposureSummary = cost.exposure.map((line) =>
+    `${decisionText(line.kind.label, 'Cancellation policy exposure (up to)')}: ${decisionMoney(line.homeAmount)}`).join(' · ');
+  const fxSummary = fx.slice(0, 2).map((rate) =>
+    `${decisionText(rate.source.label, 'Recorded exchange-rate source')}: ${rate.baseCurrency} → ${rate.homeCurrency} at ${rate.rate}`).join('; ');
   return `<div data-test="cost-separated">
     <div class="cw-metrics"><div class="cw-metric"><small>Estimated new spend · home currency</small><strong>${e(cost.newSpend?.join(' + ') ?? 'Not supplied')}</strong></div>
     <div class="cw-metric"><small>Potential cancellation loss · estimate</small><strong>${e(cost.potentialLoss?.join(' + ') ?? 'Not supplied')}</strong></div></div>
     ${cost.providerSpend ? `<p class="cw-muted">New spending in original provider currency: ${e(cost.providerSpend.join(' + '))}.</p>` : ''}
+    ${exposureSummary ? `<p class="cw-muted">${e(exposureSummary)}.</p>` : ''}
+    ${cost.comparison ? `<p class="cw-muted">Compared total: ${e(decisionMoney(cost.comparison.totalHomeAmount))} (recorded comparison, including any listed exposure).${fxSummary ? ` ${e(fxSummary)}.` : ''}</p>` : ''}
     <p class="cw-muted">These are comparison figures, not confirmed charges or refunds. Potential loss is separate from new spending; no cancellation is implied.</p>
     <table class="cw-cost-table"><thead><tr><th scope="col">Item</th><th scope="col">Provider currency</th><th scope="col">Home comparison</th></tr></thead>
     <tbody>${rows(cost.spend, 'spend')}${rows(cost.exposure, 'exposure')}${rows(cost.other, 'other')}</tbody></table>
     ${details(`cost-evidence-${key}`, 'FX and comparison evidence',
-      `${cost.comparison ? `<p>Recorded comparison total (including the listed exposure): <strong>${e(decisionMoney(cost.comparison.totalHomeAmount))}</strong>.</p><p class="cw-muted">Compared ${e(formatInstant(cost.comparison.comparedAt))}.</p>` : ''}
+      `${cost.comparison ? `<p>Compared total: <strong>${e(decisionMoney(cost.comparison.totalHomeAmount))}</strong> (recorded comparison, including any listed exposure).</p><p class="cw-muted">Compared ${e(formatInstant(cost.comparison.comparedAt))}.</p>` : ''}
       ${fx.length ? list(fx.map((rate) => `${decisionText(rate.source.label, 'Recorded exchange-rate source')}: ${rate.baseCurrency} → ${rate.homeCurrency} at ${rate.rate}; reference ${formatInstant(rate.observedAt)}${rate.validUntil ? `; valid until ${formatInstant(rate.validUntil)}` : ''}.`)) : '<p>No exchange-rate record was supplied.</p>'}`)}
   </div>`;
 }
@@ -148,7 +162,7 @@ function optionsHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
   if (considered.length) {
     chunks.push(`<div class="cw-card cw-block" data-test="rejected-summary"><h3>${m.noPlan ? 'Why the automatic options stopped' : 'Why other options were not chosen'}</h3>${considered.slice(0, 3).map((candidate) => {
       const c = rejectionSummary(candidate);
-      return `<div class="cw-rejection"><div><strong>${e(c.label)}</strong><p class="cw-muted">${e(c.status)}</p></div><div><p>${e(c.reason)}</p>${candidate.costComparison?.status === 'AVAILABLE' ? `<p class="cw-muted">Compared cost: ${e(decisionMoney(candidate.costComparison.totalHomeAmount))} (recorded comparison, including any listed exposure).</p>` : ''}</div></div>`;
+      return `<div class="cw-rejection"><div><strong>${e(c.label)}</strong><p class="cw-muted">${e(c.status)}</p></div><div><p>${e(c.reason)}</p>${candidate.costComparison?.status === 'AVAILABLE' ? `<p class="cw-muted">Compared cost: ${e(decisionMoney(candidate.costComparison.totalHomeAmount))} (recorded comparison, including any listed exposure).</p>` : ''}</div></div>${proposalHtml(candidate)}`;
     }).join('')}${considered.length > 3 ? `<p class="cw-muted">Showing 3 of ${considered.length} considered options that were rejected. Every recorded evaluation remains below.</p>` : ''}</div>`);
   }
   const allCandidates = view.planningEvidence?.candidates ?? [];
@@ -253,7 +267,7 @@ export function renderProductRecoveryCase(view: RecoveryCaseView): string {
       ${region('graph', graphHtml(view, m))}${region('affects', affectsHtml(m))}${region('options', optionsHtml(view, m))}
       ${region('execution', executionHtml(m))}${region('resolution', resolutionHtml(m))}${region('technical', technicalHtml(view, m))}
     </div><aside class="case-rail" aria-label="Decision and evidence">
-      ${region('approval', approvalHtml(view, m))}${region('rail', railHtml(m))}${region('evidence', evidenceHtml(view, m))}
+      ${region('approval', approvalHtml(view, m), 'cw-poll-approval')}${region('rail', railHtml(m))}${region('evidence', evidenceHtml(view, m))}
       ${region('activity', activityHtml(view, m))}${region('checked', checkedHtml(view, m))}
     </aside></div></main>${originalCurrentToggleScript()}${casePollingScript({ caseRef: view.caseRef })}`;
 }

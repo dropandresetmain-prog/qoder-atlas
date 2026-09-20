@@ -75,7 +75,7 @@ export const OPERATOR_WORKSPACE_STYLES = `<style data-operator-workspace-styles>
 @media (max-width: 1050px) {
   .case-workspace .case-grid { grid-template-columns: minmax(0, 1fr); }
   .case-workspace .case-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .case-workspace .case-rail > [data-poll-region="approval"] { grid-column: 1 / -1; }
+  .case-workspace .case-rail > .cw-poll-approval { grid-column: 1 / -1; }
   .product-operator-overview .qrow { grid-template-columns: 24px minmax(0, 1fr); }
   .product-operator-overview .b-right { grid-column: 2; justify-content: flex-start; }
 }

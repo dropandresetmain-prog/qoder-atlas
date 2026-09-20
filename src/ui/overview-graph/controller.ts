@@ -74,7 +74,7 @@ export const OVERVIEW_GRAPH_SCRIPT = `
       var bottom = legend ? Math.max(8, rect.bottom - legend.getBoundingClientRect().top + 8) : 8;
       var signature = [box.x, box.y, box.w, box.h, rect.width, rect.height, top, bottom, st.view, st.mode].join('|');
       if (st.fitted && signature === st.frameSignature) { apply(false); return true; }
-      var frame = fitOverviewCamera(box, rect.width, rect.height, top, bottom, st.expanded ? 24 : 12, st.mode === 'focus' ? 1.3 : 1.15);
+      var frame = fitOverviewCamera(box, rect.width, rect.height, top, bottom, st.expanded ? 24 : 12, st.mode === 'focus' ? 1.3 : 1.15, st.view === 'change' ? 'start' : 'center');
       if (!frame) return false;
       st.x = frame.x; st.y = frame.y; st.scale = frame.scale; st.fitted = true; st.frameSignature = signature;
       apply(animate); return true;

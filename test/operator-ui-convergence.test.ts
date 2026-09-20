@@ -58,8 +58,8 @@ test('Overview case navigation dominates and the full searchable population rema
   assert.match(html, /class="case-open"[^>]+data-test="population-case-link">Open case<\/a>/);
   assert.match(html, /data-test="population-traveller-link"[^>]*>Traveller view<\/a>/);
   assert.doesNotMatch(html, /Open case →Show interaction/);
-  assert.equal((html.match(/data-test="population-row"/g) ?? []).length, 12);
-  assert.equal((html.match(/data-test="population-row" hidden/g) ?? []).length, 2);
+  assert.equal((html.match(/data-test="population-row"[^>]*data-journey-ref=/g) ?? []).length, 12);
+  assert.equal((html.match(/data-test="population-row" hidden[^>]*data-journey-ref=/g) ?? []).length, 2);
   assert.ok(html.indexOf('data-poll-region="overview-attention"') < html.indexOf('data-test="simulated-airline-update"'));
 });
 test('the recorded recommendation is not replaced by an executable alternative', () => {
@@ -111,7 +111,7 @@ test('rejection uses recorded timing failure rather than an invented ranking rea
   const result = rejectionSummary(c);
   assert.equal(result.status, 'Rejected');
   assert.match(result.reason, /not enough time to connect/);
-  assert.match(result.reason, /20 min available; 50 min required/);
+  assert.match(result.reason, /Time available: 20 min; Time required: 50 min/);
   const v = view(); v.planningEvidence!.candidates.push(c);
   const html = renderProductRecoveryCase(v);
   assert.match(html, /data-test="rejected-summary"/);

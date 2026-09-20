@@ -143,8 +143,8 @@ export function rejectionSummary(candidate: PlanningCandidateView): { label: str
   const recordedReason = failedCommitment?.reasonCode ?? blocker?.reasonCode;
   const reason = recordedReason ? CASE_REASON_SENTENCE[recordedReason] : undefined;
   const timings = failedCommitment
-    ? [failedCommitment.availableMinutes === undefined ? '' : `${failedCommitment.availableMinutes} min available`, failedCommitment.requiredMinutes === undefined ? '' : `${failedCommitment.requiredMinutes} min required`]
-    : [blocker?.timing?.gapMinutes === undefined ? '' : `${blocker.timing.gapMinutes} min available`, blocker?.timing?.requiredMinutes === undefined ? '' : `${blocker.timing.requiredMinutes} min required`];
+    ? [failedCommitment.availableMinutes === undefined ? '' : `Time available: ${failedCommitment.availableMinutes} min`, failedCommitment.requiredMinutes === undefined ? '' : `Time required: ${failedCommitment.requiredMinutes} min`]
+    : [blocker?.timing?.gapMinutes === undefined ? '' : `Time available: ${blocker.timing.gapMinutes} min`, blocker?.timing?.requiredMinutes === undefined ? '' : `Time required: ${blocker.timing.requiredMinutes} min`];
   const conciseSource = candidate.reasons.map(plain).find((r): r is string => r !== undefined && r.length <= 240);
   const delta = candidate.outcomeDelta[0];
   const outcomeWord = (value: string | undefined): string | undefined =>
@@ -154,11 +154,15 @@ export function rejectionSummary(candidate: PlanningCandidateView): { label: str
   const fallback = candidate.disposition.code === 'VIABLE_NOT_RECOMMENDED'
     ? 'This option is viable but was not selected in the recorded comparison.'
     : 'The recorded checks did not accept this option. See the detailed evaluation for the reason.';
+  const unknownBlocker = proposal?.blockers.find((check) => check.verdict === 'UNKNOWN');
+  const unknownReason = unknownBlocker?.reasonCode ? CASE_REASON_SENTENCE[unknownBlocker.reasonCode] : undefined;
   return {
     label: decisionText(label, 'Another recovery option'),
     status: DISPOSITION[candidate.disposition.code ?? ''] ?? 'Not selected',
     reason: reason
       ? `${failedCommitment ? `${decisionText(failedCommitment.label, 'Commitment')}: ` : ''}${reason}${timings.some(Boolean) ? ` (${timings.filter(Boolean).join('; ')})` : ''}.`
+      : unknownReason
+        ? `${unknownReason}${timings.some(Boolean) ? ` (${timings.filter(Boolean).join('; ')})` : ''}.`
       : movement ?? conciseSource ?? fallback,
   };
 }

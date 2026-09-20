@@ -601,7 +601,7 @@ describe('Case cost and composite-stay evidence', () => {
     const text = primaryVisibleText(renderProductRecoveryCase(view));
     assert.match(text, /Example Air/);
     assert.match(text, /Airport hotel/);
-    assert.match(text, /Credential missing/);
+    assert.match(text, /required travel credential is missing/i);
     assert.match(text, /17:00/);
     assert.match(text, /12:55/);
     assert.doesNotMatch(text, /2031-09-17T04:55/);

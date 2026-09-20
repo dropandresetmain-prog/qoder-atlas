@@ -6,6 +6,8 @@ export interface CameraFrame { x: number; y: number; scale: number }
 export function fitOverviewCamera(
   box: CameraBox, width: number, height: number,
   top: number, bottom: number, padding: number, maximumScale: number,
+  /** Prefer the top of the usable lane so tall viewports keep active cards reachable. */
+  verticalAlign: 'center' | 'start' = 'center',
 ): CameraFrame | null {
   if (![box.x, box.y, box.w, box.h, width, height, top, bottom, padding, maximumScale].every(Number.isFinite)) return null;
   if (box.w <= 0 || box.h <= 0 || maximumScale <= 0 || padding < 0 || top < 0 || bottom < 0) return null;
@@ -13,9 +15,12 @@ export function fitOverviewCamera(
   const usableHeight = height - top - bottom - padding * 2;
   if (usableWidth <= 0 || usableHeight <= 0) return null;
   const scale = Math.min(usableWidth / box.w, usableHeight / box.h, maximumScale);
+  const yOffset = verticalAlign === 'start'
+    ? 0
+    : (usableHeight - box.h * scale) / 2;
   return {
     x: padding + (usableWidth - box.w * scale) / 2 - box.x * scale,
-    y: top + padding + (usableHeight - box.h * scale) / 2 - box.y * scale,
+    y: top + padding + yOffset - box.y * scale,
     scale,
   };
 }

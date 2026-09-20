@@ -134,9 +134,13 @@ async function sweep(page: Page): Promise<string[]> {
 async function activeDependencyCardsAreReachable(page: Page): Promise<void> {
   const cards = page.locator('.og-node.og-dependency:not(.og-dim)');
   assert.ok(await cards.count() > 0, 'the active shared dependency is rendered');
+  // Tall A3 graph viewports can extend below the fold when Needs Attention
+  // sits above them. Bring the viewport on-screen before hit-testing coverage.
+  await page.locator('.og-viewport').first().evaluate((el) => el.scrollIntoView({ block: 'center' }));
   const ids = await cards.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-og-node')));
   for (const id of ids) {
     assert.ok(id, 'dependency card has an identity');
+    await page.locator(`[data-og-node="${id}"]`).evaluate((card) => card.scrollIntoView({ block: 'center', inline: 'center' }));
     const blockedBy = await page.locator(`[data-og-node="${id}"]`).evaluate((card) => {
       const rect = card.getBoundingClientRect();
       const viewport = card.closest('.og-viewport')!.getBoundingClientRect();
