@@ -1,0 +1,39 @@
+name: Isolated A4 source export
+on:
+  push:
+    branches: [work/a4-continuation-source-export]
+permissions:
+  contents: read
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 987a6b66cc34b8d7fc327dbda76853e8ef1e761b
+          persist-credentials: false
+      - name: Export exact tracked source without credentials or provider recordings
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 987a6b66cc34b8d7fc327dbda76853e8ef1e761b
+          python3 - <<'PY'
+          import pathlib, subprocess, tarfile
+          names = subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0')
+          roots = {'src', 'test', 'postgres-integration', 'scripts', 'docs'}
+          with tarfile.open('a4-source.tar.gz', 'w:gz') as archive:
+              for name in names:
+                  if not name:
+                      continue
+                  path = pathlib.PurePosixPath(name)
+                  if path.name.startswith('.env') or 'recordings' in path.parts:
+                      continue
+                  if len(path.parts) == 1 or path.parts[0] in roots:
+                      archive.add(name, arcname=name, recursive=False)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: a4-source-987a6b6
+          path: a4-source.tar.gz
+          retention-days: 1
