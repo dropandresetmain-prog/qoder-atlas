@@ -238,7 +238,7 @@ function optionsHtml(m: CaseWorkspaceModel): string {
       <p class="cw-status" data-test="recovery-controls-status" role="status"></p>
     </div>`);
   }
-  if (m.noPlan && m.consideredPreview.length > 0) {
+  if (m.consideredPreview.length > 0) {
     const rows = m.consideredPreview.map((candidate) => {
       const evidence = [candidate.reason, ...candidate.movements, ...(candidate.proposalLines ?? []), candidate.costLine].filter(Boolean).join(' ');
       return `<li><strong>${escapeHtml(candidate.label)}</strong> — ${escapeHtml(evidence)}</li>`;
@@ -248,7 +248,7 @@ function optionsHtml(m: CaseWorkspaceModel): string {
       ? `<p class="meta">Showing ${m.consideredPreview.length} of ${m.considered.length} considered options. Open the full list below for the rest.</p>`
       : '';
     parts.push(`<div class="panel cw-rejection-preview" data-test="rejected-summary">
-      <h3>Why the automatic options stopped</h3>
+      <h3>${m.noPlan ? 'Why the automatic options stopped' : 'Why other options were not chosen'}</h3>
       <ul class="cw-considered">${rows}</ul>
       ${note}
     </div>`);

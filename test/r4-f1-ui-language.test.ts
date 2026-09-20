@@ -445,6 +445,7 @@ describe('R4 transport option cards: leg label and strategy-scoped cost', () => 
         semanticState: 'FAILED' as const,
         authority: 'AUTHORITATIVE' as const,
         detail: 'Manila → Cebu',
+        subjectRefs: [itemRef],
       }],
     };
     const model = presentCaseWorkspace(caseView({

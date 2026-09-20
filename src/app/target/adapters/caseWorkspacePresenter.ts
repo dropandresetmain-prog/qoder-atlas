@@ -216,38 +216,25 @@ function subjectNoun(ref: string): string {
   return CASE_SUBJECT_KIND_NOUN[kindOf(ref)] ?? 'part of the trip';
 }
 
-/** Disrupted authoritative transport bookings visible on the case graph (not proposed offers). */
-function disruptedTransportLegs(view: RecoveryCaseView): readonly { label: string; detail?: string }[] {
-  const legs: { label: string; detail?: string }[] = [];
-  for (const node of view.ldg.nodes) {
-    if (node.kind !== 'SERVICE_BOOKING') continue;
-    if (node.semanticState !== 'FAILED' && node.semanticState !== 'AFFECTED' && node.semanticState !== 'CHANGED') continue;
-    const label = plain(node.label);
-    if (!label) continue;
-    const detail = plain(node.detail);
-    legs.push(detail ? { label, detail } : { label });
-  }
-  return legs;
-}
-
 /**
- * Best-effort human label for a SELECT_OFFER on a journey item. The persisted
- * change carries no offer itinerary — only a typed JOURNEY_ITEM ref — so we
- * reuse the disrupted leg the case graph already shows.
+ * Human label for a SELECT_OFFER on a journey item. The persisted change
+ * carries no offer itinerary, so the graph node mapped to that exact journey
+ * item is the only authoritative current-leg context we can use.
  */
 function selectOfferTransportLeg(
   view: RecoveryCaseView,
-  _change: RecoveryStrategyView['changes'][number],
+  change: RecoveryStrategyView['changes'][number],
 ): string | undefined {
-  const legs = disruptedTransportLegs(view);
-  if (legs.length === 0) return undefined;
-  if (legs.length === 1) {
-    const leg = legs[0]!;
-    return leg.detail ? `${leg.label} · ${leg.detail}` : leg.label;
-  }
-  const routes = [...new Set(legs.map((l) => l.detail ?? l.label).filter((r): r is string => r !== undefined))];
-  if (routes.length === 1) return routes[0];
-  return undefined;
+  const node = view.ldg.nodes.find((candidate) =>
+    candidate.kind === 'SERVICE_BOOKING'
+      && candidate.subjectRefs?.includes(change.subjectRef)
+      && (candidate.semanticState === 'FAILED' || candidate.semanticState === 'AFFECTED' || candidate.semanticState === 'CHANGED'),
+  );
+  if (!node) return undefined;
+  const label = plain(node.label);
+  if (!label) return undefined;
+  const detail = plain(node.detail);
+  return detail ? `${label} · ${detail}` : label;
 }
 
 function changeSubjectLabel(
@@ -466,6 +453,8 @@ function formatExactMoney(amount: { amount: string; currency: string }): string 
 }
 
 function costSourceLabel(source: { label: string; code?: string }): string {
+  const code = source.code?.trim().toLowerCase();
+  if (code === 'frankfurter') return 'Frankfurter';
   return plain(source.label) ?? 'Recorded exchange-rate source';
 }
 
@@ -554,11 +543,46 @@ function timingEvidence(timing: { gapMinutes?: number; requiredMinutes?: number;
 
 function proposalLines(proposal: MaterialCandidateProposal | undefined): string[] {
   if (!proposal) return [];
+  const flights = proposal.flights as (MaterialCandidateProposal['flights'][number] & {
+    originLabel?: string;
+    destinationLabel?: string;
+  })[];
+  const programmeChecks = (proposal as MaterialCandidateProposal & {
+    programmeChecks?: readonly {
+      label: string;
+      verdict: 'PASS' | 'FAIL' | 'UNKNOWN';
+      deadline?: string;
+      arrival?: string;
+      timeZone?: string;
+      availableMinutes?: number;
+      requiredMinutes?: number;
+      transferMinutes?: number;
+      reasonCode?: string;
+    }[];
+  }).programmeChecks ?? [];
+  const verdict = (value: 'PASS' | 'FAIL' | 'UNKNOWN'): string =>
+    value === 'PASS' ? 'passes' : value === 'FAIL' ? 'fails' : 'is not confirmed';
   return [
-    ...proposal.flights.map((flight) => `${flight.label}: ${formatCaseWindowInstant(flight.departure, flight.departureTimeZone)} to ${formatCaseWindowInstant(flight.arrival, flight.arrivalTimeZone)}`),
+    ...flights.map((flight) => {
+      const origin = plain(flight.originLabel);
+      const destination = plain(flight.destinationLabel);
+      const route = origin && destination ? ` (${origin} → ${destination})` : '';
+      return `${flight.label}${route}: ${formatCaseWindowInstant(flight.departure, flight.departureTimeZone)} to ${formatCaseWindowInstant(flight.arrival, flight.arrivalTimeZone)}`;
+    }),
     ...proposal.stays.map((stay) => `Stay at ${stay.placeLabel}: ${formatCaseWindow(stay.start, stay.end, stay.timeZone)}`),
     ...proposal.entryResults.map((entry) => `${displayCode(entry.dimension)}: ${entry.verdict.toLowerCase()}${entry.reasonCodes.length ? ` (${entry.reasonCodes.map(displayCode).join(', ')})` : ''}`),
     ...proposal.blockers.map((blocker) => `${displayCode(blocker.dimension)}: ${blocker.verdict.toLowerCase()} (${displayCode(blocker.reasonCode)})${timingEvidence(blocker.timing)}`),
+    ...programmeChecks.map((check) => {
+      const timing = [
+        check.deadline ? `deadline ${formatCaseWindowInstant(check.deadline, check.timeZone)}` : undefined,
+        check.arrival ? `arrives ${formatCaseWindowInstant(check.arrival, check.timeZone)}` : undefined,
+        check.requiredMinutes === undefined ? undefined : `needs ${check.requiredMinutes} min`,
+        check.availableMinutes === undefined ? undefined : `available ${check.availableMinutes} min`,
+        check.transferMinutes === undefined ? undefined : `transfer ${check.transferMinutes} min`,
+        check.reasonCode ? displayCode(check.reasonCode) : undefined,
+      ].filter((part): part is string => part !== undefined);
+      return `Commitment ${check.label}: ${verdict(check.verdict)}${timing.length > 0 ? `; ${timing.join('; ')}` : ''}`;
+    }),
   ];
 }
 
@@ -1026,7 +1050,7 @@ export function presentCaseWorkspace(view: RecoveryCaseView): CaseWorkspaceModel
   const considered = phase === 'awaiting_approval' || phase === 'no_plan' || phase === 'executing' || phase === 'recovered'
     ? buildConsidered(view, shown)
     : [];
-  const consideredPreview = phase === 'no_plan' ? considered.slice(0, 3) : [];
+  const consideredPreview = phase === 'no_plan' || phase === 'awaiting_approval' ? considered.slice(0, 3) : [];
 
   const happened = whatHappened(view, name);
   const stake = plain(view.criticalCommitment);
