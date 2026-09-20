@@ -366,6 +366,12 @@ export function requiredAuthorityScope(
   resolvedAssessableSubjects: readonly TypedRef[],
   /** DB-derived owning journey id per JOURNEY_ITEM id (never proposer-supplied). */
   itemOwnerJourneyIds: ReadonlyMap<string, string> = new Map(),
+  /**
+   * DB-derived owning journey id per RESERVATION / RESERVATION_LINE id.
+   * Stay cancel names those refs for binding lookup and revision guards; authority
+   * itself is journey-scoped (same as SELECT_OFFER / ADD_JOURNEY_STAY).
+   */
+  reservationOwnerJourneyIds: ReadonlyMap<string, string> = new Map(),
 ): TypedRef[] {
   const map = new Map<string, TypedRef>();
   const resolvedJourneys = new Set(resolvedAssessableSubjects.filter((ref) => ref.kind === 'JOURNEY').map((ref) => ref.id));
@@ -381,6 +387,14 @@ export function requiredAuthorityScope(
     // in the required set; an unknown owner or a different journey keeps the item required.
     if (ref.kind === 'JOURNEY_ITEM') {
       const owner = itemOwnerJourneyIds.get(ref.id);
+      if (owner !== undefined && resolvedJourneys.has(owner)) continue;
+    }
+    // A4: CANCEL_STAY keeps RESERVATION / RESERVATION_LINE on the intent for
+    // immutable binding correlation and expected-revision guards. Exact grant
+    // coverage is still the owning Journey — workspace authority enumerates
+    // journeys, not every reservation line created later.
+    if (ref.kind === 'RESERVATION' || ref.kind === 'RESERVATION_LINE') {
+      const owner = reservationOwnerJourneyIds.get(`${ref.kind}:${ref.id}`) ?? reservationOwnerJourneyIds.get(ref.id);
       if (owner !== undefined && resolvedJourneys.has(owner)) continue;
     }
     map.set(`${ref.kind}:${ref.id}`, ref);
@@ -399,6 +413,45 @@ async function loadItemOwnerJourneyIds(
       'SELECT journey_id FROM journey_items WHERE workspace_id = $1 AND id = $2', [workspaceId, ref.id],
     );
     if (result.rows[0]) owners.set(ref.id, result.rows[0].journey_id);
+  }
+  return owners;
+}
+
+/** Owning journey per RESERVATION / RESERVATION_LINE named by the intent, from allocation truth. */
+async function loadReservationOwnerJourneyIds(
+  db: Queryable, workspaceId: string, intentSubjectRefs: readonly TypedRef[],
+): Promise<Map<string, string>> {
+  const owners = new Map<string, string>();
+  for (const ref of intentSubjectRefs) {
+    if (ref.kind === 'RESERVATION_LINE') {
+      const result = await db.query<{ journey_id: string }>(
+        `SELECT ji.journey_id
+           FROM reservation_allocations a
+           JOIN journey_items ji ON ji.workspace_id = a.workspace_id AND ji.id = a.journey_item_id
+          WHERE a.workspace_id = $1 AND a.line_id = $2
+          ORDER BY a.created_at, a.id
+          LIMIT 1`,
+        [workspaceId, ref.id],
+      );
+      if (result.rows[0]) {
+        owners.set(ref.id, result.rows[0].journey_id);
+        owners.set(`RESERVATION_LINE:${ref.id}`, result.rows[0].journey_id);
+      }
+    } else if (ref.kind === 'RESERVATION') {
+      const result = await db.query<{ journey_id: string }>(
+        `SELECT ji.journey_id
+           FROM reservation_allocations a
+           JOIN journey_items ji ON ji.workspace_id = a.workspace_id AND ji.id = a.journey_item_id
+          WHERE a.workspace_id = $1 AND a.reservation_id = $2
+          ORDER BY a.created_at, a.id
+          LIMIT 1`,
+        [workspaceId, ref.id],
+      );
+      if (result.rows[0]) {
+        owners.set(ref.id, result.rows[0].journey_id);
+        owners.set(`RESERVATION:${ref.id}`, result.rows[0].journey_id);
+      }
+    }
   }
   return owners;
 }
@@ -433,7 +486,12 @@ export async function loadRequiredAuthorityScope(
   // The intent's own items always contribute their owning journey to the required scope.
   seeds.push(...intent.subjectRefs.filter((ref) => ref.kind === 'JOURNEY_ITEM'));
   const assessable = await resolveAssessableSubjects(pool, workspaceId, seeds);
-  const required = requiredAuthorityScope(intent.subjectRefs, assessable, await loadItemOwnerJourneyIds(pool, workspaceId, intent.subjectRefs));
+  const required = requiredAuthorityScope(
+    intent.subjectRefs,
+    assessable,
+    await loadItemOwnerJourneyIds(pool, workspaceId, intent.subjectRefs),
+    await loadReservationOwnerJourneyIds(pool, workspaceId, intent.subjectRefs),
+  );
   if (required.length === 0) {
     return { allowed: false, reason: 'ASSESSMENT_SUBJECTS_UNRESOLVED', detail: 'required authority scope is empty' };
   }
@@ -626,7 +684,12 @@ export async function evaluateStoredExecutionGate(
   const assessmentView = await requireAllAssessmentsCurrent(pool, params.workspaceId, subjects, params.now);
   if ('allowed' in assessmentView && assessmentView.allowed === false) return assessmentView;
 
-  const requiredScopes = requiredAuthorityScope(intent.subjectRefs, subjects, await loadItemOwnerJourneyIds(pool, params.workspaceId, intent.subjectRefs));
+  const requiredScopes = requiredAuthorityScope(
+    intent.subjectRefs,
+    subjects,
+    await loadItemOwnerJourneyIds(pool, params.workspaceId, intent.subjectRefs),
+    await loadReservationOwnerJourneyIds(pool, params.workspaceId, intent.subjectRefs),
+  );
   if (requiredScopes.length === 0) {
     return { allowed: false, reason: 'ASSESSMENT_SUBJECTS_UNRESOLVED', detail: 'required authority scope is empty' };
   }

@@ -211,3 +211,31 @@ test('B1: a JOURNEY_ITEM requirement is dropped only when its own owning journey
   // OFFER refs are never independent requirements.
   assert.deepEqual(kinds(requiredAuthorityScope([{ kind: 'OFFER', id: 'o' } as never], [j1])), ['JOURNEY:j1']);
 });
+
+test('A4: RESERVATION / RESERVATION_LINE requirements drop when owning journey is required', () => {
+  const journey = { kind: 'JOURNEY', id: 'j1' } as never;
+  const line = { kind: 'RESERVATION_LINE', id: 'line-1' } as never;
+  const reservation = { kind: 'RESERVATION', id: 'res-1' } as never;
+  const kinds = (refs: { kind: string; id: string }[]) => refs.map((r) => `${r.kind}:${r.id}`);
+  const owners = new Map([
+    ['line-1', 'j1'],
+    ['RESERVATION_LINE:line-1', 'j1'],
+    ['res-1', 'j1'],
+    ['RESERVATION:res-1', 'j1'],
+  ]);
+  // Owner journey required: reservation subjects are journey-scoped.
+  assert.deepEqual(
+    kinds(requiredAuthorityScope([journey, line, reservation], [journey], new Map(), owners)),
+    ['JOURNEY:j1'],
+  );
+  // Unknown owner: fail closed — reservation stays required.
+  assert.deepEqual(
+    kinds(requiredAuthorityScope([journey, line, reservation], [journey])),
+    ['JOURNEY:j1', 'RESERVATION:res-1', 'RESERVATION_LINE:line-1'],
+  );
+  // Owner is a different journey not in the required set: keep reservation required.
+  const otherOwners = new Map([['line-1', 'j2'], ['RESERVATION_LINE:line-1', 'j2']]);
+  assert.ok(
+    kinds(requiredAuthorityScope([journey, line], [journey], new Map(), otherOwners)).includes('RESERVATION_LINE:line-1'),
+  );
+});
