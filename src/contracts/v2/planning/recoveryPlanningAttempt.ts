@@ -133,6 +133,8 @@ export type MaterialCandidateCostComparison = z.infer<typeof MaterialCandidateCo
 export const MaterialCandidateProposalSchema = z.strictObject({
   flights: z.array(z.strictObject({
     label: z.string().min(1).max(160),
+    originLabel: z.string().min(1).max(160).optional(),
+    destinationLabel: z.string().min(1).max(160).optional(),
     departure: InstantSchema,
     arrival: InstantSchema,
     departureTimeZone: z.string().min(1).max(128).optional(),
@@ -144,6 +146,17 @@ export const MaterialCandidateProposalSchema = z.strictObject({
     end: InstantSchema,
     timeZone: z.string().min(1).max(128).optional(),
   })).max(4).default([]),
+  programmeChecks: z.array(z.strictObject({
+    label: z.string().min(1).max(160),
+    verdict: z.enum(['FAIL', 'UNKNOWN', 'PASS']),
+    reasonCode: z.string().min(1).max(160),
+    deadline: InstantSchema.optional(),
+    arrival: InstantSchema.optional(),
+    timeZone: z.string().min(1).max(128).optional(),
+    availableMinutes: z.number().finite().optional(),
+    requiredMinutes: z.number().finite().optional(),
+    transferMinutes: z.number().finite().optional(),
+  })).max(8).optional(),
   entryResults: z.array(z.strictObject({
     dimension: z.string().min(1).max(128),
     verdict: z.enum(['FAIL', 'UNKNOWN', 'PASS']),

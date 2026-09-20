@@ -354,3 +354,21 @@ test('assemblePlanningAttempt: completedAt before startedAt is rejected (bounded
     domains: [], evidence: [], materialCandidates: [], viableStrategyRefs: [],
   }));
 });
+
+test('candidate programme evidence preserves captured timing without calculating missing facts', () => {
+  const { result, itemId } = programmeTimeSwapWorld();
+  const dimension = result.strategy.candidateAssessmentResults[0]!.dimensions[0]!;
+  dimension.dimension = 'programme_participation';
+  const explanation = dimension.explanations[0]!;
+  explanation.relatedSubjects = [{ kind: 'PROGRAMME_ITEM', id: itemId }];
+  explanation.facts = { deadline: LATE, arrival: EARLY, availableMinutes: 300, requiredMinutes: 150, transferMinutes: 25 };
+  const evidence = materialCandidateFromEvaluation({ candidateKey: 'captured-programme', proposerId: 'programme', domainId: 'PROGRAMME', recommended: true, result });
+  assert.deepEqual(evidence.proposal?.programmeChecks?.[0], {
+    label: result.proposedWorld.programmeItems.find(item => item.id === itemId)!.title,
+    verdict: explanation.status, reasonCode: explanation.reasonCode,
+    deadline: LATE, arrival: EARLY, availableMinutes: 300, requiredMinutes: 150, transferMinutes: 25,
+  });
+  delete explanation.facts.availableMinutes;
+  const missing = materialCandidateFromEvaluation({ candidateKey: 'missing-timing', proposerId: 'programme', domainId: 'PROGRAMME', recommended: true, result });
+  assert.equal(missing.proposal?.programmeChecks?.[0]?.availableMinutes, undefined, 'the projection must not calculate missing engine evidence from timestamps');
+});

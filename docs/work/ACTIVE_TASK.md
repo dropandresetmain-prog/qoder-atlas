@@ -3,7 +3,7 @@
 - Goal: one generalized PostgreSQL engine, two rich desktop hero recoveries. [Hard scope lock](ASTRA_HERO_DEPTH_SCOPE.md).
 - Primary: `integration/astra-post-r4` in `C:/Dev/qoder-atlas/.worktrees/astra-post-r4`.
 - Immutable R4 base: `2baf1f6df484319e131590d37a0b026222324d03`.
-- Latest verified pushed checkpoint before this commit: `b6c2b9c8bd307b63a4ca552979162662b065ee7a`. [Actual A3 LIVE progress](ASTRA_A3_LIVE_PROGRESS.md) records normal provider/PG/browser evidence and source-complete baseline; acceptance remains pending.
+- Latest verified pushed checkpoint before this commit: `eca447d804debd4e704df9ef48db08b50f1dfcb8`. [Actual A3 LIVE progress](ASTRA_A3_LIVE_PROGRESS.md) records normal provider/PG/browser evidence and source-complete baseline; acceptance remains pending.
 - Accepted: A0 `f55899b15200de692dd749bbcfb795c67f6a22e0`; A1 `a948917c239fc02435020f6740474283dd795ea8`; A2 `f0c79f2412513e3a676737ac32c3c3694c03388a` (tested565f561).
 - Evidence: [A1](ASTRA_A1_PRODUCT_EVIDENCE.md), [A2 LIVE](ASTRA_A2_LIVE_EVIDENCE.md), [A3 decisions](ASTRA_A3_STAY_EXTENSION_DECISION.md), [ROADMAP](../ROADMAP.md).
 
@@ -17,10 +17,10 @@
 
 ## Current lanes — all Act Now
 
-- Terra selected continuation: compiler/contracts c09bcc3 integrated; dedicated compiler tests f62d836 and continuation6cf753b await integration. New checkpoint-specific PG proof still required; existing2PG regression tests do not establish continuation acceptance.
+- Terra selected continuation fb4ff102 pushed (6PG pass), not integrated; critical closure review found observed-success dependency bypass and atomic application/capture integration still open. Terra fixes m8 dependency test; root owns trusted fresh capture. Compiler tests f62d836 integrated (26focused pass).
 - Terra hotel execution: existing uncommitted lane in `.worktrees/terra-a4-hotel-execution`, codex/a4-hotel-execution e0f8f7d. Fresh-context Terra now finishes the same work in place: canonical application, binding/cancel PG tests; no provider calls in lane.
-- Luna hotel ceiling b218558 integrated and cloud-pushed through primary. Visit attachment b2f6f96 + validation b9676b1 (8PG pass) awaits integration. New Luna desktop Case terminal-copy lane fixes misleading running labels after NO_RECOVERY_FOUND.
-- Root: durable candidate details9cd4ba6 integrated with local zones/timing facts; official source links and remaining formality notes; actual active sandbox baseline booking ingested/bound. Next boot source-complete world and prove one complete LIVE recommendation.
+- Luna hotel ceiling b218558 integrated and cloud-pushed through primary. Visit attachment b2f6f96 + validation b9676b1 integrated (reuse8PG pass). Luna cd8f328+b53e8f1 desktop terminal copy/exact item labels/alternatives integrated.
+- Root: durable candidate details9cd4ba6 integrated with local zones/timing facts; official source links and remaining formality notes; actual active sandbox baseline booking ingested/bound. LIVE complete composite nowrecommended/VIABLE (attempt3cdb224a); final desktop evidence/authority-readiness pending.
 
 ## Integrated A3 evidence
 
@@ -37,12 +37,12 @@
 
 - **Act Now:** finish corrected context + boot composition, explicit sandbox inputs/current destination provider booking terms, LIVE whole composite recommendation, desktop evidence. Source date truth is4→3 nights (29Sep→3Oct becomes30Sep→3Oct); founder3→2 was a conditional example.
 - **Act Now closure:** second PG world has explicit source visit+selected passport+LIVE scoped ICA evidence before baseline52PASS/15UNKNOWN. DBastra_jordan_a3_composite_20260920/workspace18891fc1-6e2a-4200-8328-f33b9ca96205; metadata/config under ignored output/playwright and data/local/a3. Source baseline sandbox booking observed; D1/D2/D3 applied normally. LIVE attempt cabd29d2 on Case2e15c71d produced16 rejected partial candidates. Retain SG arrival-card obligation visibly; no completed submission/admission claim.
-- **Act Now:** candidate capacity starved complete composites (12 flight +4 partial filled16 slots). Deduplicate hotel requests while retaining all bindings; prioritize complete composites within unchanged16 cap. Focused24/24 + TypeScript pass; normal LIVE rerun next. Current booking c4NsnfT_N confirmed; NRFN full-price loss ceiling is explicitly conservative, not exact fee/refund.
+- **Act Now closure:** candidate capacity corrected; LIVE attempt3cdb224a-0c6e-54f0-8ecc-5f6bb60a9b7d producedoneVIABLE complete composite, AWAITING_AUTHORITY. OriginalUSD and Frankfurter18Sep SGD2757.86 exposure displayed. Initial serialization conflict closed by normal fresh-basis retry; oneNuiteequote409 refused, otherquoted optionworked. Desktop finalreadability stillpending. Current booking c4NsnfT_N confirmed; NRFN full-price loss ceiling is explicitly conservative, not exact fee/refund.
 - **Act Now A4 safety:** bounded review found checkpoint JSON mismatch/refresh uniqueness, unowned receipt links, caller-asserted residual/world/revisions and unstable JSON hashes. Terra closes stored identity/provenance with isolated PG; root owns authoritative fresh capture. Nothing consequential may use this until closed.
 - **Act Now A4:** [exact selected-plan continuation contract](ASTRA_A4_SELECTED_PLAN_CONTINUATION.md); flight, overnight book, destination replacement book, old-stay cancel. Replacement confirmation precedes cancellation; unknown outcome lookup only. Atomic stay base exists; selected visit closure and new cancellation/executor proof pending.
 - **Park for Later:** healthy-trip requests/composer, mobile, generic programme/hotel/visit/credential management, immigration/crawling breadth, unrelated providers, transfer transactions, claims, multi-incidents/extra scenarios, importer atomicity, unrelated parity/refactors/infrastructure.
 - **Ignore / Accept Risk:** accepted R4 redirect/collapsed Apply and inert legacy controls, unless new hero evidence makes them blockers.
-- No founder decision pending. No A3 acceptance yet. Next: restart port4123 with tested candidate-capacity fix, legitimately request planning on current case, physically prove complete LIVE recommendation. Then A4 selected execution. Initial sandbox source booking must not be counted as an A4 selected action.
+- No founder decision pending. No A3 acceptance yet. Next: restart4123 with desktop/actual programme timing evidence, refresh via normal reassessment/operator planning, capturefinalA3visibleproof. Structuredgiven/family source dossier copied withauditedaddTravellerName; noinventedidentity. Narrative-only21:00same-nightclosure sourcegap remains explicit. Then A4 selected execution. Initial sandbox source booking must not be counted as an A4 selected action.
 
 ## Stop-safe handoff
 

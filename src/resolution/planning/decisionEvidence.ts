@@ -181,6 +181,8 @@ function proposalFromEvaluation(result: EvaluateStrategyResult): MaterialCandida
     const origin = service && result.proposedWorld.places.find((place) => place.id === service.originPlaceId);
     const destination = service && result.proposedWorld.places.find((place) => place.id === service.destinationPlaceId);
     return service && departure && arrival ? [{ label: service.operator.trim().slice(0, 160) || 'Replacement flight', departure, arrival,
+      ...(origin?.name ? { originLabel: origin.name.trim().slice(0, 160) } : {}),
+      ...(destination?.name ? { destinationLabel: destination.name.trim().slice(0, 160) } : {}),
       ...(origin?.timeZone ? { departureTimeZone: origin.timeZone } : {}),
       ...(destination?.timeZone ? { arrivalTimeZone: destination.timeZone } : {}),
     }] : [];
@@ -213,7 +215,23 @@ function proposalFromEvaluation(result: EvaluateStrategyResult): MaterialCandida
       verdict: dimension.verdict,
       reasonCodes: [...new Set(dimension.explanations.map((explanation) => explanation.reasonCode))].sort().slice(0, 8),
     })).sort((a, b) => a.dimension.localeCompare(b.dimension)).slice(0, 8);
-  return { flights, stays, entryResults, blockers };
+  const programmeChecks = dimensions.filter((dimension) => dimension.dimension === 'programme_participation')
+    .flatMap((dimension) => dimension.explanations.map((explanation) => {
+      const programmeRef = explanation.relatedSubjects.find((ref) => ref.kind === 'PROGRAMME_ITEM');
+      const item = programmeRef && result.proposedWorld.programmeItems.find((candidate) => candidate.id === programmeRef.id);
+      const place = item?.placeId && result.proposedWorld.places.find((candidate) => candidate.id === item.placeId);
+      const facts = explanation.facts;
+      return {
+        label: item?.title.trim().slice(0, 160) || 'Required programme commitment',
+        verdict: explanation.status, reasonCode: explanation.reasonCode,
+        ...(typeof facts.deadline === 'string' ? { deadline: facts.deadline } : {}),
+        ...(typeof facts.arrival === 'string' ? { arrival: facts.arrival } : {}),
+        ...(place ? { timeZone: place.timeZone } : {}),
+        ...Object.fromEntries(['availableMinutes', 'requiredMinutes', 'transferMinutes'].flatMap((key) =>
+          typeof facts[key] === 'number' && Number.isFinite(facts[key]) ? [[key, facts[key]]] : [])),
+      };
+    })).slice(0, 8);
+  return { flights, stays, entryResults, blockers, ...(programmeChecks.length ? { programmeChecks } : {}) };
 }
 
 export interface EvaluatedCandidateEvidenceInput {

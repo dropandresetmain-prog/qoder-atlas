@@ -62,7 +62,7 @@ function resolveReadinessMinutes(
 }
 
 export const EVALUATOR_ID = 'm6.participation';
-const VERSION = '1';
+const VERSION = '2';
 
 type DimensionName = 'programme_participation' | 'optional_participation';
 
@@ -179,6 +179,9 @@ function evaluateParticipation(participation: WParticipation, journey: Effective
       obligation: 'REQUIRED',
     });
     const readinessFacts = { ...arrivalFacts, ...readiness.facts, readinessReason: readiness.reasonCode };
+    // Successful readiness is decision evidence too: keep the actual policy
+    // and available window when the later participation checks also pass.
+    Object.assign(arrivalFacts, readiness.facts, { readinessReason: readiness.reasonCode });
     if (readiness.verdict === 'FAIL' || readiness.verdict === 'UNKNOWN') {
       return {
         dim,

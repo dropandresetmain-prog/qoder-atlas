@@ -468,3 +468,20 @@ test('composition: registering both L2 evaluators declares all five dimensions w
     assert.equal(d.applicable, true, `${dim} should be applicable given the world data`);
   }
 });
+
+test('participation: successful readiness retains policy, arrival and transfer facts', () => {
+  const { world, journey, ref } = worldWithJourney();
+  const arrival = service({ destinationPlaceId: 'p-airport', published: { departure: observed('2030-01-02T03:00:00.000Z'), arrival: observed('2030-01-02T06:30:00.000Z') } });
+  world.transportServices.push(arrival);
+  world.journeyItems.push(transportItem(journey.id, { desiredDestinationPlaceId: 'p-airport', selectedServiceId: arrival.id }));
+  const commitment = programmeItemRow({ operatingRequirements: { requiresPhysicalPresence: true, arrivalReadinessMinutes: 150 } });
+  world.programmeItems.push(commitment);
+  world.participations.push(participationRow(journey.travellerId, commitment.id));
+  world.constraints.push(transferConstraint(ref, 'p-airport', 'p-venue', 25));
+  const result = participationEvaluator.evaluate(ref, { world, effective: effectiveOf(world), now: NOW });
+  const check = result.dimensions.find(d => d.dimension === 'programme_participation')!;
+  assert.equal(check.verdict, 'PASS');
+  assert.equal(check.explanations[0]?.facts.requiredMinutes, 150);
+  assert.equal(check.explanations[0]?.facts.availableMinutes, 210);
+  assert.equal(check.explanations[0]?.facts.transferMinutes, 25);
+});

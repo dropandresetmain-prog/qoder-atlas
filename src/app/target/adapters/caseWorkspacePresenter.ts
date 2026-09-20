@@ -543,23 +543,8 @@ function timingEvidence(timing: { gapMinutes?: number; requiredMinutes?: number;
 
 function proposalLines(proposal: MaterialCandidateProposal | undefined): string[] {
   if (!proposal) return [];
-  const flights = proposal.flights as (MaterialCandidateProposal['flights'][number] & {
-    originLabel?: string;
-    destinationLabel?: string;
-  })[];
-  const programmeChecks = (proposal as MaterialCandidateProposal & {
-    programmeChecks?: readonly {
-      label: string;
-      verdict: 'PASS' | 'FAIL' | 'UNKNOWN';
-      deadline?: string;
-      arrival?: string;
-      timeZone?: string;
-      availableMinutes?: number;
-      requiredMinutes?: number;
-      transferMinutes?: number;
-      reasonCode?: string;
-    }[];
-  }).programmeChecks ?? [];
+  const flights = proposal.flights;
+  const programmeChecks = proposal.programmeChecks ?? [];
   const verdict = (value: 'PASS' | 'FAIL' | 'UNKNOWN'): string =>
     value === 'PASS' ? 'passes' : value === 'FAIL' ? 'fails' : 'is not confirmed';
   return [
