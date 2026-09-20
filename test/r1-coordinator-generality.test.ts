@@ -30,7 +30,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { emptyWorld, id } from './support/m6World.ts';
 import type { TypedRef, SubjectId } from '../src/domain/v2/shared/identity.ts';
-import type { CapturedWorld, WJourney, WJourneyItem, WProgrammeItem } from '../src/resolution/world/world.ts';
+import type { CapturedWorld, WJourney, WJourneyItem, WProgrammeItem, WTransportService } from '../src/resolution/world/world.ts';
 import type { AssessmentResult } from '../src/contracts/v2/assessment/assessmentManifest.ts';
 import { AssessmentResultSchema } from '../src/contracts/v2/assessment/assessmentManifest.ts';
 import { createEvaluatorRegistry } from '../src/resolution/evaluation/assess.ts';
@@ -259,6 +259,69 @@ test('generality A: PROGRAMME domain via the real time-swap proposer yields a VI
   assert.ok(rec!.immediateChangeBlastRadius!.changedRefs.some((r) => r.kind === 'PROGRAMME_ITEM' && r.id === unmetItemId));
   assert.ok(rec!.reassessmentClosure!.reachedRefs.length > 0);
   assert.ok(rec!.outcomeDelta.some((d) => d.delta === 'BETTER'));
+  assert.equal(rec!.costComparison, undefined, 'without a composed supplier Sarah/current planning retains its existing cost-free behavior');
+});
+
+test('coordinator compares captured provider prices with dated FX and retains unavailable cost evidence', async () => {
+  const { basis, unmetItemId, journeyId } = programmeBasis();
+  const transportItemId = id();
+  const services: WTransportService[] = [id(), id(), id()].map((serviceId) => ({
+    id: serviceId, revision: 1, mode: 'AIR', operator: 'test', originPlaceId: 'p-a', destinationPlaceId: 'p-b',
+    published: { departure: null, arrival: null }, estimated: { departure: null, arrival: null }, actual: { departure: null, arrival: null },
+  }));
+  basis.world.journeyItems.push({
+    id: transportItemId, journeyId, kind: 'TRANSPORT', orderKey: '010', lifecycleStatus: 'PLANNED', flexible: false,
+    intendedWindow: null, desiredOriginPlaceId: 'p-a', desiredDestinationPlaceId: 'p-b', selectedServiceId: null,
+    intendedPlaceId: null, requiredNights: null, participationId: null, standaloneTitle: null, standaloneWindow: null,
+    resourceId: null, intendedLocationPlaceId: null,
+  });
+  basis.world.transportServices.push(...services);
+  basis.effective = projectEffective(basis.world);
+  const offers = [
+    { key: 'nz-low', offerId: id(), serviceId: services[0]!.id, price: { amount: '100.00', currency: 'NZD' } },
+    { key: 'usd-mid', offerId: id(), serviceId: services[1]!.id, price: { amount: '60.00', currency: 'USD' } },
+    { key: 'eur-unknown', offerId: id(), serviceId: services[2]!.id, price: { amount: '40.00', currency: 'EUR' } },
+  ];
+  const fxEvidenceId = id();
+  const out = await runRecoveryPlanning(basis, {
+    domainRegistry: defaultRecoveryDomainRegistry(), availableCapabilities: ['FLIGHT', 'HOTEL'], minters: minters(),
+    coordinatorVersion: COORDINATOR_VERSION, comparatorVersion: COMPARATOR_VERSION,
+    proposers: [{ domain: 'PROGRAMME', proposer: {
+      id: 'test.cost-comparison', version: '1',
+      async propose(): Promise<ProposalCandidate[]> {
+        return offers.map((offer) => ({
+          key: offer.key,
+          effects: [
+            { effectKind: 'CHANGE_PROGRAMME_ITEM_TIME' as const, programmeItemId: unmetItemId, proposedWindow: { start: LATE, end: '2030-06-02T16:00:00.000Z' } },
+            { effectKind: 'SELECT_OFFER' as const, journeyItemId: transportItemId, offerId: offer.offerId, offerPrice: offer.price },
+          ],
+          affectedSubjectRefs: [{ kind: 'PROGRAMME_ITEM' as const, id: unmetItemId }, { kind: 'JOURNEY_ITEM' as const, id: transportItemId }, { kind: 'JOURNEY' as const, id: journeyId }],
+          rationale: 'Use a captured viable transport offer.', assumptions: [],
+        }));
+      },
+    } }],
+    resolveOffersForDomain: () => offers.map((offer) => ({ offerId: offer.offerId, transportServiceId: offer.serviceId })),
+    costContextForCandidate: async () => ({
+      homeCurrency: 'USD',
+      comparedAt: '2030-06-01T13:00:00.000Z',
+      rates: [{ id: fxEvidenceId, baseCurrency: 'NZD', homeCurrency: 'USD', rate: 0.5, sourceId: id(), authority: 'AUTHORITATIVE', observedAt: '2030-06-01T00:00:00.000Z' }],
+    }),
+  });
+  assert.equal(out.attempt.recommendation?.recommendedStrategyRef, 'strategy:nz-low', 'the lower exact USD-equivalent cost breaks an otherwise equivalent viable choice');
+  const nz = out.attempt.materialCandidates.find((candidate) => candidate.candidateKey === 'nz-low')!;
+  assert.equal(nz.costComparison?.status, 'AVAILABLE');
+  if (nz.costComparison?.status === 'AVAILABLE') {
+    assert.deepEqual(nz.costComparison.lines[0]?.providerAmount, { amount: '100.00', currency: 'NZD' });
+    assert.deepEqual(nz.costComparison.totalHomeAmount, { amount: '50.00', currency: 'USD' });
+    assert.deepEqual(nz.costComparison.selectedFxEvidence.map((evidence) => evidence.id), [fxEvidenceId]);
+  }
+  const missingFx = out.attempt.materialCandidates.find((candidate) => candidate.candidateKey === 'eur-unknown')!;
+  assert.deepEqual(missingFx.costComparison, {
+    status: 'UNAVAILABLE', code: 'MISSING_RATE_EVIDENCE',
+    reason: 'no captured EUR->USD rate exists', comparedAt: '2030-06-01T13:00:00.000Z',
+  });
+  assert.equal(out.completionHorizon, '2030-06-01T13:00:00.000Z');
+  assert.equal(out.attempt.completedAt, out.completionHorizon, 'the immutable attempt cannot complete before its captured FX comparison');
 });
 
 test('generality B: STAY domain via a different proposer + effect kind flows through the SAME coordinator', async () => {
