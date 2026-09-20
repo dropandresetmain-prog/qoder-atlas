@@ -194,6 +194,7 @@ describe('A3 Jordan connection foundation (real configured AiT world)', () => {
 
     const baseline = await currentAssessmentView(pool, workspaceId, { kind: 'JOURNEY', id: journeyId }, 'VIABILITY', AIT_FIXTURE_NOW);
     assert.equal(baseline.status, 'CURRENT');
+    assert.equal(baseline.assessment?.overallVerdict, 'PASS', 'the healthy whole journey passes before any disruption');
     let connection = connectionDimension(baseline);
     assert.deepEqual(connection, { verdict: 'PASS', reasonCode: 'connection_meets_minimum', gapMinutes: 160 });
     assert.equal(deriveConnectionViabilityFromEvaluator(connection), 'VIABLE');

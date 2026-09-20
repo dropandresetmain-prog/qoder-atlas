@@ -139,7 +139,7 @@ function evaluateGap(
 
 export const overnightEvaluator: Evaluator = {
   id: EVALUATOR_ID,
-  version: '1',
+  version: '2',
   assessmentKind: 'VIABILITY',
   subjectKinds: ['JOURNEY'],
   dimensions: ['overnight_accommodation'],
@@ -168,11 +168,23 @@ export const overnightEvaluator: Evaluator = {
         continue;
       }
       const gapHours = minutesBetween(a.end.value, b.start.value) / 60;
-      if (gapHours < requirement.minimumGapHours) continue;
+      if (gapHours < requirement.minimumGapHours) {
+        explanations.push(explain({
+          evaluatorId: EVALUATOR_ID, dimension: 'overnight_accommodation', status: 'PASS', reasonCode: 'overnight_not_required_for_gap',
+          cause: { kind: 'REQUIREMENT', subjectRef: { kind: 'CONSTRAINT_DEFINITION', id: requirement.constraints[0]!.id } },
+          affectedSubject: subject,
+          relatedSubjects: [a.itemRef, b.itemRef, ...requirement.constraints.map((constraint) => ({ kind: 'CONSTRAINT_DEFINITION' as const, id: constraint.id }))],
+          evidenceRefs: pairEvidence(a, b),
+          facts: { ...pairFacts(a, b, gapHours * 60), minimumGapHours: requirement.minimumGapHours },
+        }));
+        continue;
+      }
       explanations.push(evaluateGap(subject, world, a, b, stays, requirement.constraints));
     }
 
-    const dim = dimension({ dimension: 'overnight_accommodation', explanations, blocking: true });
+    // A known short connection satisfies this conditional obligation. An empty
+    // explanation list must not manufacture uncertainty in a healthy journey.
+    const dim = explanations.length ? dimension({ dimension: 'overnight_accommodation', explanations, blocking: true }) : notApplicable('overnight_accommodation');
     const evidence = [...new Map(dim.explanations.flatMap((e) => e.evidenceRefs).map((e) => [`${e.kind}:${e.id}:${e.detail ?? ''}`, e])).values()];
     return { dimensions: [dim], evidence, missingCoverage: [] };
   },

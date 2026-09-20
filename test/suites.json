@@ -32,6 +32,7 @@
   "suites": {
     "current": [
       "test/a3-recovery-cost-comparison.test.ts",
+      "test/a3-stay-replacement-context.test.ts",
       "test/a3-target-fx.test.ts",
       "test/a3-sandbox-protected-documents.test.ts",
       "test/hotel-property-policy.test.ts",
@@ -160,6 +161,7 @@
       "postgres-integration/atomicCommit.pgtest.ts",
       "postgres-integration/a3ReviewedEntryPublication.pgtest.ts",
       "postgres-integration/a3CandidateGeography.pgtest.ts",
+      "postgres-integration/a3StayArrivalRequirement.pgtest.ts",
       "postgres-integration/a3TargetFx.pgtest.ts",
       "postgres-integration/a3SandboxProtectedDocuments.pgtest.ts",
       "postgres-integration/aitFixtureClone.pgtest.ts",
@@ -246,6 +248,7 @@
       "postgres-integration/atomicCommit.pgtest.ts",
       "postgres-integration/a3ReviewedEntryPublication.pgtest.ts",
       "postgres-integration/a3CandidateGeography.pgtest.ts",
+      "postgres-integration/a3StayArrivalRequirement.pgtest.ts",
       "postgres-integration/a3TargetFx.pgtest.ts",
       "postgres-integration/a3SandboxProtectedDocuments.pgtest.ts",
       "postgres-integration/b1ProductPlanningCoordinator.pgtest.ts",

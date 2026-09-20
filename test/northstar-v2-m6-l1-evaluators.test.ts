@@ -399,6 +399,21 @@ test('overnight: an active STAY covering the gap at the same place PASSes stay_c
   assert.equal(dim?.explanations[0]?.reasonCode, 'stay_covers_gap');
 });
 
+test('overnight: a known gap below the governing threshold passes, while the exact threshold requires accommodation', () => {
+  const journeyId = id();
+  const world = emptyWorld({ journeys: [journeyRow(journeyId, id())] });
+  const { b } = longGapJourney(world, journeyId);
+  world.constraints.push(constraintRow(subjectOf(journeyId), 'overnight_accommodation_required', [numOperand('minimum_gap_hours', 8)]));
+  b.intendedWindow = window('2030-01-03T00:40:00.000Z', '2030-01-03T02:40:00.000Z');
+  const short = overnightEvaluator.evaluate(subjectOf(journeyId), { now: NOW, world, effective: effectiveOf(world) });
+  assert.equal(short.dimensions[0]?.verdict, 'PASS');
+  assert.equal(short.dimensions[0]?.explanations[0]?.reasonCode, 'overnight_not_required_for_gap');
+  b.intendedWindow = window('2030-01-03T06:00:00.000Z', '2030-01-03T08:00:00.000Z');
+  const overnight = overnightEvaluator.evaluate(subjectOf(journeyId), { now: NOW, world, effective: effectiveOf(world) });
+  assert.equal(overnight.dimensions[0]?.verdict, 'FAIL');
+  assert.equal(overnight.dimensions[0]?.explanations[0]?.reasonCode, 'overnight_unaccommodated');
+});
+
 test('overnight: no covering stay FAILs overnight_unaccommodated', () => {
   const journeyId = id();
   const travellerId = id();

@@ -296,3 +296,9 @@ Unknown or terminal supplier state requires reconciliation before a new cancel p
 Park for Later: date-shopping breadth, general hotel operations and credential administration.
 The next-local-day search is enabled only by actual connection-failure evidence; ordinary
 programme recovery retains its existing search scope. No new scenario/application switches.
+
+## Healthy baseline and conditional overnight obligation
+
+WHAT WE KNOW: fresh normal dataset provisioning produced Jordan UNKNOWN solely because a registered overnight requirement had no qualifying gap, leaving an empty explanation list. Its160-minute connection is below the8-hour threshold. WHAT WE DO NOT KNOW: final LIVE composite recommendation and selected transactions. KEY ASSUMPTION: a known below-threshold gap satisfies the conditional overnight obligation; unknown times remain UNKNOWN and qualifying gaps require an actual covering stay. WHAT SHOULD BE TESTED NEXT: normal composed LIVE recommendation after entry/property preparation, then the required selected action chain.
+
+Act Now closure: evaluator version2 records the known short-gap PASS explicitly.24focused tests and focused foundationPG1/1(145s) pass, including whole-Journey baseline PASS and unchanged D1/D2/D3 progression. Actual fresh product PG capture/evaluation/immutable save also proves CURRENT/PASS; no supplier or itinerary facts were changed to obtain this result. This is a newly demonstrated A3 blocker, not a reopening of accepted R4.
