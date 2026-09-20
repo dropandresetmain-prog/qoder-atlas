@@ -12,7 +12,13 @@ import { DomainCommandEnvelopeSchema, type DomainCommandEnvelope } from '../../.
 import type { ExternalRecordLinkRecord } from '../../../contracts/v2/repository/arrangements.ts';
 import type { ActorContext } from '../../../contracts/v2/repository/people.ts';
 import type { TypedRef } from '../../../domain/v2/shared/identity.ts';
-import { JourneyItemSchema, type JourneyItem } from '../../../domain/v2/trip/trip.ts';
+import {
+  CredentialSelectionSchema,
+  IntendedVisitSchema,
+  JourneyItemSchema,
+  type CredentialSelection,
+  type JourneyItem,
+} from '../../../domain/v2/trip/trip.ts';
 import {
   ReservationAllocationSchema,
   ReservationLineSchema,
@@ -29,16 +35,40 @@ import {
   appendAuditTrail,
   buildReceipt,
   createRoot,
+  derivedCommandRef,
   lockedRevisionOf,
   registerChildSubject,
   type AdvancedRoot,
 } from '../commandSupport.ts';
 import type { ExecuteOutcome } from '../pgUnitOfWork.ts';
 import { PgArrangementRepositories } from '../repositories/pgArrangementRepositories.ts';
+import { PgGeographyRepository } from '../repositories/pgGeographyRepository.ts';
 import { PgJourneyRepository } from '../repositories/pgJourneyRepository.ts';
 
 const COMMAND_TYPE = 'OBSERVED_STAY_ATTACHED';
 const Uuid = z.uuid();
+
+const ApprovedCredentialSelectionInputSchema = z.strictObject({
+  id: Uuid,
+  credentialId: Uuid,
+  credentialVersionId: Uuid,
+  scopeIntendedVisitIds: z.array(Uuid).min(1),
+});
+
+const ApprovedVisitInputSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.literal('PROPOSED'),
+    visit: IntendedVisitSchema,
+    credentialSelection: ApprovedCredentialSelectionInputSchema,
+  }),
+  z.strictObject({
+    kind: z.literal('EXISTING'),
+    visitId: Uuid,
+    credentialSelection: ApprovedCredentialSelectionInputSchema,
+  }),
+]);
+
+export type ApprovedVisitInput = z.infer<typeof ApprovedVisitInputSchema>;
 
 export interface ObservedStayAttachmentParams {
   workspaceId: string;
@@ -73,6 +103,8 @@ export interface ObservedStayAttachmentParams {
     status: 'CONFIRMED';
     occupancy?: Record<string, unknown>;
   };
+  /** Explicit approved entry context for a stay. Omitted for legacy callers. */
+  approvedVisit?: ApprovedVisitInput;
   evidenceRefs?: string[];
 }
 
@@ -158,6 +190,11 @@ export async function attachObservedStay(
     params.booking.reservationResponsibleOrganisationId,
   ].filter((id): id is string => id !== undefined);
   if (inputIds.some((id) => !Uuid.safeParse(id).success)) return reject('all domain references must be UUIDs', refs);
+  const approvedVisitResult = params.approvedVisit === undefined
+    ? undefined
+    : ApprovedVisitInputSchema.safeParse(params.approvedVisit);
+  if (approvedVisitResult && !approvedVisitResult.success) return reject('approved visit and credential selection are malformed', [journeyRef]);
+  const approvedVisit = approvedVisitResult?.success ? approvedVisitResult.data : undefined;
   if (params.booking.status !== 'CONFIRMED') return reject('observed stay attachment requires CONFIRMED provider status', [lineRef]);
   if (!params.journeyItem.orderKey.trim()) return reject('approved Journey STAY intent requires a nonempty orderKey', [itemRef]);
   if (params.journeyItem.intendedPlaceId !== params.booking.placeId) return reject('Journey STAY place must match the observed booking place', [itemRef, lineRef]);
@@ -215,7 +252,18 @@ export async function attachObservedStay(
     evidenceId: params.provider.evidenceId,
     linkedAt: params.provider.observedAt,
   };
-  const payload = { journeyId: params.journeyId, travellerId: params.travellerId, item, reservation: newReservation, line, allocation, provider: params.provider, link, bookingInterval: bookingInterval.data };
+  const payload = {
+    journeyId: params.journeyId,
+    travellerId: params.travellerId,
+    item,
+    reservation: newReservation,
+    line,
+    allocation,
+    provider: params.provider,
+    link,
+    bookingInterval: bookingInterval.data,
+    ...(approvedVisit ? { approvedVisit } : {}),
+  };
   const envelope: DomainCommandEnvelope = DomainCommandEnvelopeSchema.parse({
     commandType: COMMAND_TYPE,
     schemaVersion: '1',
@@ -235,6 +283,58 @@ export async function attachObservedStay(
       const journey = await journeys.load(params.workspaceId, params.journeyId);
       if (!journey) return { ok: false, conflict: typedConflict('VALIDATION_FAILED', `journey ${params.journeyId} does not exist`, [journeyRef]) };
       if (journey.travellerId !== params.travellerId) return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'observed stay traveller does not own the Journey', [journeyRef, ref('TRAVELLER', params.travellerId)]) };
+
+      if (approvedVisit) {
+        const geography = new PgGeographyRepository();
+        const journeysVisits = await journeys.listIntendedVisits(params.workspaceId, params.journeyId);
+        const visit = approvedVisit.kind === 'PROPOSED'
+          ? approvedVisit.visit
+          : journeysVisits.find((candidate) => candidate.id === approvedVisit.visitId);
+        if (!visit) {
+          return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'approved visit does not belong to the Journey', [journeyRef]) };
+        }
+        if (visit.journeyId !== params.journeyId) {
+          return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'approved visit belongs to another Journey', [journeyRef, ref('JOURNEY', visit.journeyId)]) };
+        }
+        if (!await geography.loadJurisdiction(params.workspaceId, visit.jurisdictionId)) {
+          return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'approved visit jurisdiction is not present in this workspace', [journeyRef, ref('JURISDICTION', visit.jurisdictionId)]) };
+        }
+        if (approvedVisit.kind === 'PROPOSED' && journeysVisits.some((candidate) => candidate.id === visit.id)) {
+          return { ok: false, conflict: typedConflict('DUPLICATE_REGISTRATION', 'approved proposed visit already exists on the Journey', [journeyRef]) };
+        }
+        const scopeIds = approvedVisit.credentialSelection.scopeIntendedVisitIds;
+        if (new Set(scopeIds).size !== scopeIds.length) {
+          return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'credential selection scope must not repeat an intended visit', [journeyRef]) };
+        }
+        const knownVisitIds = new Set([...journeysVisits.map((candidate) => candidate.id), visit.id]);
+        if (!scopeIds.includes(visit.id) || scopeIds.some((id) => !knownVisitIds.has(id))) {
+          return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'credential selection must cover the approved visit and only visits on this Journey', [journeyRef]) };
+        }
+        const owner = await journeys.credentialOwner(params.workspaceId, approvedVisit.credentialSelection.credentialId);
+        if (!owner || owner.travellerId !== journey.travellerId) {
+          return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'approved credential belongs to another traveller or is missing', [journeyRef, ref('TRAVELLER', journey.travellerId)]) };
+        }
+        const versionOwner = await journeys.credentialVersionOwner(params.workspaceId, approvedVisit.credentialSelection.credentialVersionId);
+        if (versionOwner !== approvedVisit.credentialSelection.credentialId) {
+          return { ok: false, conflict: typedConflict('VALIDATION_FAILED', 'approved credential edition does not belong to the selected credential', [journeyRef]) };
+        }
+        if (approvedVisit.kind === 'PROPOSED') {
+          await journeys.addIntendedVisit({ visit, actor: actor(params) });
+        }
+        const selection: CredentialSelection = CredentialSelectionSchema.parse({
+          id: approvedVisit.credentialSelection.id,
+          journeyId: params.journeyId,
+          credentialId: approvedVisit.credentialSelection.credentialId,
+          credentialVersionId: approvedVisit.credentialSelection.credentialVersionId,
+          scopeIntendedVisitIds: scopeIds,
+          selectedByCommandId: derivedCommandRef(envelope),
+        });
+        await journeys.selectCredential({
+          selection,
+          receipt: { commandNamespace: envelope.commandType, idempotencyKey: envelope.idempotencyKey },
+          actor: actor(params),
+        });
+      }
 
       const observedRecord = await arrangements.external.loadRecord({ workspaceId: params.workspaceId, recordId: externalRecordId });
       if (!observedRecord
