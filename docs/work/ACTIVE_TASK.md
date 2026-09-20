@@ -1,85 +1,157 @@
-# ACTIVE TASK — A4 CP4a JORDAN PROGRESSION / RECOMMENDATION CLOSURE
+# ACTIVE TASK — A5 FINAL TRUTH PASS, LIVE REPEAT AND FREEZE
 
 ## Identity
 
-- Branch: `finish/a4-destination-hotel-robustness`
-- Hotel preservation: `74ac4e7810e6acf63ae9fbeec27a1d36d3e3d9bf` (base `347fcc0ac7b9a29f0547fb3d4afac13b2c8ee95b`)
-- Role: PRIMARY LOCAL IMPLEMENTER — A4 CP4a
-- Do NOT: provider mutations, approval, Atlas booking/cancel
+- Accepted A4 product branch: `finish/a4-destination-hotel-robustness`
+- Accepted A4 product SHA: `546adf210db8ead343ecdac22b410515665c176a`
+- A4 acceptance evidence: [A4_PHYSICAL_SANDBOX_ACCEPTANCE.md](A4_PHYSICAL_SANDBOX_ACCEPTANCE.md)
+- Docs reconciliation branch: `docs/a4-final-reconcile`
+- Current phase: **A5**
+- Do not reopen A4 architecture absent a concrete regression.
 
-## Verdict
+## Milestone status
 
-**A4 HERO PROGRESSION CLOSURE PASS**
+| Milestone | Status |
+|---|---|
+| R4 | **ACCEPTED** |
+| A0 / A1 / A2 | **ACCEPTED** |
+| A3 | **CONDITIONAL PASS** — recommendation/UI sufficient to continue; bounded graph/copy truth debt carried |
+| A4 CP2 continuation | **PASS** |
+| A4 CP3 protected hotel execution | **PASS** |
+| A4 CP3.5 controlled four-action seam | **PASS** |
+| A4 progression/provider closure | **PASS** |
+| A4 physical sandbox | **ACCEPTED** @ `546adf2` |
+| A5 repeat + freeze | **ACTIVE** |
 
-- Final tip: `40bae0b00efd6f02fda0af1f50cf618703ec5756`
-- Branch: `finish/a4-destination-hotel-robustness`
+## What A4 physically proved
 
-## Preservation (hotel robustness)
+Jordan executed the selected four-action sandbox recovery through the generalized protected path:
 
-- SHA: `74ac4e7810e6acf63ae9fbeec27a1d36d3e3d9bf`
-- Focused proof at preserve: 52/52; anti-hardcoding CLEAN
+1. Atlas replacement flight → TICKETED
+2. Narita hotel → CONFIRMED
+3. destination replacement hotel → CONFIRMED
+4. displaced destination hotel → CANCELLED
+5. final whole-trip assessment → **CURRENT / PASS**
+6. Case → **RESOLVED / RECOVERED**
 
-## Progression root cause
+No mandatory provider outcome remained UNKNOWN. Provider success alone never advanced the plan; observation/reconciliation, canonical application and reassessment remained required.
 
-At wall-clock planning, same-night TR875 remained boardable → recommended strategy omitted Narita overnight. Overnight requirement is **boardability vs planning `now`**: timeline stage `overnight_narita_necessary` sets `planningNow` after same-night departures so only next-morning onward + connection-airport overnight remain viable. Engine derives overnight from timing; no force-overnight branch.
+See [A4_PHYSICAL_SANDBOX_ACCEPTANCE.md](A4_PHYSICAL_SANDBOX_ACCEPTANCE.md) for IDs, receipts and provider evidence.
 
-## `scope_intended_visit_ids` bug
+## A5 objective
 
-- Cause: callers expected a JSON/array column on `credential_selections`; schema stores visit scope in `credential_selection_visits`.
-- Fix: `stayExecutionInputs` aggregates via `array_agg` join (same pattern as world reader). No duplicate JSON column.
+Produce the final hackathon candidate and recording path without adding product breadth.
 
-## Fresh overnight RECORD plan
+A5 has three bounded jobs:
 
-- Case: `297337f5-cda2-5397-a2ba-9ace992396b3`
-- planningNow: `2026-09-29T21:30:00+09:00`
-- Attempt: `2bd16724-c55f-5378-a5d6-e2e4e052d892`
-- Basis assessment: `c07dc092-f120-4031-9527-2c77668e9c6e` (CURRENT FAIL)
-- Outcome: **AWAITING_AUTHORITY** (2 viable)
-- Recommended: `dcb28c10-27d3-50b9-953a-6cc09356ff51`
-- Effects: `SELECT_OFFER` + `ADD_JOURNEY_STAY` (Narita) + `CANCEL_STAY` + `ADD_JOURNEY_STAY` (destination)
-- Flight: TR `2026-09-30T08:20+09:00` NRT → SIN `14:35+08:00`
-- Stays: Narita Gateway Hotel overnight; destination **MET A Space Pod at Arab Street** (`propertyLabel`; place context Concorde)
-- Same-night / transport-only candidates rejected (`overnight_unaccommodated`)
+1. **truth/presentation repair** for the known A3/UI defects;
+2. **repeat Sarah and Jordan** on the same final code candidate using supported LIVE/RECORD paths and repeatable baseline setup;
+3. **run final gates once**, freeze the candidate and prepare handoff/submission evidence.
 
-## Cost provenance (recommended)
+## Act Now — bounded truth/UI pass
 
-| Component | Provider | SGD |
-|---|---|---|
-| Replacement flight | USD 83.35 | 106.55 |
-| Narita overnight | USD 35.29 | 45.11 |
-| Destination replacement stay | USD 109.47 | 139.95 |
-| **New spend total** | | **291.61** |
-| Displaced booking max loss (POLICY_PENALTY_ESTIMATE) | USD 1135.63 | 1451.79 |
-| Maximum exposure (new spend + potential loss) | | 1743.40 |
+Fix only demonstrated hero-visible issues:
 
-FX: Frankfurter `fx_frankfurter_usd_sgd_2026-09-18`, rate **1.2784**, observed `2026-09-18T00:00:00Z`, authority CONNECTED.
+- V5.6: definitive FAIL must not appear amber/yellow.
+- V5.6: progressive-delay edges/state must tell the actual causal story.
+- Overview: Active Change / focus behavior must be understandable and stable.
+- Case + Overview: graph should appear above secondary content blocks.
+- Recovery/Activity: reduce walls of text and UUID-heavy operator copy.
+- Cost presentation: **new spend** and **potential displaced-booking loss** must be visibly separate.
+- Preserve actual quoted hotel property label separately from destination/place context.
+- Final progression/disruption control must make the Jordan stage arc repeatable for recording.
 
-`totalHomeAmount` remains maximum exposure for comparator; `newSpendHomeAmount` / `potentialLossHomeAmount` are explicit.
+Do not redesign V5.6/V7.2 semantics or add new product features.
 
-## Other CP4a repairs
+## A5 baseline/setup requirements
 
-- Prepare publication cache: process-stable document + published-key sets (stop STALE_RETRY loop)
-- Planning verification uses planning `now` (not wall) so coverage survives progressive `planningNow`
-- Demo policy `maxEvidenceAgeSeconds` raised to 14d (schema max aligned) — SCENARIO DATA for RECORD→planningNow span
-- Stay replacement `proposedJourneyItemId` is deterministic UUID (was `stay-replacement:` hash; broke `stay_execution_bindings.journey_item_id`)
-- Place vs property labels on stay proposals
+Before the final repeat:
 
-## Checks run
+- provision sandbox budget envelopes **before** disruption/planning;
+- use a fresh active displaced destination booking for destructive Jordan repeats;
+- prepare protected booking identity/contact/payment inputs before planning;
+- ensure no stale runtime points at another database/workspace/SHA;
+- preserve the synthetic scenario clock at the intended progression stage during reassessment;
+- use fresh provider research where required;
+- do not reuse a cancelled baseline booking as active supplier state.
 
-- `a4-cp4a-progression-closure` + cost + stay-replacement: pass
-- hotel / M7 / reviewed-entry / hotel-property-policy: pass
-- `tsc --noEmit`: pass
-- `gate:anti-hardcoding`: CLEAN
-- Not run: full `npm test`, `test:postgres`
+A fresh PostgreSQL workspace alone is insufficient for destructive provider repeats.
 
-## Carry-forward (A3 / V5.6 / UI)
+## Final Sarah repeat
 
-- Graph may still map definitive FAIL as amber — bounded projection fix later
-- Progressive delay V5.6 node/edge presentation
-- Overview active-change behaviour
-- Competing wall-clock reassessment workers during planningNow drains (stop runtimeServices in proof scripts)
+Repeat Sarah through the accepted generalized programme-side recovery on the same final candidate.
 
-## Remaining A4 blockers
+Required:
 
-- None for pre-mutation hero recommendation at overnight-required stage
-- Next: authority / execution only when explicitly authorised (still pre-mutation)
+- normal PostgreSQL runtime;
+- LIVE Qwen/Model Studio where required;
+- LIVE/RECORD Atlas research as accepted;
+- deterministic recommendation/authority;
+- actual programme-side execution path;
+- observation/canonical update/reassessment;
+- final Case RESOLVED / PASS;
+- no forced external flight purchase.
+
+## Final Jordan repeat
+
+Repeat the full final hero arc on the same candidate:
+
+`baseline -> delay progression -> connection failure -> same-night option becomes non-boardable -> overnight required -> complete recommendation -> approval -> flight -> Narita -> destination replacement -> displaced cancel -> PASS/RESOLVED`
+
+Required execution truth:
+
+- fresh selected plan;
+- provider actions only through protected executors;
+- no blind redispatch;
+- canonical application + current reassessment between actions;
+- replacement destination stay before displaced cancellation;
+- final whole-trip PASS and Case RESOLVED.
+
+If a provider outcome is uncertain, preserve/reconcile rather than restarting for a cleaner recording.
+
+## Final gates
+
+Only after Sarah + Jordan repeat successfully on the exact final code candidate:
+
+1. `npm run typecheck`
+2. `npm run build`
+3. `npm run lint`
+4. `npm test`
+5. `npm run test:postgres`
+6. `npm run test:migration`
+7. `npm run gate:anti-hardcoding`
+8. normal PostgreSQL boot smoke
+
+Run focused tests first for any A5 code change. Do not use the full gates as a debugging loop.
+
+## Scope lock
+
+Park:
+
+- mobile;
+- healthy-trip request/composer;
+- generic hotel/visit/credential management;
+- broad immigration/legal crawling;
+- transfer transactions;
+- insurance claims;
+- extra scenarios/multi-incident breadth;
+- unrelated providers;
+- importer atomicity redesign;
+- infrastructure/refactors;
+- noncritical legacy parity.
+
+## Completion criteria
+
+A5 closes only when:
+
+- bounded hero UI truth defects are fixed;
+- Sarah repeat passes;
+- Jordan repeat passes;
+- final broad gates pass;
+- docs reflect the exact frozen SHA;
+- no demo-specific application hardcoding exists;
+- final branch/commit is pushed and ready for submission/recording.
+
+## Exact next planning task
+
+Plan the **smallest A5 truth/presentation pass** from `546adf2` before touching code: identify which UI defects are backend projection truth vs presentation-only, freeze acceptance criteria, and then implement in bounded lanes. Do not start broad refactors.
