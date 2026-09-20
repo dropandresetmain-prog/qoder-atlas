@@ -112,3 +112,14 @@ four external actions' normal-runtime outcome. **KEY ASSUMPTION:** existing eval
 execution machinery plus the small required typed stay action set suffice.
 **WHAT SHOULD BE TESTED NEXT:** close focused lane/entry checks, compose FX and revised-stay
 consequences, then normal LIVE PostgreSQL/desktop recommendation. Broader gates wait for a checkpoint.
+
+## Desktop presentation clarification
+
+The pre-refactor frontend is a product-quality floor and user-job reference, not a visual,
+component, DOM or pixel replication target. Improve hierarchy, layout, copy, spacing,
+progressive disclosure and interaction where they make the desktop hero path clearer.
+Preserve what changed, affected people and population context, recommendations/rejections,
+uncertainty, authority, execution progress, whole-trip outcome and clear navigation.
+V5.6/V7.2 remain the accepted semantic visual systems with their truth boundaries and
+required interactions; their prototypes do not require pixel-level duplication.
+No unrelated parity work is reopened by this clarification.
