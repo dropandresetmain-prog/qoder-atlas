@@ -47,7 +47,7 @@ export function renderProductOperatorOverview(
     <div class="v5-page-head-main">${eyebrow}<h1>${escapeHtml(surface.title)}</h1>
       <p class="sub">See the event as a connected system, then go straight to the cases that need attention.</p>
       <p class="sub" data-test="overview-reconciling"${lifecycle.state === 'RECONCILING' ? '' : ' hidden'}>Reconciling changes…</p></div>
-    ${eventLine}</div>
+    <div class="v5-page-head-aside">${eventLine}<div data-poll-region="overview-summary">${surface.summaryHtml}</div></div></div>
   <div class="v5-overview-layout">
     <div class="v5-overview-main">
       <div class="v5-workspace-tabs">
@@ -62,7 +62,6 @@ export function renderProductOperatorOverview(
           ? `<strong data-test="overview-active-context">${escapeHtml(active)}</strong>${activeContext ? `<span class="v5-context-slash" aria-hidden="true">/</span><span class="v5-context-what">${escapeHtml(activeContext)}</span>` : ''}`
           : '<span data-test="overview-active-context">No incident in focus</span>'}</div>
         ${renderOverviewGraphAssets()}${renderEventOverviewGraph(view)}
-        <div data-poll-region="overview-summary">${surface.summaryHtml}</div>
       </section>
       <section class="v5-panel" data-overview-panel="participants" hidden>
         <div class="roster-tools" data-test="roster-filters">

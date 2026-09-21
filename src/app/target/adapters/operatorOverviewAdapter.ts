@@ -62,7 +62,7 @@ function summaryTiles(counted: ReturnType<typeof countedSet>): string {
   return BUCKETS.map(({ key, label, tone, count }) => {
     const n = count(counted.counts);
     if (n === 0 && !ALWAYS_SHOWN.has(key)) return '';
-    return `<div class="readout-bucket tone-${tone}${key === 'needs-attention' && n > 0 ? ' is-attention' : ''}" data-test="summary-${tone}" data-summary-key="${key}"><strong class="tile-count">${n}</strong><span class="tile-label">${e(tileLabel(label))}</span></div>`;
+    return `<div class="readout-bucket tone-${tone}${key === 'needs-attention' && n > 0 ? ' is-attention' : ''}" data-test="summary-${tone}" data-summary-key="${key}"><span class="v5-readiness-dot"></span><strong class="tile-count">${n}</strong><span class="tile-label">${e(tileLabel(label))}</span></div>`;
   }).filter(Boolean).join('');
 }
 function barWidth(count: number, total: number): string {
@@ -74,7 +74,7 @@ function compactReadiness(counted: ReturnType<typeof countedSet>): string {
   const c = counted.counts;
   const watching = c.atRisk + c.recovering;
   const total = counted.total;
-  return `<div class="v5-readiness" data-test="overview-readiness"><div class="v5-readiness-title"><h2>Managed travel readiness</h2>
+  return `<div class="v5-readiness v5-readiness-top" data-test="overview-readiness"><div class="v5-readiness-title"><h2>Managed travel readiness</h2>
     <button type="button" class="v5-text-button" data-switch-overview="participants">${total} participants →</button></div>
     <div class="v5-readiness-bar" role="img" aria-label="Managed travel readiness">
       <span class="seg-ok" style="width:${barWidth(c.ready, total)}%"></span>

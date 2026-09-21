@@ -74,8 +74,10 @@ test('Overview case navigation dominates and the full searchable population rema
   const graphAt = html.indexOf('data-test="event-overview-graph"');
   const attentionAt = html.indexOf('data-poll-region="overview-attention"');
   const summaryAt = html.indexOf('data-poll-region="overview-summary"');
+  const tabsAt = html.indexOf('class="v5-workspace-tabs"');
   if (graphAt >= 0) {
-    assert.ok(graphAt < summaryAt, 'event graph must precede compact readiness');
+    assert.ok(summaryAt >= 0 && summaryAt < tabsAt && summaryAt < graphAt,
+      'compact readiness now lives in the page heading, before the workspace tabs and therefore before the event graph');
     assert.ok(graphAt < attentionAt, 'event graph must precede Needs attention');
   }
   assert.match(html, /data-test="overview-readiness"/);

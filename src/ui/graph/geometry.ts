@@ -22,8 +22,53 @@ export interface EdgeGeometry {
 
 const r1 = (n: number): number => Math.round(n * 10) / 10;
 
-/** Clearance kept between a bowed curve and the obstacle card it steps around. */
-const OBSTACLE_MARGIN = 12;
+/** Clearance kept between a bypass lane and the obstacle card it steps around. */
+const OBSTACLE_MARGIN = 26;
+
+/** Target corner radius for an orthogonal bypass lane; clamped down per-corner when a segment is too short. */
+const BYPASS_CORNER_RADIUS = 9;
+
+interface Point {
+  readonly x: number;
+  readonly y: number;
+}
+
+/**
+ * Render an orthogonal polyline through `points` (each consecutive pair
+ * axis-aligned) as an SVG path, rounding every interior corner with a
+ * quarter-turn `Q`. Each corner's radius is clamped to half of both its
+ * adjoining segment lengths (and to `baseRadius`), so adjacent corners can
+ * never eat more than a segment's full length between them -- the path can't
+ * self-intersect or overshoot even when a lane leg is very short.
+ */
+function roundedOrthogonalPath(points: readonly Point[], baseRadius: number): string {
+  const segLen = (i: number): number => Math.hypot(points[i + 1]!.x - points[i]!.x, points[i + 1]!.y - points[i]!.y);
+  let d = `M${r1(points[0]!.x)} ${r1(points[0]!.y)} `;
+  for (let i = 1; i < points.length - 1; i += 1) {
+    const prev = points[i - 1]!;
+    const cur = points[i]!;
+    const next = points[i + 1]!;
+    const before = segLen(i - 1);
+    const after = segLen(i);
+    const radius = Math.min(baseRadius, before / 2, after / 2);
+    if (radius <= 0.01) {
+      d += `L${r1(cur.x)} ${r1(cur.y)} `;
+      continue;
+    }
+    const inX = (cur.x - prev.x) / before;
+    const inY = (cur.y - prev.y) / before;
+    const outX = (next.x - cur.x) / after;
+    const outY = (next.y - cur.y) / after;
+    const preX = cur.x - inX * radius;
+    const preY = cur.y - inY * radius;
+    const postX = cur.x + outX * radius;
+    const postY = cur.y + outY * radius;
+    d += `L${r1(preX)} ${r1(preY)} Q${r1(cur.x)} ${r1(cur.y)},${r1(postX)} ${r1(postY)} `;
+  }
+  const last = points[points.length - 1]!;
+  d += `L${r1(last.x)} ${r1(last.y)}`;
+  return d;
+}
 
 /**
  * Obstacle boxes whose footprint the straight sx->tx corridor would cross:
@@ -50,12 +95,16 @@ function bowIsClear(viaFromX: number, viaToX: number, viaY: number, obstacles: r
 /**
  * Step a horizontal (side/diagonal) curve above or below any obstacle cards
  * sitting in its straight-line corridor, so the edge no longer disappears
- * behind an intervening node. Returns null when nothing blocks the corridor,
- * or when neither detour has clearance -- callers then keep their original,
- * unbowed curve rather than risk a new overlap (conservative by design).
+ * behind an intervening node. The detour is an orthogonal bypass lane (the
+ * circuit/metro-diagram idiom): out horizontally from the source, a rounded
+ * turn up/down to a clear lane, flat across the obstacle span, a rounded
+ * turn back, and in horizontally to the target. Returns null when nothing
+ * blocks the corridor, or when neither detour has clearance -- callers then
+ * keep their original, unbowed curve rather than risk a new overlap
+ * (conservative by design).
  */
 function bowedHorizontalPath(
-  sx: number, sy: number, tx: number, ty: number, handle: number, obstacles: readonly Box[],
+  sx: number, sy: number, tx: number, ty: number, obstacles: readonly Box[],
 ): string | null {
   const hits = obstaclesInCorridor(sx, sy, tx, ty, obstacles);
   if (hits.length === 0) return null;
@@ -70,15 +119,20 @@ function bowedHorizontalPath(
 
   const viaFromX = Math.max(sx, Math.min(...hits.map((o) => o.x)));
   const viaToX = Math.min(tx, Math.max(...hits.map((o) => o.x + o.w)));
-  const viaX = (viaFromX + viaToX) / 2;
 
   for (const c of candidates) {
     if (!bowIsClear(viaFromX, viaToX, c.viaY, obstacles)) continue;
-    const h1 = Math.max(4, Math.min(handle, Math.abs(viaX - sx) * 0.6));
-    const h2 = Math.max(4, Math.min(handle, Math.abs(tx - viaX) * 0.6));
-    return `M${r1(sx)} ${r1(sy)} ` +
-      `C${r1(sx + h1)} ${r1(sy)},${r1(viaX - h1)} ${r1(c.viaY)},${r1(viaX)} ${r1(c.viaY)} ` +
-      `C${r1(viaX + h2)} ${r1(c.viaY)},${r1(tx - h2)} ${r1(ty)},${r1(tx)} ${r1(ty)}`;
+    return roundedOrthogonalPath(
+      [
+        { x: sx, y: sy },
+        { x: viaFromX, y: sy },
+        { x: viaFromX, y: c.viaY },
+        { x: viaToX, y: c.viaY },
+        { x: viaToX, y: ty },
+        { x: tx, y: ty },
+      ],
+      BYPASS_CORNER_RADIUS,
+    );
   }
   return null;
 }
@@ -97,7 +151,7 @@ export function sideCurve(
   const ty = target.y + target.h * targetFraction;
   const dx = Math.max(1, tx - sx);
   const handle = Math.max(4, Math.min(72, dx * 0.36));
-  const bowed = bowedHorizontalPath(sx, sy, tx, ty, handle, obstacles);
+  const bowed = bowedHorizontalPath(sx, sy, tx, ty, obstacles);
   return {
     route: 'side',
     d: bowed ?? `M${r1(sx)} ${r1(sy)} C${r1(sx + handle)} ${r1(sy)},${r1(tx - handle)} ${r1(ty)},${r1(tx)} ${r1(ty)}`,
@@ -119,7 +173,7 @@ export function diagonalCurve(
   const ty = target.y + target.h * targetFraction;
   const dx = Math.max(1, tx - sx);
   const handle = Math.max(30, Math.min(110, dx * 0.3));
-  const bowed = bowedHorizontalPath(sx, sy, tx, ty, handle, obstacles);
+  const bowed = bowedHorizontalPath(sx, sy, tx, ty, obstacles);
   return {
     route: 'diagonal',
     d: bowed ?? `M${r1(sx)} ${r1(sy)} C${r1(sx + handle)} ${r1(sy)},${r1(tx - handle)} ${r1(ty)},${r1(tx)} ${r1(ty)}`,

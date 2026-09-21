@@ -4,7 +4,7 @@
  * survive refresh. Stops before consequential A4 work.
  */
 import type { PlanningCandidateView, RecoveryCaseView, RecoveryStrategyView } from '../../contracts/v2/product/readModels.ts';
-import { executionBlockerLine, presentCaseWorkspace, type CaseRow, type CaseWorkspaceModel } from '../../app/target/adapters/caseWorkspacePresenter.ts';
+import { executionBlockerLine, executionBlockerShort, presentCaseWorkspace, type CaseRow, type CaseWorkspaceModel } from '../../app/target/adapters/caseWorkspacePresenter.ts';
 import { SHELL_LINKS } from '../../app/target/productShell.ts';
 import { CASE_COPY, CASE_CHANGE_TYPE_SENTENCE, CASE_REASON_SENTENCE } from '../copy.ts';
 import { escapeHtml, formatInstant } from '../html.ts';
@@ -112,9 +112,23 @@ function costBreakdownHtml(candidate: PlanningCandidateView | undefined, key: st
     ${fx.length ? list(fx.map((rate) => `${decisionText(rate.source.label, 'Recorded exchange-rate source')}: ${rate.baseCurrency} → ${rate.homeCurrency} at ${rate.rate}; reference ${formatInstant(rate.observedAt)}${rate.validUntil ? `; valid until ${formatInstant(rate.validUntil)}` : ''}.`)) : '<p>No exchange-rate record was supplied.</p>'}`);
 }
 
-function proposalHtml(candidate: PlanningCandidateView | undefined): string {
+/**
+ * Shared with alternatives/rejected candidates, which must keep rendering
+ * exactly as before (verified by the operator-ui-convergence suite). `parts`
+ * lets the recommendation card pull the itinerary and the programme
+ * commitments into separate steps without changing any other caller.
+ */
+interface ProposalHtmlOptions {
+  readonly parts?: 'itinerary' | 'commitments';
+  /** Step 2 only: tuck each directly-shown check's dense timing line behind a disclosure. */
+  readonly timingDisclosure?: boolean;
+}
+function proposalHtml(candidate: PlanningCandidateView | undefined, options?: ProposalHtmlOptions): string {
   const p = candidate?.proposal;
-  if (!p) return '<p class="cw-muted">Detailed itinerary evidence was not supplied for this option.</p>';
+  if (!p) {
+    if (options?.parts === 'commitments') return '';
+    return '<p class="cw-muted">Detailed itinerary evidence was not supplied for this option.</p>';
+  }
   const flights = p.flights.map((flight) => `<article><p class="cw-kicker">Flight</p><h4>${e(decisionText(flight.label, 'Replacement flight'))}</h4>
     ${flight.originLabel || flight.destinationLabel ? `<p>${e(decisionText(flight.originLabel, 'Origin not supplied'))} → ${e(decisionText(flight.destinationLabel, 'Destination not supplied'))}</p>` : ''}
     <dl class="cw-times"><div><dt>Depart</dt><dd>${e(decisionTime(flight.departure, flight.departureTimeZone))}</dd></div><div><dt>Arrive</dt><dd>${e(decisionTime(flight.arrival, flight.arrivalTimeZone))}</dd></div></dl></article>`).join('');
@@ -126,18 +140,30 @@ function proposalHtml(candidate: PlanningCandidateView | undefined): string {
     return `<article><p class="cw-kicker">Accommodation</p><h4>${e(decisionText(property, 'Property not supplied'))}</h4>
     ${placeContext}<p>${e(decisionTime(stay.start, stay.timeZone))} → ${e(decisionTime(stay.end, stay.timeZone))}</p></article>`;
   }).join('');
+  const itineraryHtml = `<div class="cw-itinerary">${flights}${stays}</div>`;
+  if (options?.parts === 'itinerary') return itineraryHtml;
+
   const checks = p.programmeChecks ?? [];
   const primaryChecks = checks.filter((c) => c.verdict !== 'PASS');
   primaryChecks.push(...checks.filter((c) => c.verdict === 'PASS').slice(0, Math.max(0, 3 - primaryChecks.length)));
   const remainingChecks = checks.filter((c) => !primaryChecks.includes(c));
-  const check = (c: typeof checks[number]): string => `<article><h4>${e(decisionText(c.label, 'Programme commitment'))}</h4>
+  const check = (c: typeof checks[number], wrapTiming: boolean): string => {
+    const timingLine = c.availableMinutes === undefined && c.requiredMinutes === undefined ? '' :
+      `${c.availableMinutes === undefined ? '' : `${c.availableMinutes} min available`}${c.requiredMinutes === undefined ? '' : ` · ${c.requiredMinutes} min required`}${c.transferMinutes === undefined ? '' : ` · ${c.transferMinutes} min transfer`}`;
+    const timingBlock = !timingLine ? '' : wrapTiming
+      ? details(`programme-check-timing-${candidate?.candidateKey ?? 'option'}-${checks.indexOf(c)}`, 'Timing detail', `<p class="cw-muted">${timingLine}</p>`)
+      : `<p class="cw-muted">${timingLine}</p>`;
+    return `<article><h4>${e(decisionText(c.label, 'Programme commitment'))}</h4>
     <p>${c.verdict === 'PASS' ? 'Preserved under this proposal' : c.verdict === 'FAIL' ? 'Not satisfied under this proposal' : 'Not confirmed under this proposal'}</p>
     ${c.arrival || c.deadline ? `<p class="cw-muted">${c.arrival ? `Arrives ${e(decisionTime(c.arrival, c.timeZone))}` : ''}${c.deadline ? ` · required by ${e(decisionTime(c.deadline, c.timeZone))}` : ''}</p>` : ''}
-    ${c.availableMinutes !== undefined || c.requiredMinutes !== undefined ? `<p class="cw-muted">${c.availableMinutes === undefined ? '' : `${c.availableMinutes} min available`}${c.requiredMinutes === undefined ? '' : ` · ${c.requiredMinutes} min required`}${c.transferMinutes === undefined ? '' : ` · ${c.transferMinutes} min transfer`}</p>` : ''}</article>`;
-  return `<div class="cw-itinerary">${flights}${stays}</div>
-    ${checks.length ? `<div class="cw-block"><h4>Programme commitments</h4><div class="cw-itinerary">${primaryChecks.map(check).join('')}</div>
-    ${remainingChecks.length ? details(`programme-checks-${candidate?.candidateKey ?? 'option'}`, `${remainingChecks.length} more commitment checks`, `<div class="cw-itinerary">${remainingChecks.map(check).join('')}</div>`) : ''}</div>` : ''}
+    ${timingBlock}</article>`;
+  };
+  const commitmentsHeading = options?.parts === 'commitments' ? '' : '<h4>Programme commitments</h4>';
+  const commitmentsHtml = `${checks.length ? `<div class="cw-block">${commitmentsHeading}<div class="cw-itinerary">${primaryChecks.map((c) => check(c, !!options?.timingDisclosure)).join('')}</div>
+    ${remainingChecks.length ? details(`programme-checks-${candidate?.candidateKey ?? 'option'}`, `${remainingChecks.length} more commitment checks`, `<div class="cw-itinerary">${remainingChecks.map((c) => check(c, false)).join('')}</div>`) : ''}</div>` : ''}
     ${p.blockers.length ? `<div class="cw-block" data-test="proposal-conditions"><h4>Conditions still identified in this proposal</h4>${list(p.blockers.map((b) => `${b.verdict === 'FAIL' ? 'Failed' : 'Unconfirmed'} — ${CASE_REASON_SENTENCE[b.reasonCode] ?? 'a recorded check remains unresolved; see Technical details'}.`))}</div>` : ''}`;
+  if (options?.parts === 'commitments') return commitmentsHtml;
+  return `${itineraryHtml}${commitmentsHtml}`;
 }
 
 function conditionsList(view: RecoveryCaseView, m: CaseWorkspaceModel, candidate: PlanningCandidateView | undefined): string[] {
@@ -156,6 +182,72 @@ function conditionsList(view: RecoveryCaseView, m: CaseWorkspaceModel, candidate
   return notes;
 }
 
+/**
+ * One short sentence: only strategy.projectedSummary and the candidate's
+ * PASS programme checks feed it. Never claims the trip is recovered.
+ */
+function recommendationVerdict(strategy: RecoveryStrategyView, candidate: PlanningCandidateView | undefined): string {
+  const { pass, fail, unknown, total } = strategy.projectedSummary;
+  const checksPart = total === 0
+    ? 'No projected checks were recorded'
+    : fail === 0 && unknown === 0
+      ? `All ${total} projected checks pass`
+      : `${pass} of ${total} projected checks pass`;
+  const passing = (candidate?.proposal?.programmeChecks ?? []).filter((c) => c.verdict === 'PASS');
+  const first = passing[0];
+  const keepsPart = first
+    ? ` · keeps ${truncateForGlance(decisionText(first.label, 'a programme commitment'))}${passing.length > 1 ? ` and ${passing.length - 1} more` : ''}`
+    : '';
+  return `${checksPart}${keepsPart}.`;
+}
+
+/** ~40 chars for a glance cell; the full sentence still appears lower on the card. */
+function truncateForGlance(text: string, max = 40): string {
+  return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
+}
+
+function glanceChangesCell(candidate: PlanningCandidateView | undefined): string {
+  const p = candidate?.proposal;
+  const flight = p?.flights[0];
+  if (flight) {
+    const originLabel = flight.originLabel ? decisionText(flight.originLabel, '') : '';
+    const destinationLabel = flight.destinationLabel ? decisionText(flight.destinationLabel, '') : '';
+    const sub = originLabel && destinationLabel ? `<span class="v5-glance-sub">${e(originLabel)} → ${e(destinationLabel)}</span>` : '';
+    return `${e(decisionText(flight.label, 'Replacement flight'))}${sub}`;
+  }
+  const stay = p?.stays[0];
+  if (stay) return e(decisionText(stay.propertyLabel ?? stay.placeLabel, 'Not supplied'));
+  return 'Not supplied';
+}
+
+function glanceProtectsCell(candidate: PlanningCandidateView | undefined): string {
+  const passing = (candidate?.proposal?.programmeChecks ?? []).filter((c) => c.verdict === 'PASS');
+  const first = passing[0];
+  if (!first) return 'No commitments recorded';
+  const more = passing.length > 1 ? `<span class="v5-glance-sub">+${passing.length - 1} more</span>` : '';
+  return `${e(decisionText(first.label, 'Programme commitment'))}${more}`;
+}
+
+function glanceCostsCell(candidate: PlanningCandidateView | undefined): string {
+  const cost = decisionCosts(candidate?.costComparison);
+  if (cost.unavailable) return 'Not compared';
+  return e(cost.newSpend?.join(' + ') ?? 'Not supplied');
+}
+
+function glanceBlockedByCell(strategy: RecoveryStrategyView): string {
+  if (!strategy.executionBlocker) return 'Nothing blocking';
+  return e(executionBlockerShort(strategy.executionBlocker));
+}
+
+function recommendationGlanceHtml(strategy: RecoveryStrategyView, candidate: PlanningCandidateView | undefined): string {
+  return `<dl class="v5-rec-glance">
+    <div class="v5-glance-cell"><dt>Changes</dt><dd>${glanceChangesCell(candidate)}</dd></div>
+    <div class="v5-glance-cell"><dt>Protects</dt><dd>${glanceProtectsCell(candidate)}</dd></div>
+    <div class="v5-glance-cell"><dt>Costs</dt><dd>${glanceCostsCell(candidate)}</dd></div>
+    <div class="v5-glance-cell"><dt>Blocked by</dt><dd>${glanceBlockedByCell(strategy)}</dd></div>
+  </dl>`;
+}
+
 /** Dominant recommendation card — same strategy/candidate as the decision panel. */
 function recommendationHtml(view: RecoveryCaseView): string {
   const options = decisionOptions(view);
@@ -171,13 +263,21 @@ function recommendationHtml(view: RecoveryCaseView): string {
   const reasons = [...outcomes, ...basis].slice(0, 3);
   const unresolved = view.uncertainty.map((text) => decisionText(text, '')).filter((text) => text.length > 0).slice(0, 3);
   return `<article class="cw-card cw-rec option-card is-recommended" id="cw-recommendation" data-test="recovery-strategy" data-strategy-ref="${e(strategy.strategyRef)}" data-option-number="${strategy.optionNumber}">
-    <p class="cw-kicker">Proposed — not yet applied</p>
-    <h3>${e(decisionTitle(strategy))}</h3>
-    ${proposalHtml(candidate)}
-    <div class="cw-block"><h4>Why this proposal</h4>${list(reasons)}
-      <p class="cw-muted">${strategy.projectedSummary.pass} passed · ${strategy.projectedSummary.fail} failed · ${strategy.projectedSummary.unknown} unconfirmed across ${strategy.projectedSummary.total} assessed item${strategy.projectedSummary.total === 1 ? '' : 's'}.</p>
-      ${unresolved.length ? `<h4>Still unresolved</h4>${list(unresolved)}` : ''}
-      ${details(`outcome-checks-${strategy.strategyRef}`, 'All projected outcome checks', list(strategy.resolves.map((c) => `${c.projectedVerdict === 'PASS' ? 'Passed' : c.projectedVerdict === 'FAIL' ? 'Failed' : 'Unconfirmed'} — ${decisionText(c.personLabel, 'Traveller')}`)))}</div>
+    <div class="v5-rec-head">
+      <p class="cw-kicker">Proposed — not yet applied</p>
+      <h3>${e(decisionTitle(strategy))}</h3>
+      <p class="v5-rec-verdict">${e(recommendationVerdict(strategy, candidate))}</p>
+    </div>
+    ${recommendationGlanceHtml(strategy, candidate)}
+    <section class="v5-rec-step" data-step="1"><h4>What changes</h4>${proposalHtml(candidate, { parts: 'itinerary' })}</section>
+    <section class="v5-rec-step" data-step="2"><h4>What it protects</h4>${proposalHtml(candidate, { parts: 'commitments', timingDisclosure: true })}</section>
+    <section class="v5-rec-step" data-step="3"><h4>Why this one</h4>
+      <div class="cw-block">${list(reasons)}
+        <p class="cw-muted">${strategy.projectedSummary.pass} passed · ${strategy.projectedSummary.fail} failed · ${strategy.projectedSummary.unknown} unconfirmed across ${strategy.projectedSummary.total} assessed item${strategy.projectedSummary.total === 1 ? '' : 's'}.</p>
+        ${unresolved.length ? `<h4>Still unresolved</h4>${list(unresolved)}` : ''}
+        ${details(`outcome-checks-${strategy.strategyRef}`, 'All projected outcome checks', list(strategy.resolves.map((c) => `${c.projectedVerdict === 'PASS' ? 'Passed' : c.projectedVerdict === 'FAIL' ? 'Failed' : 'Unconfirmed'} — ${decisionText(c.personLabel, 'Traveller')}`)))}
+      </div>
+    </section>
     ${strategy.changes.some((c) => c.effectKind === 'CANCEL_STAY') ? '<p class="cw-muted">Cancellation of the displaced stay is proposed, not completed.</p>' : ''}
     ${costBreakdownHtml(candidate, strategy.strategyRef)}
     ${strategy.executionBlocker ? `<p class="cw-muted" data-test="option-execution-blocker"><strong>Cannot be carried out yet:</strong> ${e(executionBlockerLine(strategy.executionBlocker))}</p>` : ''}

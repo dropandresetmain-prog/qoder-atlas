@@ -351,6 +351,100 @@ export const OPERATOR_WORKSPACE_STYLES = `<style data-operator-workspace-styles>
 .v5-trip-foot strong.tone-alert { color: #bb4c42; }
 .v5-trip-foot strong.tone-ok { color: #287c5d; }
 
+/* ---- Readiness meter in the page heading ---------------------------------- */
+/* The heading row left ~680px of dead space at 1440 while the readiness meter sat
+   below the graph reading as a hairline. It moves up as the heading's right-hand
+   counterweight, and stays deliberately quiet: small-caps label, muted numbers, no
+   large type, so it reads as a status strip and not a hero. */
+.v5-page-head-aside { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; min-width: 0; flex: 0 1 420px; }
+.v5-page-head-aside .v5-event-meta { margin: 0; }
+.v5-readiness-top { width: 100%; max-width: 420px; margin: 0; padding: 0; border-bottom: 0; }
+.v5-readiness-top .v5-readiness-title { margin-bottom: 8px; gap: 14px; }
+.v5-readiness-top .v5-readiness-title h2 {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-soft);
+}
+.v5-readiness-top .v5-text-button { font-size: 11px; white-space: nowrap; }
+/* 10px, rounded, with real gaps so the segments read as quantities not a rule. */
+.v5-readiness-top .v5-readiness-bar { height: 10px; gap: 2px; border-radius: 999px; background: transparent; }
+.v5-readiness-top .v5-readiness-bar > span { border-radius: 999px; min-width: 0; }
+.v5-readiness-top .v5-readiness-bar .seg-unk { background: #dfe4e9; }
+.v5-readiness-top .readout-buckets { justify-content: flex-start; gap: 6px 16px; margin-top: 9px; }
+.v5-readiness-top .readout-bucket { font-size: 11px; gap: 5px; align-items: center; }
+.v5-readiness-top .readout-bucket .tile-count { font-size: 13px; font-weight: 600; }
+/* State is never carried by colour alone - the dot repeats the label's tone. */
+.v5-readiness-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; display: inline-block; }
+.v5-readiness-top .readout-bucket.tone-ok .v5-readiness-dot { background: #669981; }
+.v5-readiness-top .readout-bucket.tone-alert .v5-readiness-dot { background: #bf6762; }
+.v5-readiness-top .readout-bucket.tone-watch .v5-readiness-dot { background: #d7b15a; }
+.v5-readiness-top .readout-bucket.tone-neutral .v5-readiness-dot { background: #c3ccd4; }
+
+/* ---- Recommended recovery: verdict, glance strip, numbered steps ----------- */
+.case-workspace .v5-rec-head { margin-bottom: 18px; }
+.case-workspace .v5-rec-head h3 { margin: 6px 0 0; }
+/* The one-line answer, read before any detail. */
+.case-workspace .v5-rec-verdict { margin: 8px 0 0; font-size: 14px; line-height: 1.5; color: var(--text); max-width: 68ch; }
+/* Four facts an operator always wants, in one scan. */
+.case-workspace .v5-rec-glance {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0;
+  margin: 0 0 22px; border: 1px solid var(--line-soft); border-radius: 10px; overflow: hidden;
+  background: var(--surface-2, var(--paper-warm));
+}
+.case-workspace .v5-glance-cell { padding: 11px 14px; border-left: 1px solid var(--line-soft); min-width: 0; }
+.case-workspace .v5-glance-cell:first-child { border-left: 0; }
+.case-workspace .v5-glance-cell dt {
+  margin: 0 0 5px; font-size: 9px; font-weight: 700; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--text-soft);
+}
+.case-workspace .v5-glance-cell dd { margin: 0; font-size: 13px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.case-workspace .v5-glance-sub { display: block; margin-top: 3px; font-size: 11px; font-weight: 400; color: var(--text-soft); line-height: 1.35; }
+/* Numbered steps give the eye an explicit order. The digit is CSS, not markup. */
+.case-workspace .v5-rec-step { padding: 18px 0 0; margin-top: 18px; border-top: 1px solid var(--line-soft); }
+.case-workspace .v5-rec-step:first-of-type { padding-top: 0; margin-top: 0; border-top: 0; }
+.case-workspace .v5-rec-step > h4 {
+  display: flex; align-items: center; gap: 10px; margin: 0 0 12px;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-soft);
+}
+.case-workspace .v5-rec-step > h4::before {
+  content: ""; display: grid; place-items: center;
+  width: 20px; height: 20px; border-radius: 50%; flex: none;
+  background: var(--ink); color: var(--paper); font-size: 10px; font-weight: 700; letter-spacing: 0;
+}
+.case-workspace .v5-rec-step[data-step="1"] > h4::before { content: "1"; }
+.case-workspace .v5-rec-step[data-step="2"] > h4::before { content: "2"; }
+.case-workspace .v5-rec-step[data-step="3"] > h4::before { content: "3"; }
+.case-workspace .v5-rec-step .cw-block { margin-top: 0; padding-top: 0; border-top: 0; }
+.case-workspace .v5-rec-step .cw-block > h4 { font-size: 12px; text-transform: none; letter-spacing: 0; color: var(--text); }
+
+/* ---- Rail sections: action vs log ----------------------------------------- */
+/* Sections previously ran together on a hairline, so "things I must decide" and
+   "what the engine did" blurred. Proximity does the separating; the rule confirms it. */
+.v5-context-rail .v5-rail-title, .v5-case-rail .v5-rail-title {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-soft); padding-bottom: 10px; border-bottom: 1px solid var(--border); margin: 0 0 14px;
+}
+.v5-context-rail .v5-rail-title span, .v5-case-rail .v5-rail-title span { letter-spacing: 0; text-transform: none; font-size: 11px; }
+/* The title is a flex row with space-between, which pushed the activity icon to
+   the opposite end of its own label. Group icon+label, push any count right. */
+.v5-activity .v5-rail-title { justify-content: flex-start; gap: 0; }
+.v5-activity .v5-rail-title span, .v5-activity .v5-rail-title a { margin-left: auto; }
+/* A real gap before the log section, not another hairline. */
+.v5-context-rail .v5-activity, .v5-case-rail .v5-activity, .v5-case-rail [aria-label="Northstar activity"] {
+  margin-top: 40px;
+}
+/* The activity feed is a timeline, so it carries a tick rail and never a card. */
+.v5-context-rail .v5-activity .v5-activity-item, .v5-case-rail .check-row {
+  position: relative; padding-left: 14px; border-bottom: 0;
+}
+.v5-context-rail .v5-activity .v5-activity-item::before, .v5-case-rail .check-row::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 1px; background: var(--border);
+}
+.v5-context-rail .v5-activity .v5-activity-item:first-of-type::before, .v5-case-rail .check-row:first-of-type::before { top: 9px; }
+.v5-context-rail .v5-activity .v5-activity-item:last-of-type::before, .v5-case-rail .check-row:last-of-type::before { bottom: 9px; }
+.v5-context-rail .v5-activity .v5-activity-bullet { width: 18px; height: 18px; font-size: 9px; }
+.v5-context-rail .v5-activity .v5-activity-item { grid-template-columns: 18px minmax(0, 1fr); gap: 8px; }
+/* Whole-trip state is status, not an action: it closes the rail after its own gap. */
+.v5-case-rail .v5-trip-foot { margin-top: 32px; padding-top: 14px; font-size: 11px; }
+
 @media (max-width: 1100px) {
   .v5-overview-layout, .v5-case-layout { grid-template-columns: 1fr; }
   .v5-context-rail, .v5-case-rail { position: static; max-height: none; overflow: visible; border-left: 0; border-top: 1px solid var(--border); padding-left: 0; padding-top: 24px; }

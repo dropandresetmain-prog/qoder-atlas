@@ -668,6 +668,20 @@ export function executionBlockerLine(blocker: { code: string; message: string })
   return EXECUTION_BLOCKER_COPY[blocker.code] ?? plain(blocker.message) ?? 'This option cannot be carried out yet.';
 }
 
+/**
+ * The same blocker as a glanceable label. A scan cell cannot hold a sentence, and
+ * truncating one mid-word ("This would work, but booking with the a...") reads as
+ * broken. The full sentence stays wherever the card explains itself.
+ */
+const EXECUTION_BLOCKER_SHORT: Record<string, string> = {
+  EXTERNAL_EXECUTION_NOT_COMPOSED: 'Airline booking not enabled here',
+  EXECUTION_INPUTS_UNAVAILABLE: 'Traveller booking details missing',
+  FRESH_PROVIDER_QUOTE_REQUIRED: 'Live price check needed',
+};
+export function executionBlockerShort(blocker: { code: string; message: string }): string {
+  return EXECUTION_BLOCKER_SHORT[blocker.code] ?? 'Cannot be carried out yet';
+}
+
 // --------------------------------------------------------------------------
 // Affects
 // --------------------------------------------------------------------------
