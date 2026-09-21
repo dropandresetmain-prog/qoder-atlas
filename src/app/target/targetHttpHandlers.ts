@@ -42,6 +42,11 @@ import { OVERVIEW_BACK, renderInShell, type ShellContext } from './productShell.
 import { loadShellChrome } from './readmodels/pgShellChrome.ts';
 import { demoResetGate, resetDemoWorkspace } from '../demo/demoReset.ts';
 import { datasetDirectoryFromEnv } from '../demo/datasetLoader.ts';
+import { findDemoControl, loadDemoControlCatalog } from '../demo/demoControlCatalog.ts';
+import { applyDemoControl } from '../demo/demoControlApplication.ts';
+import { createWorkspaceEvaluationClock } from './evaluationClock.ts';
+import { runDemoReadinessPreflight } from './demoReadinessPreflight.ts';
+import { renderDemoConsole } from '../../ui/screens/demo-console.ts';
 import { renderProductOperatorOverview } from '../../ui/screens/product-operator-overview.ts';
 import { renderProductProgrammeSchedule } from '../../ui/screens/product-programme-schedule.ts';
 import { renderProductProgrammeIntake } from '../../ui/screens/product-programme-intake.ts';
@@ -140,9 +145,30 @@ function shellContext(view: OperatorOverview): ShellContext {
   };
 }
 
-/** The persistent Reset demo control renders only where the reset gate is open. */
-function resetChrome(): { resetDemo?: true } {
-  return demoResetGate(process.env).open ? { resetDemo: true } : {};
+/** Persistent demo tooling chrome renders only where the reset gate is open. */
+function resetChrome(): { resetDemo?: true; demoConsole?: true } {
+  return demoResetGate(process.env).open ? { resetDemo: true, demoConsole: true } : {};
+}
+
+function refuseDemoGate(res: ServerResponse): boolean {
+  const gate = demoResetGate(process.env);
+  if (gate.open) return false;
+  sendJson(res, 403, { error: gate.code, message: gate.message });
+  return true;
+}
+
+async function demoControlApplyDeps(app: TargetApplication) {
+  const evaluationClock = app.runtimeHooks?.evaluationClock
+    ?? await createWorkspaceEvaluationClock(app.pool, app.workspaceId);
+  return {
+    pool: app.pool,
+    workspaceId: app.workspaceId,
+    actorPrincipalId: `demo-console:${app.workspaceId}`,
+    uow: () => app.unitOfWork(),
+    evaluationClock,
+    driveLifecycle: false as const,
+    ...(app.runtimeHooks?.wakeEvaluation ? { wakeWorkers: app.runtimeHooks.wakeEvaluation } : {}),
+  };
 }
 
 /** Event name + decision count + reset gate for pages whose read model lacks them. */
@@ -193,6 +219,38 @@ export async function handleTargetProductHttp(
   url: URL,
 ): Promise<boolean> {
   const { pathname } = url;
+
+  if (req.method === 'GET' && pathname === '/demo/control') {
+    if (refuseDemoGate(res)) return true;
+    try {
+      const catalog = loadDemoControlCatalog(process.env);
+      const clock = ctx.app.runtimeHooks?.evaluationClock
+        ?? await createWorkspaceEvaluationClock(ctx.app.pool, ctx.app.workspaceId);
+      const snap = clock.snapshot();
+      sendHtml(
+        res,
+        200,
+        renderInShell(
+          'dashboard',
+          'Demo Console',
+          await pageChrome(ctx),
+          renderDemoConsole({
+            workspaceId: ctx.app.workspaceId,
+            evaluationClock: { ...snap, now: clock.now() },
+            controls: catalog.controls,
+            disruptionConfigured: Boolean(catalog.disruptionEventFile),
+            timelineConfigured: Boolean(catalog.timeline),
+          }),
+        ),
+      );
+    } catch (err) {
+      sendJson(res, 500, {
+        error: 'DEMO_CONSOLE_FAILED',
+        message: err instanceof Error ? err.message : 'unknown',
+      });
+    }
+    return true;
+  }
 
   if (req.method === 'GET' && pathname === '/programme/intake') {
     sendHtml(res, 200, renderInShell('programme', 'Import programme', await pageChrome(ctx),
@@ -605,6 +663,65 @@ export async function handleTargetProductHttp(
       return true;
     }
 
+    if (req.method === 'GET' && pathname === '/api/v2/demo/controls') {
+      if (refuseDemoGate(res)) return true;
+      const catalog = loadDemoControlCatalog(process.env);
+      const clock = ctx.app.runtimeHooks?.evaluationClock
+        ?? await createWorkspaceEvaluationClock(ctx.app.pool, ctx.app.workspaceId);
+      const snap = clock.snapshot();
+      sendJson(res, 200, {
+        workspaceId: ctx.app.workspaceId,
+        evaluationClock: { ...snap, now: clock.now() },
+        controls: catalog.controls.map((control) => ({
+          id: control.id,
+          kind: control.kind,
+          variant: control.variant,
+          group: control.group,
+          label: control.label,
+          description: control.description,
+          order: control.order,
+          ...(control.stageId ? { stageId: control.stageId } : {}),
+        })),
+      });
+      return true;
+    }
+
+    const applyControl = pathname.match(/^\/api\/v2\/demo\/controls\/([^/]+)\/apply$/);
+    if (req.method === 'POST' && applyControl) {
+      if (refuseDemoGate(res)) return true;
+      const controlId = decodeURIComponent(applyControl[1]!);
+      const catalog = loadDemoControlCatalog(process.env);
+      const control = findDemoControl(catalog, controlId);
+      if (!control) {
+        sendJson(res, 404, { error: 'UNKNOWN_CONTROL', message: `Unknown demo control: ${controlId}` });
+        return true;
+      }
+      const result = await applyDemoControl(await demoControlApplyDeps(ctx.app), catalog, control);
+      if (!result.ok) {
+        sendJson(res, 409, { error: result.code, message: result.message });
+        return true;
+      }
+      sendJson(res, 200, {
+        ok: true,
+        controlId: result.controlId,
+        kind: result.kind,
+        variant: result.variant,
+        detail: result.detail,
+        evaluationClock: result.evaluationClock,
+      });
+      return true;
+    }
+
+    if (req.method === 'POST' && pathname === '/api/v2/demo/preflight') {
+      if (refuseDemoGate(res)) return true;
+      const report = await runDemoReadinessPreflight({
+        pool: ctx.app.pool,
+        workspaceId: ctx.app.workspaceId,
+      });
+      sendJson(res, 200, report);
+      return true;
+    }
+
     if (req.method === 'POST' && pathname === '/api/v2/demo/reset') {
       // A runtime with a demo dataset gets the SAFE workspace-scoped reset
       // (src/app/demo/demoReset.ts): one locked transaction deleting only the
@@ -623,6 +740,10 @@ export async function handleTargetProductHttp(
           workspaceId: ctx.app.workspaceId,
         });
         if (outcome.status === 'RESET') {
+          await ctx.app.runtimeHooks?.afterDemoReset?.();
+          const clock = ctx.app.runtimeHooks?.evaluationClock
+            ?? await createWorkspaceEvaluationClock(ctx.app.pool, ctx.app.workspaceId);
+          const snap = clock.snapshot();
           sendJson(res, 200, {
             ok: true,
             workspaceId: outcome.workspaceId,
@@ -631,6 +752,7 @@ export async function handleTargetProductHttp(
             provisioning: outcome.provisioning,
             baselineEvaluated: outcome.baselineEvaluated,
             timingsMs: outcome.timingsMs,
+            evaluationClock: { ...snap, now: clock.now() },
           });
         } else if (outcome.status === 'IN_PROGRESS') {
           sendJson(res, 409, { error: outcome.code, message: outcome.message });

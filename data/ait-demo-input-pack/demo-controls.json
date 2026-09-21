@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "note": "Demo Console presentation + source refs. Scenario names/labels live here — application code applies only generic kinds.",
+  "timelinePath": "data/ait-demo-input-pack/scenarios/s2-missed-connection/inputs/progressive-delay-timeline.json",
+  "controls": [
+    {
+      "id": "airline-disruption-configured",
+      "kind": "PROVIDER_EVENT",
+      "variant": "CONFIGURED_AIRLINE_REBOOKING",
+      "group": "Sarah",
+      "label": "Trigger airline disruption",
+      "description": "Applies the configured disclosed airline cancellation and rebooking through the normal provider-event boundary.",
+      "order": 10
+    },
+    {
+      "id": "delay_begins_connection_viable",
+      "kind": "PROVIDER_EVENT",
+      "variant": "TIMELINE_PROVIDER_STAGE",
+      "stageId": "delay_begins_connection_viable",
+      "group": "Jordan",
+      "label": "D1 — Delay, connection safe",
+      "description": "Progressive delay stage: connection remains viable above minimum connection time.",
+      "order": 20
+    },
+    {
+      "id": "delay_increases_connection_at_risk",
+      "kind": "PROVIDER_EVENT",
+      "variant": "TIMELINE_PROVIDER_STAGE",
+      "stageId": "delay_increases_connection_at_risk",
+      "group": "Jordan",
+      "label": "D2 — Connection at risk",
+      "description": "Progressive delay stage: connection tight / at risk under MCT pressure.",
+      "order": 30
+    },
+    {
+      "id": "zg053_impossible",
+      "kind": "PROVIDER_EVENT",
+      "variant": "TIMELINE_PROVIDER_STAGE",
+      "stageId": "zg053_impossible",
+      "group": "Jordan",
+      "label": "D3 — Connection impossible",
+      "description": "Progressive delay stage: baseline connection is impossible.",
+      "order": 40
+    },
+    {
+      "id": "overnight_narita_necessary",
+      "kind": "EVALUATION_CLOCK_ADVANCE",
+      "variant": "TIMELINE_CLOCK_STAGE",
+      "stageId": "overnight_narita_necessary",
+      "group": "Jordan",
+      "label": "Overnight — Advance scenario clock",
+      "description": "Advances the workspace evaluation clock only. Overnight / boardability must emerge from timing.",
+      "order": 50
+    }
+  ]
+}

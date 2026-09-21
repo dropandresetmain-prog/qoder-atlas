@@ -52,6 +52,8 @@ export interface ShellContext {
   decisionCount?: number;
   /** Show the persistent Reset demo control (backend reset gate is open). */
   resetDemo?: boolean;
+  /** Faint Demo Console link when the demo/reset gate is open. */
+  demoConsole?: boolean;
   /** Back link above the page body (Incident / Traveller pages). */
   backLink?: { label: string; href: string };
 }
@@ -75,6 +77,7 @@ export function renderInShell(
       ...(context.eventName ? { eventName: context.eventName } : {}),
       ...(context.decisionCount !== undefined ? { decisionCount: context.decisionCount } : {}),
       ...(context.resetDemo ? { resetDemo: true } : {}),
+      ...(context.demoConsole ? { demoConsole: true } : {}),
       ...(context.backLink ? { backLink: context.backLink } : {}),
     },
     bodyHtml,

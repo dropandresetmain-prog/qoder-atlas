@@ -20,6 +20,7 @@ import type { RuntimeServices } from '../runtimeServices.ts';
 import type { IntelligenceClient } from '../../intelligence/client.ts';
 import type { CoordinatorPlanOutcome } from './recoveryPlanningCoordinator.ts';
 import type { RecoveryPlanningCoordinator, RecoveryPlanningInput } from '../../contracts/v2/planning/recoveryPlanningAttempt.ts';
+import type { WorkspaceEvaluationClock } from './evaluationClock.ts';
 import { M9_REPLAN_IDENTITY } from './replanIdentity.ts';
 import { M9_OBJECTIVE_DISPOSITION_API_EXPOSED } from './objectiveDispositionBoundary.ts';
 
@@ -62,6 +63,16 @@ export interface TargetApplication {
     executorPrincipalId: string;
     afterApproval?: () => Promise<void>;
     afterExecution?: () => Promise<void>;
+    /**
+     * Demo reset composition hook: refresh runtime-owned evaluation clock (and
+     * any other boot-owned caches) after workspace rows are rebuilt. Owned by
+     * composeTargetBoot — HTTP must not poke clock internals directly.
+     */
+    afterDemoReset?: () => Promise<void>;
+    /** Boot-owned evaluation clock for demo control application in-process. */
+    evaluationClock?: WorkspaceEvaluationClock;
+    /** Wake reassessment + lifecycle after a demo control mutates time or world. */
+    wakeEvaluation?: () => Promise<void>;
     /** R4-F2: declared external capability truth (present only when the Atlas sandbox execution seam is composed). */
     externalCapabilities?: readonly { capabilityRef: string; supported: boolean }[];
     planner?: RecoveryPlanningCoordinator & {

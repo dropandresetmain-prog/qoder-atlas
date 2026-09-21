@@ -418,6 +418,31 @@ export async function composeTargetBoot(
     afterApproval: async () => { await execution.runNow(); await externalExecution?.runNow(); },
     ...(externalCapabilityStatements.length > 0 ? { externalCapabilities: externalCapabilityStatements } : {}),
     afterExecution: () => lifecycle.runNow(),
+    // After demo reset deletes workspace rows (including the durable clock),
+    // resync the in-process evaluation-clock cache so background workers do
+    // not keep evaluating at a stale CONTROLLED instant until process restart.
+    afterDemoReset: async () => {
+      const snapshot = await evaluationClock.refresh();
+      console.log(
+        snapshot.mode === 'CONTROLLED'
+          ? `[atlas] evaluation clock refreshed after demo reset: CONTROLLED at ${evaluationClock.now()}`
+          : '[atlas] evaluation clock refreshed after demo reset: WALL (baseline)',
+      );
+      await lifecycle.runNow();
+    },
+    evaluationClock,
+    wakeEvaluation: async () => {
+      const now = evaluationNow();
+      await endpoints.app.reassessmentWorker.enqueueDue(now, config.workspaceId);
+      await endpoints.app.reassessmentWorker.drainAvailable(now, pipeline, {
+        workspaceId: config.workspaceId,
+        maxItems: 200,
+        maxMs: 60_000,
+      });
+      await lifecycle.runNow();
+      await execution.runNow();
+      await externalExecution?.runNow();
+    },
     // R3: the ONE planning coordinator instance (also used by the C4
     // progression pass above) so the product planning trigger cannot diverge
     // from, or duplicate, lifecycle planning.

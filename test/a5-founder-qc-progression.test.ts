@@ -14,7 +14,7 @@ import {
   loadTimeline,
   providerEventStages,
   type DelayTimeline,
-} from '../scripts/a5-founder-qc-progression.ts';
+} from '../src/app/demo/progressiveDelayTimeline.ts';
 
 const TIMELINE_PATH = fileURLToPath(
   new URL('../data/ait-demo-input-pack/scenarios/s2-missed-connection/inputs/progressive-delay-timeline.json', import.meta.url),

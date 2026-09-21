@@ -57,6 +57,11 @@ export interface PageOptions {
    * never decides that itself.
    */
   resetDemo?: boolean;
+  /**
+   * Faint Demo Console link (opens `/demo/control` in a new tab). Only when
+   * the demo/reset gate is open — same gate as resetDemo.
+   */
+  demoConsole?: boolean;
   /** Back link rendered above the page body (`renderBackLink`). */
   backLink?: { label: string; href: string };
   demoBanner?: {
@@ -125,6 +130,8 @@ const SHELL_CSS = `
 .reset-demo-btn:disabled, [data-action]:disabled { opacity: .55; cursor: progress; }
 .reset-demo-status, [data-action-status] { font-size: 12px; color: var(--text-soft); }
 [data-action-status]:empty { display: none; }
+.demo-console-link { font-size: 12px; color: var(--text-soft); text-decoration: none; opacity: 0.55; padding: 4px 6px; border-radius: 4px; }
+.demo-console-link:hover, .demo-console-link:focus-visible { opacity: 0.9; color: var(--text); outline: 1px solid var(--border); outline-offset: 2px; }
 `;
 
 /** Closes the profile popover when the operator clicks anywhere outside it. */
@@ -182,6 +189,9 @@ function renderOperatorTopbar(options: PageOptions): string {
   }
   if (options.operatorInitials || options.profileResetAction) {
     right.push(renderProfileMenu(options.operatorInitials ?? 'A', options.profileResetAction, options.eventName));
+  }
+  if (options.demoConsole) {
+    right.unshift(`<a class="demo-console-link" data-test="demo-console-link" href="/demo/control" target="_blank" rel="noopener noreferrer" title="Open Demo Console in a new tab">Demo Console</a>`);
   }
   if (options.resetDemo) {
     right.unshift(`<span class="reset-demo" data-test="reset-demo"><button type="button" class="reset-demo-btn" data-action="reset-demo" data-test="reset-demo-btn" title="Return the demo to its starting state">Reset demo</button><span class="reset-demo-status" data-action-status role="status" aria-live="polite"></span></span>`);
