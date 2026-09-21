@@ -4,7 +4,8 @@
 
 - Branch: `ui/operator-workspace-v5`
 - Worktree: `.worktrees/ui-operator-workspace-v5`
-- Starting SHA: `b1727887143deb5307fdea27157994ceb1bcb47b`
+- Starting SHA (this correction session): `5561783d9bfedc47d971b6be330b18aa8a4b1c52`
+- Activity-rail correction: `edf62e97be11df1cc6b0c174d52744ed4ddede47`
 - Role: PRIMARY IMPLEMENTATION OWNER
 
 ## Goal
@@ -13,34 +14,29 @@ Founder-approved Overview + Case V5 composition on the real frontend, using prod
 
 ## Current checkpoint
 
-**Activity-rail correction + CP1–CP5. CP6 physical hero walkthrough next.**
+**CP6 physical walkthrough completed with PARTIAL evidence** (D2 amber screenshot gap). Activity rail correction shipped.
 
 ## Acceptance checklist
 
-- [x] CP1 V5 layout primitives in `operatorWorkspaceStyles.ts` + tab/focus/drawer client
-- [x] CP2 Overview: Event health / All participants tabs, real `renderEventOverviewGraph()`, compact readiness, sticky attention rail, focus selector that does not drop other stories
-- [x] CP3 Case: real `renderFocusedCaseGraph()`, Recommended recovery default tab, sticky decision rail, trip viability separate from approval
-- [x] CP4 Compact case activity from the existing case activity rows; Overview rail composes latest real `ActivityFeed` (same adapter vocabulary) + View log link
-- [x] CP5 Tight connection (`connection_below_minimum` only) presents AT_RISK / CHECKING, not DISRUPTED / UNRESOLVED. Broken or other blocking failures stay DISRUPTED
-- [ ] CP6 Physical Sarah + Jordan demo walkthrough on the running product
+- [x] CP1–CP5 (prior commit `5561783`)
+- [x] Overview activity rail composes real `ActivityFeed` (same adapter vocabulary; OperatorOverview unchanged)
+- [x] CP6 Jordan D1 GREEN / D2 AT_RISK / D3 DISRUPTED (API + Case agreement)
+- [x] CP6 Sarah + Jordan coexistence without reset
+- [x] Screenshots under `docs/work/operator-workspace-v5-cp6-evidence/`
+- [ ] Dedicated D2 amber UI screenshot (gap recorded)
 - [x] Anti-hardcoding CLEAN
 - [x] Focused UI tests + `tsc --noEmit`
-
-## Checks
-
-- `test/operator-ui-convergence.test.ts`: pass (incl. Overview activity rail composition)
-- Overview HTML composes `loadActivityFeed` + `renderCompactActivityRail`; refreshes via existing Overview HTML poll regions (`overview-activity`)
-- Limitation recorded: mini-feed refresh depends on Overview page poll, not a dedicated activity cursor poll
-- Not run yet: live Sarah/Jordan browser rehearsal
 
 ## Issue disposition
 
 | Issue | Class | Notes |
 |---|---|---|
-| Overview activity rail without a feed on `OperatorOverview` | Act Now | Fixed by page composition; OperatorOverview contract unchanged |
-| Live Sarah/Jordan D1–D3 click-through | Act Now (next) | Needs demo runtime; not faked here |
-| Legacy `/operator` screens | Ignore / Accept Risk | Product path is product-* |
+| Overview activity rail | Act Now | Closed — page composition + Overview HTML poll |
+| D2 amber screenshot not frozen before D3 | Park for Later | API proved AT_RISK; see evidence README |
+| Sarah recommendation title travel-led | Park for Later | Matches recorded recommendation; programme alternatives remain; no FE branch |
+| Approval unavailable in REPLAY | Ignore / Accept Risk | Sandbox execution not composed |
+| Activity phrase “for a recovery option” | Park for Later | Adapter vocabulary; not invented entries |
 
 ## Next action
 
-Boot the accepted demo runtime and walk Overview + Case for Sarah + Jordan in the same workspace.
+Optional: one more controlled D1→D2 screenshot pass if founder requires amber PNG; otherwise proceed to integration/review of V5 branch.
