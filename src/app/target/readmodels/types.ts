@@ -298,7 +298,14 @@ export interface RecoveryCaseFacts extends ProductWorldFacts {
    * here instead of re-querying (FIG-6/FIG-7) and stay on the same cursor
    * scale without a second stamp read.
    */
-  subjectFacts?: readonly { ref: string; tone: AssessmentTone; evaluation: AssessmentViewStatus; stamp?: bigint }[];
+  subjectFacts?: readonly {
+    ref: string;
+    tone: AssessmentTone;
+    evaluation: AssessmentViewStatus;
+    stamp?: bigint;
+    /** Connection-aware node colour. Absent on hand-built facts; callers then use tone alone. */
+    semanticState?: LdgSemanticState;
+  }[];
   /**
    * A5 FIX-2B — internal only, never parsed into `RecoveryCaseView`. True when a
    * SEPARATE blocking (non-connection) dimension definitively FAILs somewhere in

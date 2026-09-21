@@ -14,6 +14,7 @@ import {
   remainderViabilityFromAssessment,
   semanticStateFromAssessment,
 } from '../src/app/target/readmodels/mapConnectionProgression.ts';
+import { buildTravellerTripFacts } from '../src/app/target/readmodels/pgFactAssembler.ts';
 import { projectFocusedGraph } from '../src/app/target/readmodels/projectFocusedGraph.ts';
 import { buildEventOverview } from '../src/app/target/readmodels/eventOverview.ts';
 import { decisionActionState, decisionOptions } from '../src/ui/caseDecisionPresentation.ts';
@@ -359,4 +360,13 @@ test('A5 FIX-2: classify ignores PASS/UNKNOWN explanations and non-applicable co
       explanations: [{ status: 'FAIL' as const, reasonCode: 'connection_broken' }],
     }],
   }).connectionViability, undefined);
+});
+
+test('A5: a tight connection paints the trip amber while a separate failure stays red', () => {
+  const tight = buildTravellerTripFacts({ tripRef: 'trip-1', amIOkay: 'NO', doesTheRestWork: 'AT_RISK' });
+  assert.equal(tight.currentSemanticState, 'AFFECTED');
+  assert.equal(tight.nodes[0]?.semanticState, 'AFFECTED');
+  const broken = buildTravellerTripFacts({ tripRef: 'trip-1', amIOkay: 'NO', doesTheRestWork: 'NOT_VIABLE' });
+  assert.equal(broken.currentSemanticState, 'FAILED');
+  assert.equal(semanticStateFromAssessment('FAIL', 'TIGHT', true), 'FAILED');
 });

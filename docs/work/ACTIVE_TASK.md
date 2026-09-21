@@ -30,6 +30,10 @@
 
 Approved property: lyf Bugis Singapore, `lp6d67d`, booking `z-xdzAxcv`, USD 670.77, check-in 2026-09-29, check-out 2026-10-03. Retrieve `fixtures/recordings/nuitee/retrieve/rec_09c4c22e006e5e2df8408247c4716fe8.json`. Only `ait-draft-09` moved off shared Concorde. Jordan progression PostgreSQL test still 1 PASS / 0 FAIL. Seed tests 6 PASS / 0 FAIL. Anti-hardcoding CLEAN.
 
+## CP3 in progress
+
+Case and traveller-trip nodes now use the connection-aware colour. A tight-only failure is AFFECTED; a separate blocking failure stays FAILED. Overview already did this. `test/a5-backend-truth-closure.test.ts` 16 PASS / 0 FAIL. Sarah projection and polling traces are still open.
+
 ## Exact next step
 
-Checkpoint 3: Overview and Case reflect this PostgreSQL truth. Do not reopen the hotel penalty or the 95/82/impossible progression.
+Finish Checkpoint 3 from the remaining projection traces. Do not reopen hotel penalty or the 95/82/impossible progression.

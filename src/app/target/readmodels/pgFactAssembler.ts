@@ -11,6 +11,7 @@ import type {
   CaseCauseView,
   CausalPathStep,
   ConnectionProgression,
+  LdgSemanticState,
   RemainderViability,
 } from '../../../contracts/v2/product/readModels.ts';
 import type {
@@ -672,7 +673,13 @@ async function loadRecoveryCaseFactsInner(
   // explicit staleness note (see M9 C4 current-assessment finding). Each
   // subject keeps its own tone/evaluation status (FIG-6/FIG-7) — the case's
   // aggregate verdict below must never be copied back onto every subject node.
-  interface SubjectFact { ref: string; tone: AssessmentTone; evaluation: AssessmentViewStatus; stamp: bigint }
+  interface SubjectFact {
+    ref: string;
+    tone: AssessmentTone;
+    evaluation: AssessmentViewStatus;
+    stamp: bigint;
+    semanticState: LdgSemanticState;
+  }
   const subjectFacts: SubjectFact[] = [];
   // T3: the deterministic causal path — every applicable blocking FAIL
   // explanation of every failing subject, exactly as the evaluator typed it.
@@ -720,7 +727,14 @@ async function loadRecoveryCaseFactsInner(
     if (view.status === 'CURRENT' && view.assessment) {
       const verdict = view.assessment.overallVerdict;
       const tone: AssessmentTone = verdict === 'PASS' ? 'PASS' : verdict === 'FAIL' ? 'FAIL' : 'UNKNOWN';
-      subjectFacts.push({ ref, tone, evaluation: view.status, stamp });
+      const classification = classifyAssessmentConnection(view.assessment);
+      subjectFacts.push({
+        ref,
+        tone,
+        evaluation: view.status,
+        stamp,
+        semanticState: semanticStateFromAssessment(tone, classification.connectionViability, classification.separateBlockingFailure),
+      });
       if (tone === 'UNKNOWN') {
         uncertainty.push(`${ref} current assessment verdict ${verdict}`);
       }
@@ -743,11 +757,9 @@ async function loadRecoveryCaseFactsInner(
           }
         }
       }
-      // A5 FIX-2A — classify this subject's CURRENT assessment through the ONE
-      // shared helper: the connection hint aggregates ALL failing explanations
-      // (worst-of severity, not `explanations[0]`), and a separate blocking
-      // dimension FAIL on any subject wins the case out of the amber watch band.
-      const classification = classifyAssessmentConnection(view.assessment);
+      // A5 FIX-2A — the classification above is this subject's own. Worst-of
+      // across subjects still decides the case: one broken connection is enough,
+      // and a separate blocking failure anywhere leaves the amber watch band.
       if (classification.connectionViability) {
         const derived = classification.connectionViability;
         if (!connectionViability || CONNECTION_SEVERITY[derived] > CONNECTION_SEVERITY[connectionViability]) {
@@ -756,7 +768,7 @@ async function loadRecoveryCaseFactsInner(
       }
       if (classification.separateBlockingFailure) separateBlockingFailure = true;
     } else {
-      subjectFacts.push({ ref, tone: 'UNKNOWN', evaluation: view.status, stamp });
+      subjectFacts.push({ ref, tone: 'UNKNOWN', evaluation: view.status, stamp, semanticState: 'UNKNOWN' });
       uncertainty.push(`${ref} assessment ${view.status.toLowerCase()}`);
     }
   }
@@ -1167,7 +1179,7 @@ async function loadRecoveryCaseFactsInner(
         // case's aggregate (a PASS subject must be able to read HEALTHY even
         // when another subject fails the whole case).
         const fact = subjectFactByRef.get(ref);
-        const semanticState = fact ? TONE_TO_STATE[fact.tone] : 'UNKNOWN' as const;
+        const semanticState = fact?.semanticState ?? (fact ? TONE_TO_STATE[fact.tone] : 'UNKNOWN' as const);
         // R2: use human label for JOURNEY subjects (traveller display name)
         const label = s.subject_kind === 'JOURNEY' 
           ? (travellerLabelsByJourney.get(s.subject_id) ?? s.subject_kind)
@@ -1838,6 +1850,16 @@ export function loadIncidentProgrammeFactsFromCohort(input: {
   };
 }
 
+function travellerTripSemanticState(
+  amIOkay: 'YES' | 'NO' | 'UNKNOWN',
+  doesTheRestWork: RemainderViability,
+): LdgSemanticState {
+  if (doesTheRestWork === 'AT_RISK') return 'AFFECTED';
+  if (amIOkay === 'NO') return 'FAILED';
+  if (amIOkay === 'YES') return 'HEALTHY';
+  return 'UNKNOWN';
+}
+
 export function buildTravellerTripFacts(input: {
   tripRef: string;
   amIOkay: 'YES' | 'NO' | 'UNKNOWN';
@@ -1855,8 +1877,8 @@ export function buildTravellerTripFacts(input: {
     projectionRevision: 1,
     changedVisibleRefs: [input.tripRef],
     changedEdgeIds: [],
-    currentSemanticState: input.amIOkay === 'NO' ? 'FAILED' : input.amIOkay === 'YES' ? 'HEALTHY' : 'UNKNOWN',
-    nodes: [{ ref: input.tripRef, kind: 'TRAVELLER', label: 'Your trip', semanticState: input.amIOkay === 'NO' ? 'FAILED' : input.amIOkay === 'YES' ? 'HEALTHY' : 'UNKNOWN', authority: 'AUTHORITATIVE' }],
+    currentSemanticState: travellerTripSemanticState(input.amIOkay, input.doesTheRestWork),
+    nodes: [{ ref: input.tripRef, kind: 'TRAVELLER', label: 'Your trip', semanticState: travellerTripSemanticState(input.amIOkay, input.doesTheRestWork), authority: 'AUTHORITATIVE' }],
     edges: [],
     tripRef: input.tripRef,
     amIOkay: input.amIOkay,
@@ -1984,7 +2006,7 @@ async function loadIncidentProgrammeFactsInner(
         ref: f.ref,
         kind: 'TRAVELLER' as const,
         label: f.ref,
-        semanticState: TONE_TO_STATE[f.tone],
+        semanticState: f.semanticState ?? TONE_TO_STATE[f.tone],
         authority: 'AUTHORITATIVE' as const,
         caseRef: caseId,
         evaluation: f.evaluation,
@@ -2056,10 +2078,15 @@ export async function loadTravellerTripFacts(
       generatedAt,
     );
     const verdict = assessment.status === 'CURRENT' ? assessment.assessment?.overallVerdict : undefined;
+    const tone: AssessmentTone = verdict === 'PASS' ? 'PASS' : verdict === 'FAIL' ? 'FAIL' : 'UNKNOWN';
+    const tripClassification = classifyAssessmentConnection(assessment.assessment);
     const amIOkay: 'YES' | 'NO' | 'UNKNOWN' =
       verdict === 'PASS' ? 'YES' : verdict === 'FAIL' ? 'NO' : 'UNKNOWN';
-    const doesTheRestWork: RemainderViability =
-      verdict === 'PASS' ? 'VIABLE' : verdict === 'FAIL' ? 'NOT_VIABLE' : 'UNKNOWN';
+    const doesTheRestWork = remainderViabilityFromAssessment(
+      tone,
+      tripClassification.connectionViability,
+      tripClassification.separateBlockingFailure,
+    );
 
     const travellerItems = await client.query<{
       kind: 'TRANSPORT' | 'STAY' | 'ENGAGEMENT' | 'RESOURCE_USE';
