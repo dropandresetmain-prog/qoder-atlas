@@ -1,28 +1,34 @@
-# ACTIVE TASK — A5.1 PHASE 1 (V5 integration + control smoke)
+# ACTIVE TASK — Sarah + Jordan hero E2E closure
 
 ## Identity
 
 - Repo: `dropandresetmain-prog/qoder-atlas`
-- Writer: `C:\Dev\qoder-atlas-a5-integration`
-- Branch: `finish/a5-1-integration`
-- **Integrated candidate SHA:** `f787df2a929ff21c660f0eddb24250919a1b9dea`
-- Substrate start: `80441cc5ca7112a09250972dd60ec3b8d7f59c21`
-- Frozen V5: `ui/operator-workspace-v5` @ `dca9e6653cd8c6f019fda574093c1f541208e638`
+- Worktree: `C:\Dev\qoder-atlas-a5-hero-e2e-closure`
+- Branch: `fix/a5-hero-e2e-closure`
+- Required start: `787fb77bafea158be11981e47b9dcfb1fd08260c`
 
-## Critical rule
+## Checkpoint ledger
 
-Backend semantics on the substrate win over presentation expectations.
+- [x] CP1 — programme horizon, validation limit, cost-before-blast comparator, omit absent programme cost. SHA `787fb77bafea158be11981e47b9dcfb1fd08260c`. Focused tests: 23 PASS / 0 FAIL. Do not redesign unless a later focused test shows a concrete defect.
+- [ ] CP2 — seed/world + Sarah/Jordan deterministic truth
+- [ ] CP3 — backend/read-model/graph truth
+- [ ] CP4 — Sarah full vertical
+- [ ] CP5 — Jordan full vertical
+- [ ] CP6 — same-world Sarah + Jordan product proof
+- [ ] Final gates — only after both pass on one candidate SHA
 
-## Phase 1 status
+## Exact next phase
 
-- [x] B — V5 presentation integrated; shell Demo Console preserved; backend semantics kept
-- [x] C — Focused tests green
-- [x] Checkpoint 1 — pushed (`6849df7`, then preflight fix `f787df2`)
-- [x] D — One process on :8788; migration 0136 applied; V5 Overview + Demo Console
-- [x] E — Supported reset + preflight (required PASS after journey-operable fix)
-- [x] F — Same-process Sarah + Jordan D1→D2→D3→Overnight smoke + retrigger
-- [x] G — Overnight capability assessed (research config absent)
+Seed/world + Sarah/Jordan deterministic truth (CP2).
 
-## Exact next step
+Sarah: healthy → 5 affected → synthetic reprotection → 4 PASS + Sarah FAIL(programme). Flight facts provider-backed; disruption event stays labelled synthetic. Programme times may move in seed so original flight is viable, reprotected arrival makes Sarah's slot infeasible, a later slot restores viability, and the counterpart stays viable.
 
-Bring Phase 1 report to planning/acceptance. Do **not** start Sarah→Jordan hero E2E until accepted.
+Jordan: healthy → D1 viable (~95 min) → D2 AT_RISK (~80–85 min) → D3 NOT_VIABLE (physically impossible). Manual triggers. Classification from the evaluator. No stage-ID semantic logic.
+
+Jordan immigration: reviewed static SG→JP entry data, not a hardcoded pass and not LIVE research.
+
+Jordan hotel (locked): do not split the four-night stay and do not implement partial modification. Reseed the original four-night Singapore booking as penalty-free cancellable, then reuse the generalized replacement flow: book three-night replacement, observe it, then cancel the original. Penalty = 0. Replacement stay is not free.
+
+## CP2 acceptance
+
+Focused PostgreSQL/data tests prove the world sequence above, reviewed SG→JP evaluation, and zero hotel cancellation penalty. No full suite.
