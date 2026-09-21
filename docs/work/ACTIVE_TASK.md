@@ -20,7 +20,7 @@
 
 ## Current checkpoint
 
-CP2 COMPLETE (pushed). Next: CP3 — FIX3 controlled runtime clock.
+CP2 COMPLETE (pushed @ a7d9cb2). CP3 (FIX3 controlled clock) PAUSED at design-frozen, implementation NOT started — per user stop request. The two read-only clock-map investigations are captured below; no CP3 code written yet. Resume by implementing migration 0136 + boot/periodic/drain/coordinator clock injection + harness clock-only-stage advance.
 
 ## CP1 investigation results (subagents, verified against code)
 
@@ -42,10 +42,26 @@ CP2 COMPLETE (pushed). Next: CP3 — FIX3 controlled runtime clock.
 - C: `deriveConnectionViabilityFromEvaluator` maps every FAIL except `connection_broken` to TIGHT — including `transfer_does_not_fit` with negative gap (evaluator connection.ts:173 emits it when gap < transfer minutes; gap may be negative = physically impossible). Must use facts.gapMinutes for transfer_does_not_fit.
 - Plan: one shared deterministic helper (aggregate over ALL failing explanations of the connection dimension; worst-of severity; separate `hasNonConnectionBlockingFailure`), consumed by product status / remainder / semantic state / planning eligibility / progression. Keep D1 (VIABLE) / D2 (TIGHT) / D3 (IMPOSSIBLE) behavior.
 
-### FIX3 — clock (to confirm via agent C)
-- Boot: `buildReassessmentPipeline` uses `new Date()` internally; `createPeriodicService` default wall clock; coordinator `now = input.now ?? deps.now ?? wall`; harness passes stage.at per stage; clock-only overnight stages only printed (`planningNow`).
-- `RecoveryPlanningInput.now` already exists ("planning clock for progressive demo/operator control").
-- Design direction: runtime-owned evaluation clock seam (DB-persisted controlled clock row + env opt-in), consumed by reassessment pipeline, lifecycle/progression passes, planning basis; provider evidence timestamps stay wall-clock-truthful; default = wall clock. Harness advances the clock (incl. clock-only stages).
+### FIX3 — clock (CONFIRMED via two read-only agents; NO code yet)
+
+**Decisive facts:**
+- Most passes ALREADY take `ctx.now ?? new Date().toISOString()`, so they are downstream of the periodic-service clock: caseEscalation.ts:111, recoveryProgressionPass.ts:275, caseResolutionPass.ts:45, recoveryApproval.ts:301, recoveryPlanning.ts:116, executionPass.ts:99, externalOfferExecution.ts:532, externalStayExecution.ts:766.
+- The drain loop ALREADY has `options.now?: () => Instant` (pgAssessments.ts:556/586). `enqueueDueReassessments(pool, now)` (CLOCK_EXPIRY) makes time-alone able to stale+reassess — so advancing a clock alone CAN drive reassessment.
+- TWO boot seams are hardcoded wall and must become clock-driven:
+  1. `composeTargetBoot.ts:83` `buildReassessmentPipeline` → `new Date().toISOString()` feeds captureWorld({at}) + assessSubject({now}).
+  2. coordinator composed WITHOUT `now` (composeTargetBoot.ts:235-250); `planCaseDetailed` uses `input.now ?? deps.now ?? wall` (recoveryPlanningCoordinator.ts:285). Boot must supply `deps.now` from the controlled clock.
+- `createPeriodicService` clock = `options.now?.() ?? new Date()` (runtimeServices.ts:147) — supply `now` to caseLifecycle/execution/externalExecution.
+- `AppEndpoints.now()` (server/http.ts:194) is the HTTP clock seam; currently wall-only.
+- `RecoveryPlanningInput.now` exists (recoveryPlanningAttempt.ts:306-313) but is NOT wired from any demo endpoint/harness.
+
+**Harness gap (the actual FIX3 defect):** clock-only "overnight" stages are INERT.
+- Stage timings are DATA-DRIVEN: `data/ait-demo-input-pack/scenarios/s2-missed-connection/inputs/progressive-delay-timeline.json` (each stage has `id`, `at`, and clock-only stages have `planningNow` + no `eventId`). No scenario branch in app logic (anti-hardcoding OK).
+- `scripts/a5-founder-qc-progression.ts`: provider-event stages flow `stage.at` end-to-end (ingress receivedAt → captureWorld at → assessSubject now → drainAvailable now → runCaseEscalation now). But clock-only stages are PRINTED and REFUSED (lines 214-216, 237-241): "Set the synthetic planning clock / run planning against this stage manually; this harness does not fake wall-clock." So advancing time alone (no world change) does nothing today.
+- No HTTP endpoint sets/advances demo time.
+
+**MUST-STAY-WALL (never controlled):** all provider observedAt/requestedAt (atlas/*, hotel/nuiteeAdapter, targetTransportResearch:110, targetHotelResearch, targetFxResearch, providers/research/*), `modelActivities[].observedAt` (recoveryPlanningCoordinator:416), read-model generatedAt/isoNow (pgFactAssembler:54, pgShellFacts:34/381/461), command receipt timestamps (committedAt/openedAt/closedAt/resolvedAt/issuedAt/acceptedAt across commands/*, commandSupport:191, mutation.ts:251), completionClock (recoveryPlanningCoordinator:310/495), boot provisionWorkspaceAuthority now (composeTargetBoot:170), drain elapsed/budget Date.now() (pgAssessments:478/487/496/527), externalOfferExecution hold-expiry (337). Full 110-site inventory captured this session (28 controlled-candidate, 82 must-stay-wall).
+
+**Design direction (frozen, not yet implemented):** ONE authoritative runtime-owned evaluation clock. Default = wall clock. A workspace-scoped controlled clock (new migration 0136, WALL|CONTROLLED + controlled_now) read by boot and injected as `now` into: buildReassessmentPipeline, all createPeriodicService passes, the drain loop, and the planning coordinator's `deps.now`. Harness advances the controlled clock (incl. clock-only overnight stages) and re-runs the lifecycle/reassessment passes so overnight emerges from timing/boardability/availability — no "if Jordan"/"force overnight"/route-specific/hardcoded path. MUST-STAY-WALL sites untouched.
 
 ### FIX4 — Qwen causal role (CONFIRMED non-causal today)
 - `recoveryPlanningCoordinator.ts:392-427`: deterministic registry resolves ALL domains first (`resolveRecoveryDomainDecisions` records every registered domain, `recoveryDomain.ts:183-186`); AI suggestions filtered against `already` investigated set → cannot change which domains are investigated. A successful Qwen call is causally inert when registry already covers everything.
@@ -82,4 +98,10 @@ CP2 COMPLETE (pushed). Next: CP3 — FIX3 controlled runtime clock.
 
 ## Next action
 
-Dispatch parallel read-only investigations (Qwen seam, hero subject cardinality, clock inventory, preflight inputs); implement FIX1+FIX2 in primary.
+PAUSED per user stop request after CP2 push. To resume CP3 (FIX3 controlled runtime clock):
+1. Add migration 0136: workspace-scoped controlled clock (`mode` WALL|CONTROLLED, `controlled_now` timestamptz), runtime-owned, default WALL.
+2. Add a small clock module read by boot; inject as `now` into: `buildReassessmentPipeline` (composeTargetBoot.ts:83), each `createPeriodicService` (runtimeServices.ts:147 default), the drain loop (`options.now`), and the planning coordinator's `deps.now` (composeTargetBoot.ts:235-250 → recoveryPlanningCoordinator.ts:285). Optionally `AppEndpoints.now()` (server/http.ts:194).
+3. Make the harness advance the controlled clock for clock-only overnight stages (scripts/a5-founder-qc-progression.ts:214-216/237-241) and re-run reassessment+lifecycle so overnight emerges from timing/boardability — no scenario/route branch.
+4. Keep ALL MUST-STAY-WALL sites untouched (inventory above).
+5. PG + background-worker proof; typecheck; `npm run gate:anti-hardcoding`; commit+push CP3.
+Then CP4 (FIX4 causal Qwen), CP5 (FIX6 preflight + integration + anti-hardcoding + docs), and the 17-item final report.
