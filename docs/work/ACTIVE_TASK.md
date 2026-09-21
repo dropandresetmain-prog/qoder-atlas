@@ -28,8 +28,8 @@
 
 ## CP2 blocker — Act Now before CP3
 
-Live Nuitée sandbox search for Concorde `lp21d9f`, 2026-09-29 → 2026-10-03, returned 3 rates, 0 refundable (SG, omitted nationality, and US). The checked-in baseline booking `O6vdr7G2T` is NRFN. Do not invent a free-cancellation recording. Zero cancellation penalty cannot be seeded until the sandbox offers a refundable four-night rate whose free window is still open at recovery time.
+Concorde is not required. A live Nuitée sandbox search for any Singapore stay, 2026-09-29 → 2026-10-03, one adult, nationality SG, Marina Bay 8 km, returned 134 properties / 393 rates / 115 refundable. Every refundable rate carries a positive cancellation fee. Raw policies have no zero-amount cancel row. The latest first penalty tier is `2026-09-28 10:00:00` GMT. Jordan recovery is later: D3 `2026-09-29T12:00:00+09:00` and overnight `2026-09-29T21:30:00+09:00`. Zero rates are still free at either time. A 15 km retry did not add a later window. Do not invent a zero penalty or book a rate that is already inside a penalty tier.
 
 ## Exact next step
 
-Unblock the four-night free-cancellation reseed, then finish CP2 acceptance. Do not start CP3 while that penalty is still the full non-refundable price.
+Unblock with sandbox inventory whose free-cancel deadline is still open at D3, then finish CP2. Do not start CP3.
