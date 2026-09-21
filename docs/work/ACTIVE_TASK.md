@@ -36,6 +36,10 @@ Case and traveller-trip nodes use the connection-aware colour (`617ed6a`). A tig
 
 Polling replaces the graph region only when `data-graph-scene-hash` changes, then restores camera, view, and selection from `window.__northstarGraphState`. An unchanged hash correctly leaves the canvas alone. Do not add a second in-place update path.
 
+## CP4 started — Act Now
+
+`postgres-integration/b1SarahWorldRecovery.pgtest.ts` failed on a fresh world: airline reprotection ingress returned APPLIED, drain finished EMPTY, and `runCaseEscalation` had zero candidates (`outcomes=[]`). No current VIABILITY assessment was FAIL, so no case was linked to the change signal. Do not treat that as a graph-colour bug.
+
 ## Exact next step
 
-Checkpoint 4: run Sarah through the normal product path and record why the programme swap beats the paid travel alternative. Do not reopen hotel penalty, the 95/82/impossible progression, or the graph colour rule.
+Find why the reprotected journeys are not FAIL after that ingress, then continue Sarah’s product path. Do not reopen hotel penalty, the 95/82/impossible progression, or the graph colour rule.
