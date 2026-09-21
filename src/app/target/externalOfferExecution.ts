@@ -292,10 +292,16 @@ export async function loadExpectedOrderTerms(
   pool: Pool, workspaceId: string, inputs: Extract<OfferExecutionInputs, { ready: true }>, ceiling: { amount: number; currency: string },
 ): Promise<ExpectedOrderTerms | undefined> {
   const b = inputs.binding;
+  // Same airport-code vocabulary as transport research timezone resolution:
+  // demo/dataset places commonly carry `airport-code`, not only `IATA`.
   const rows = (await pool.query<{ id: string; time_zone: string; code: string }>(
-    `SELECT p.id, p.time_zone, x.external_key AS code
-       FROM places p JOIN place_external_refs x ON x.workspace_id = p.workspace_id AND x.place_id = p.id AND x.provider_namespace = 'IATA'
-      WHERE p.workspace_id = $1 AND p.id = ANY($2::uuid[])`,
+    `SELECT DISTINCT ON (p.id) p.id, p.time_zone, x.external_key AS code
+       FROM places p
+       JOIN place_external_refs x
+         ON x.workspace_id = p.workspace_id AND x.place_id = p.id
+        AND lower(x.provider_namespace) IN ('iata', 'airport-code')
+      WHERE p.workspace_id = $1 AND p.id = ANY($2::uuid[])
+      ORDER BY p.id, (lower(x.provider_namespace) = 'iata') DESC, x.external_key`,
     [workspaceId, [b.itinerary.originPlaceId, b.itinerary.destinationPlaceId]],
   )).rows;
   const origin = rows.find((r) => r.id === b.itinerary.originPlaceId);

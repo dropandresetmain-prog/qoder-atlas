@@ -9,7 +9,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { validateExistingOrder, type ExpectedOrderTerms } from '../src/app/target/existingOrderValidation.ts';
-import { buildAtlasOfferDispatcher, type ExternalOfferExecutionDeps } from '../src/app/target/externalOfferExecution.ts';
+import { buildAtlasOfferDispatcher, loadExpectedOrderTerms, type ExternalOfferExecutionDeps } from '../src/app/target/externalOfferExecution.ts';
 import { atlasOrderIdentity, normalizeOrderCreate, normalizeOrderDetails, ATLAS_SANDBOX_BALANCE_PAYMENT_REF } from '../src/providers/atlas/transactionAdapter.ts';
 import { atlasScheduleToIso } from '../src/providers/atlas/normalize.ts';
 import { sanitizeRaw } from '../src/providers/sanitize.ts';
@@ -225,4 +225,58 @@ test('dispatcher: a normal (non-duplicate) create is unchanged: checkpoint then 
   assert.equal(result.kind, 'SUCCESS');
   assert.deepEqual(h.checkpoints, ['atlas:order:NEW-1']);
   assert.equal(h.calls.pay, 1);
+});
+
+test('loadExpectedOrderTerms accepts airport-code place refs (not only IATA)', async () => {
+  const originId = '11111111-1111-4111-8111-111111111111';
+  const destinationId = '22222222-2222-4222-8222-222222222222';
+  const sqls: string[] = [];
+  const pool = {
+    query: async (sql: string) => {
+      sqls.push(sql);
+      return {
+        rows: [
+          { id: originId, time_zone: 'Asia/Jakarta', code: 'CGK' },
+          { id: destinationId, time_zone: 'Asia/Singapore', code: 'SIN' },
+        ],
+      };
+    },
+  };
+  const terms = await loadExpectedOrderTerms(
+    pool as never,
+    '33333333-3333-4333-8333-333333333333',
+    {
+      ready: true,
+      passengers: [{ travellerId: 't1', givenName: 'Sarah', familyName: 'Lim', gender: 'FEMALE', contactEmail: 'sarah.lim@example.test' }],
+      contactName: 'Lim/Sarah',
+      contactEmail: 'sarah.lim@example.test',
+      binding: {
+        id: 'b1',
+        recoveryStrategyId: 's1',
+        journeyItemId: 'ji1',
+        journeyId: 'j1',
+        offerKey: 'o1',
+        providerId: 'atlas',
+        providerOfferRef: 'offer-ref',
+        researchMode: 'RECORD',
+        observedAt: '2026-09-21T14:15:26.137Z',
+        quotedAmount: '49.11',
+        quotedCurrency: 'USD',
+        itinerary: {
+          originPlaceId: originId,
+          destinationPlaceId: destinationId,
+          departure: '2026-09-30T11:00:00+07:00',
+          arrival: '2026-09-30T13:45:00+08:00',
+          operator: 'ID',
+          mode: 'FLIGHT',
+        },
+      },
+    },
+    { amount: 100, currency: 'USD' },
+  );
+  assert.match(sqls[0] ?? '', /airport-code/);
+  assert.ok(terms);
+  assert.equal(terms.origin.code, 'CGK');
+  assert.equal(terms.destination.code, 'SIN');
+  assert.equal(terms.quoted.amount, 49.11);
 });
