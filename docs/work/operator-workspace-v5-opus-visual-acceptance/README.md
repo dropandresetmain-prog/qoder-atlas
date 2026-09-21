@@ -14,13 +14,13 @@ to use `renderEventOverviewGraph()` and `renderFocusedCaseGraph()`.
 |---|---|
 | Branch | `ui/operator-workspace-v5` |
 | Base before this pass | `6a6abd2` |
-| Runtime | normal product boot (`node src/main.ts`), `HTTP_PORT=8790` |
+| Runtime | normal product boot (`node src/main.ts`), `HTTP_PORT=8791` |
 | Adapter mode | `REPLAY` (no fresh destructive bookings) |
 | Database | PostgreSQL 16 on `localhost:55432`, `astra_a5_founder_qc_20260921` |
 | Demo workspace | `b62c6b6b-4af1-4ea4-8314-588f119317d9` |
-| Dataset | reused existing state — **no `demo/reset` was issued** |
-| Sarah case | `d4ff8d2d-10ec-57cd-822b-e38cceb2c238` (AWAITING_AUTHORITY) |
-| Jordan case | `8344fcd3-5d11-584d-9e3a-7bb07127b285` (AWAITING_AUTHORITY) |
+| Dataset | **rebuilt**: the shared database was destroyed mid-session by a `down -v` teardown from another session. Recreated the database, ran migrations, provisioned the AiT dataset, then reapplied both disruptions through the normal demo boundary (`POST /api/v2/demo/provider-event/airline-rebooking` for Sarah; `a5-founder-qc-progression --stage zg053_impossible` for Jordan). Population counts match the pre-loss state exactly: 50 confirmed / 2 needs attention / 15 unconfirmed of 67. |
+| Sarah case | `b6136ad1-3af0-5862-ab66-57bc57332f80` (AWAITING_AUTHORITY) |
+| Jordan case | `13f584ce-c084-5710-8d15-7dc33f0b7842` (AWAITING_AUTHORITY) |
 | Viewport | 1440 × 900, deviceScaleFactor 1 |
 
 ## Screenshots
@@ -33,6 +33,7 @@ to use `renderEventOverviewGraph()` and `renderFocusedCaseGraph()`.
 | 4 | `04-sarah-case-recommendation-1440.png` | Same composition on the programme case. Approval status is legible; new spend and displaced-booking loss stay separate and read "Not compared"; unknown stays unknown; whole trip reads "Not yet recovered" — recovery is not visually implied. |
 | 5 | `05-sarah-case-full-page-1440.png` | Full scroll: Recommended recovery visually outranks Other options and Checks & sources; itinerary and commitment blocks are hairline-separated rather than nested panels; the rail stays useful while scrolling. |
 | 7 | `07-jordan-graph-edge-routing-detail.png` | 2x zoom on the Jordan case graph: the transitive inbound->onward edge bows clear of the Arrival timing card and enters the onward flight on its own anchor, instead of passing behind the card and converging on a single anchor (which read as a phantom doubled connection). Node detail text clips on a whole line with an ellipsis. |
+| 8 | `08-overview-heading-band-detail.png` | The heading band: title block and readiness meter occupy equal halves, each running to its own page edge; the meter's label, bar and legend align to that half's edges; counts sit in equal columns rather than at bar proportions they do not measure. |
 | 6 | `06-sarah-case-other-options-1440.png` | Rejected options that present identically collapse into one row with a count ("Rejected · 4 options") and one grouped evaluation disclosure — presentation-only grouping, nothing dropped. Negative time is stated as a shortfall ("65 min short"). |
 
 ## Checks run at this state
@@ -48,6 +49,30 @@ to use `renderEventOverviewGraph()` and `renderFocusedCaseGraph()`.
   were not revived to satisfy them.
 
 ## Semantic issues visible in this evidence and deliberately NOT disguised
+
+**ACT NOW — the onward flight is green while both of its dependencies have failed.**
+On the Jordan case graph the onward ZG flight (Narita → Singapore) renders with a
+green `Healthy` badge, while *both* edges into it are `FAILED`. Straight from the
+read model:
+
+```
+SERVICE_BOOKING     HEALTHY   "ZG flight"  (onward, Narita -> Singapore)
+MUST_HAPPEN_BEFORE  FAILED    inbound ZG flight  -> onward ZG flight
+MUST_HAPPEN_BEFORE  FAILED    Arrival timing     -> onward ZG flight
+```
+
+The projection is asserting that the onward booking is itself unaffected — the
+aircraft departs, the seat exists — while everything that would get the traveller
+onto it has failed. Read literally that is defensible; read as an operator it is
+misleading, and the green node fill visually dominates the two red edges pointing
+at it. Reviewer reaction was that the second flight should be red because the
+first one changed.
+
+This is **LDG projection state, not presentation**. It was not recoloured in the
+UI: doing so would fake semantic state. The question for the projection owner is
+whether a booking whose inbound dependencies have all failed should stay
+`HEALTHY` or become `AFFECTED`/`FAILED`. Visible in
+`07-jordan-graph-edge-routing-detail.png`.
 
 **ACT NOW — planner/comparator selection (unchanged from the prior evidence package).**
 Sarah's selected recommendation is domain **TRANSPORT** ("Book replacement travel")
@@ -86,6 +111,16 @@ empty space above its content, so the nodes sit low in the viewport and the fade
 context row meets the "drag to pan" hint at the bottom edge. Reducing the container
 height clips content below ~470px, so the slack is in the scene rect, not the
 container. Not addressed in this pass.
+
+**FIXED — Case graph bypass routing (final form).** A bypassing edge now leaves and
+re-enters on the SAME face of both cards — both bottoms, or both tops — and flows
+between them in the clear space outside the card row, instead of squeezing an arc
+through the same band as the card in its way. Two earlier attempts were rejected on
+sight: a smooth bow that sagged under the focal card and read as a glitch, and an
+orthogonal lane that read as a schematic rather than this graph's language.
+Verified by sampling every rendered path at 120 points against every card body:
+**zero visible edges enter a card** on either case; the only three that do are
+dimmed context edges at 0.11 opacity, unchanged from before.
 
 **FIXED — Case graph edge routing and node text.** Edges passing behind a card:
 6 -> 0 (Jordan), 2 -> 0 (Sarah), both panels. Node text now clips on a whole line
