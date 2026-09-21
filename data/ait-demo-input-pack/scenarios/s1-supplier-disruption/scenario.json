@@ -7,14 +7,14 @@
     "src-syn-ait-event"
   ],
   "scenarioId": "S1",
-  "catalogueTitle": "CGK?SIN synthetic Batik schedule change: accept / recover / programme continuity",
+  "catalogueTitle": "CGK-SIN disclosed simulated reprotection onto Atlas-recorded Batik services: accept / recover / programme continuity",
   "trigger": "SUPPLIER_EVENT",
   "stage": "POST_BOOKING_BEFORE_TRAVEL",
   "tier": "TIER_A",
   "demoRole": "Main organiser hero — continuous into S3",
   "anchorEventId": "evt-ait-2026",
   "occurredAt": "2026-09-21T09:40:00+08:00",
-  "note": "Simulated carrier Batik (ID, synthetic) retimes the shared CGK→SIN inbound ID7159/ID7153 from 30 Sep morning to 1 Oct morning. Airline auto-reprotects every ticketed passenger onto the retimed service. Northstar evaluates travellers individually against programme buffers (engine MIN_BUFFER = 150min): Group A (Wanderpay afternoon cohort) stays VIABLE under airline reprotection; Felix Hartono / ait-draft-03 remains VIABLE for the Day-1 agentic provocation at 16:30; Group C (Sarah Lim / ait-draft-14, Day-1 headline interview 11:30) has no travel-only offer that restores the 150min gap — continuity continues into S3 without reset. Simulated seam: every airline artifact in inputs/ is SIMULATED_EXTERNAL_EVENT (src-sim-airline-id). Atlas search REPLAY for CGK→SIN may be hand-authored simulated inventory at the provider recording boundary with honest provenance — engine viability is never faked. Roster rehomes for non-CGK drafts are a shared patch (see output/lane-b-s1s3-shared-patch-request.md); ait-draft-03 is already home-CGK.",
+  "note": "A disclosed simulated airline event reprotects the shared CGK→SIN cohort from Atlas-recorded ID7159 (30 Sep 17:45+07→20:30+08) onto Atlas-recorded ID7153 (1 Oct 07:45+07→10:30+08). Airline auto-reprotects every ticketed passenger onto the retimed service. Northstar evaluates travellers individually against programme buffers (engine MIN_BUFFER = 150min): Group A (Wanderpay afternoon cohort) stays VIABLE under airline reprotection; Felix Hartono / ait-draft-03 remains VIABLE for the Day-1 agentic provocation at 16:30; Group C (Sarah Lim / ait-draft-14, Day-1 headline interview 11:30) has no travel-only offer that restores the 150min gap — continuity continues into S3 without reset. The disruption event stays SIMULATED_EXTERNAL_EVENT (src-sim-airline-id). ID7159 and ID7153 schedules are the checked-in Atlas search recordings, not hand-authored timings. Engine viability is never faked. Roster rehomes for non-CGK drafts are a shared patch (see output/lane-b-s1s3-shared-patch-request.md); ait-draft-03 is already home-CGK.",
   "affectedTravellers": [
     {
       "draftId": "ait-draft-14",

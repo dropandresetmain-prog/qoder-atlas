@@ -27,7 +27,7 @@ test('A5.1 harness: provider-event stages are data-driven and ordered', () => {
   assert.equal(stages[0]?.id, 'delay_begins_connection_viable');
   assert.equal(stages[0]?.connectionRemainingMinutes, 95);
   assert.equal(stages[1]?.id, 'delay_increases_connection_at_risk');
-  assert.equal(stages[1]?.connectionRemainingMinutes, 30);
+  assert.equal(stages[1]?.connectionRemainingMinutes, 82);
   assert.equal(stages[2]?.id, 'zg053_impossible');
   assert.ok((stages[2]?.connectionRemainingMinutes ?? 0) < 0);
   assert.ok(stages.every((stage) => stage.eventId && stage.arrTime));

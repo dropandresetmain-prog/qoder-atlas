@@ -251,7 +251,7 @@ describe('A3 Jordan connection foundation (real configured AiT world)', () => {
     const d2 = stage('delay_increases_connection_at_risk');
     const d2Result = await applyStage(d2, evidenceIds[1]!);
     connection = connectionDimension(d2Result.view);
-    assert.deepEqual(connection, { verdict: 'FAIL', reasonCode: 'connection_below_minimum', gapMinutes: 30 });
+    assert.deepEqual(connection, { verdict: 'FAIL', reasonCode: 'connection_below_minimum', gapMinutes: 82 });
     assert.equal(mapConnectionProgression({ viability: deriveConnectionViabilityFromEvaluator(connection) }), 'CONNECTION_AT_RISK');
     assert.equal(
       productStatusFromAssessment(d2Result.view.assessment!.overallVerdict, deriveConnectionViabilityFromEvaluator(connection)),

@@ -31,10 +31,10 @@
       "at": "2026-09-28T15:00:00-07:00",
       "eventId": "sim-zg-evt-s2-delay-02",
       "eventType": "DELAY",
-      "depTime": "2026-09-28T13:25:00-07:00",
-      "arrTime": "2026-09-29T16:20:00+09:00",
-      "connectionRemainingMinutes": 30,
-      "narrative": "Delay increases; connection at risk under MCT pressure."
+      "depTime": "2026-09-28T12:23:00-07:00",
+      "arrTime": "2026-09-29T15:28:00+09:00",
+      "connectionRemainingMinutes": 82,
+      "narrative": "Delay increases; 82 minutes remain before the onward departure — still physically possible, below the 90-minute minimum."
     },
     {
       "id": "zg053_impossible",

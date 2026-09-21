@@ -3,7 +3,7 @@
   "sourceIds": [
     "src-sim-airline-id"
   ],
-  "note": "Synthetic Batik replacement inventory for CGK?SIN. Organiser-supplied simulation only; never claim Atlas evidence.",
+  "note": "The reprotection assignment is a disclosed simulated airline event. ID7153 2026-10-01 07:45+07 to 10:30+08 is the Atlas-recorded service in recordings/atlas/search/rec_b615f4f1bca688f781fe2ee3cdc39720.json.",
   "observedAt": "2026-09-21T10:05:00+08:00",
   "routes": [
     {
@@ -25,7 +25,7 @@
         }
       ],
       "noOfferArrivingBy": "2026-10-01T09:00:00+08:00",
-      "note": "This synthetic inventory is organiser-supplied only; it does not claim Atlas evidence for Batik. The ID7153 reprotection arrives 10:30 and leaves only 60min before Sarah's 11:30 headline."
+      "note": "ID7153 is the Atlas-recorded 10:30 arrival. The simulated reprotection onto it leaves 60 minutes before the 11:30 commitment, inside the 150-minute readiness buffer."
     }
   ]
 }

@@ -131,6 +131,7 @@
       "test/r2-case-workspace-integration.test.ts",
       "test/r2-focused-case-graph.test.ts",
       "test/a5-founder-qc-progression.test.ts",
+      "test/a5-hero-seed-truth.test.ts",
       "test/a5-evaluation-clock.test.ts",
       "test/a5-offer-selection.test.ts",
       "test/a5-demo-readiness-preflight.test.ts",

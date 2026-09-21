@@ -4,12 +4,12 @@
     "src-syn-ait-event",
     "src-syn-ait-policy"
   ],
-  "note": "Synthetic Batik baseline for five CGK cohort travellers; ID7159 is organiser-supplied and not Atlas-backed.",
+  "note": "Shared CGK cohort baseline. ID7159 2026-09-30 17:45+07 to 20:30+08 is the Atlas-recorded service in recordings/atlas/search/rec_d40b625e84e68b27deab3fbb52e27c2e.json. The later simulated reprotection event is separate from these service facts.",
   "asOf": "2026-09-21T09:00:00+08:00",
   "itineraries": [
     {
       "draftId": "ait-draft-14",
-      "plan": "Direct synthetic Batik ID7159 CGK → SIN on 30 Sep 17:45–20:30; baseline landside arrival clears the Day 1 11:30 headline interview.",
+      "plan": "Direct Atlas-recorded ID7159 CGK → SIN on 30 Sep 17:45–20:30; baseline landside arrival clears the Day 1 11:30 headline interview.",
       "segments": [
         {
           "flightNumber": "ID7159",

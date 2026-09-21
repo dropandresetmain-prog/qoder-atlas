@@ -3,13 +3,13 @@
   "sourceIds": [
     "src-sim-airline-id"
   ],
-  "note": "Synthetic Batik schedule-change story; organiser-supplied, not Atlas-backed. ID7159 is cancelled and all five tickets are involuntarily reprotected to ID7153.",
+  "note": "The airline disruption and involuntary reprotection are a disclosed simulated event. The published service facts are Atlas-recorded and must not be relabelled as invented timings: ID7159 is recordings/atlas/search/rec_d40b625e84e68b27deab3fbb52e27c2e.json (2026-09-30 17:45+07 to 20:30+08) and ID7153 is recordings/atlas/search/rec_b615f4f1bca688f781fe2ee3cdc39720.json (2026-10-01 07:45+07 to 10:30+08).",
   "eventId": "sim-id-evt-20260921-cgk-001",
   "eventType": "SCHEDULE_CHANGE",
   "issuedAt": "2026-09-21T09:40:00+08:00",
   "carrier": {
     "code": "ID",
-    "name": "Batik Air (simulated)"
+    "name": "Batik Air"
   },
   "flight": {
     "flightNumber": "ID7159",
@@ -26,7 +26,7 @@
     "reason": "Aircraft rotation constraint following network-wide disruption earlier in September."
   },
   "autoRebooking": {
-    "policy": "All five ticketed passengers are involuntarily reprotected onto synthetic Batik ID7153 on 1 Oct; no fare difference.",
+    "policy": "All five ticketed passengers are involuntarily reprotected onto Atlas-recorded ID7153 on 1 Oct by this simulated airline event; no fare difference.",
     "fareDifference": "NONE",
     "ticketReissue": "AUTOMATIC"
   },
