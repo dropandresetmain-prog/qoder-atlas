@@ -669,8 +669,22 @@ const EXECUTION_BLOCKER_COPY: Record<string, string> = {
   EXECUTION_INPUTS_UNAVAILABLE: 'This would work, but we do not yet hold the traveller’s booking details (legal name and contact), so it cannot be booked automatically.',
   FRESH_PROVIDER_QUOTE_REQUIRED: 'This fare was checked from saved records, not with the airline. A fresh live price check is needed before it can be booked.',
 };
-function executionBlockerLine(blocker: { code: string; message: string }): string {
+/** Shared so every surface states one blocker in one operator voice. */
+export function executionBlockerLine(blocker: { code: string; message: string }): string {
   return EXECUTION_BLOCKER_COPY[blocker.code] ?? plain(blocker.message) ?? 'This option cannot be carried out yet.';
+}
+
+/**
+ * The same blocker as a glanceable label. A scan cell cannot hold a sentence, and
+ * truncating one mid-word reads as broken. The full sentence stays on the card.
+ */
+const EXECUTION_BLOCKER_SHORT: Record<string, string> = {
+  EXTERNAL_EXECUTION_NOT_COMPOSED: 'Airline booking not enabled here',
+  EXECUTION_INPUTS_UNAVAILABLE: 'Traveller booking details missing',
+  FRESH_PROVIDER_QUOTE_REQUIRED: 'Live price check needed',
+};
+export function executionBlockerShort(blocker: { code: string; message: string }): string {
+  return EXECUTION_BLOCKER_SHORT[blocker.code] ?? 'Cannot be carried out yet';
 }
 
 // --------------------------------------------------------------------------
@@ -687,9 +701,18 @@ function buildAffects(view: RecoveryCaseView): CaseWorkspaceModel['affects'] {
       continue;
     }
     if (node.semanticState === 'PROPOSED' || node.semanticState === 'ACTIVE') continue;
-    const label = plain(node.label) ?? CASE_NODE_KIND_NOUN[node.kind] ?? 'Part of the trip';
-    const tone = node.semanticState === 'FAILED' ? 'alert' : node.semanticState === 'UNKNOWN' ? 'neutral' : 'watch';
-    items.push({ label, note: CASE_NODE_STATE_NOTE[node.semanticState] ?? 'Affected', tone });
+    const label = node.kind === 'TRAVELLER'
+      ? 'Trip objective'
+      : plain(node.label) ?? CASE_NODE_KIND_NOUN[node.kind] ?? 'Part of the trip';
+    const note = node.kind === 'TRAVELLER'
+      ? 'Requires recovery'
+      : node.semanticState === 'FAILED'
+        ? (node.kind === 'PROGRAMME_COMMITMENT' ? 'Not currently protected' : 'No longer viable')
+        : node.semanticState === 'AFFECTED'
+          ? 'At risk'
+          : CASE_NODE_STATE_NOTE[node.semanticState] ?? 'Affected';
+    const tone = node.semanticState === 'FAILED' || node.kind === 'TRAVELLER' ? 'alert' : node.semanticState === 'UNKNOWN' ? 'neutral' : 'watch';
+    items.push({ label, note, tone });
   }
   return { items, ...(healthy > 0 ? { healthyNote: CASE_COPY.healthyContext(healthy) } : {}) };
 }

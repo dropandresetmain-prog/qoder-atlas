@@ -147,6 +147,17 @@ export const FOCUSED_GRAPH_CSS = `
 .fg-dot.sem-alert { background: var(--fg-red); }
 .fg-dot.sem-active { background: var(--fg-navy); }
 
+/* Clip on a whole line, never mid-glyph. Both rules already box-clamp, but a
+   flat 2/2 split doesn't fit inside every card: .fg-detail is a flex: 1 1 0
+   child, so once title + header + footer eat into the card's fixed height
+   (SIZES in layout.ts — small is the tightest at 104px), the detail box gets
+   flex-shrunk below its own 2-line content and the card's outer
+   overflow: hidden (not the clamp) does the cutting, landing mid-row instead
+   of on the ellipsis. Detail at 1 line fits with margin to spare across every
+   size class (focal/secondary/normal/small — see styles.ts arithmetic in the
+   accompanying change notes), so title keeps its 2-line clamp and only detail
+   drops to 1. The overflow: hidden below is also the fallback for engines
+   without -webkit-line-clamp support. */
 .fg-title {
   flex: 0 0 auto;
   margin: 0;
@@ -161,7 +172,13 @@ export const FOCUSED_GRAPH_CSS = `
   overflow: hidden;
 }
 .fg-detail {
-  flex: 1 1 0;
+  /* Must NOT be flex-sized. -webkit-line-clamp only clamps a box whose height
+     comes from its own content; flex: 1 1 0 made the flex algorithm set the
+     height instead, which silently disabled the clamp and let the card's outer
+     overflow: hidden cut through the middle of a text row. .fg-title clamps
+     correctly precisely because it is flex: 0 0 auto. The footer is pinned by
+     its own margin-top: auto, so nothing needs this box to absorb slack. */
+  flex: 0 1 auto;
   min-height: 0;
   margin: 4px 0 0;
   font-size: 10.5px;
@@ -169,7 +186,7 @@ export const FOCUSED_GRAPH_CSS = `
   color: #778498;
   font-weight: 600;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }

@@ -65,7 +65,7 @@ export function buildOriginalCurrentRegion(input: OriginalCurrentRegionInput): s
     <button type="button" role="tab" class="oc-tab" data-oc-view="original" aria-selected="false">Original</button>
   </div>
   <div class="oc-panel oc-current active" data-test="current-panel" data-oc-panel="current">
-    <p class="oc-caption">Live — always the current authoritative state.</p>
+    <p class="oc-caption">Live — how the trip stands right now.</p>
     ${currentHtml}
   </div>
   <div class="oc-panel oc-original" data-test="original-panel" data-oc-panel="original" hidden>

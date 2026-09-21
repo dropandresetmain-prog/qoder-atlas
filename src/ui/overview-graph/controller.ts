@@ -86,7 +86,16 @@ export const OVERVIEW_GRAPH_SCRIPT = `
       var bottom = legend ? Math.max(8, rect.bottom - legend.getBoundingClientRect().top + 8) : 8;
       var signature = [box.x, box.y, box.w, box.h, rect.width, rect.height, top, bottom, st.view, st.mode].join('|');
       if (st.fitted && signature === st.frameSignature) { apply(false); return true; }
-      var frame = fitOverviewCamera(box, rect.width, rect.height, top, bottom, st.expanded ? 24 : 12, st.mode === 'focus' ? 1.3 : 1.15, st.view === 'change' ? 'start' : 'center');
+      // Change/focus framing is tight around a small cluster; give it a
+      // margin so nodes straddling the box edge aren't sliced by the
+      // viewport (see fitOverviewCamera's margin param in camera.ts).
+      // 32 is measured, not guessed: it is the largest world-space margin that
+      // still frames the change TIGHTER than the whole-event view at 1100-1920
+      // wide. Larger values (the 48-72 range) zoom out past the whole-event
+      // scale, which would make "Active change" the wider of the two views and
+      // invert what the toggle means.
+      var contextMargin = st.mode === 'focus' || st.view === 'change' ? 32 : 0;
+      var frame = fitOverviewCamera(box, rect.width, rect.height, top, bottom, st.expanded ? 24 : 12, st.mode === 'focus' ? 1.3 : 1.15, st.view === 'change' ? 'start' : 'center', contextMargin);
       if (!frame) return false;
       st.x = frame.x; st.y = frame.y; st.scale = frame.scale; st.fitted = true; st.frameSignature = signature;
       apply(animate); return true;

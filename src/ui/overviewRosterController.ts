@@ -9,7 +9,7 @@ export function renderOverviewRosterControllerScript(): string {
 (function() {
   'use strict';
   var stateKey = '__northstarOverviewRosterState';
-  var state = window[stateKey] || { query: '', page: 0 };
+  var state = window[stateKey] || { query: '', page: 0, filter: 'all' };
 
   function initRoster() {
     var roster = document.querySelector('[data-roster]');
@@ -21,10 +21,22 @@ export function renderOverviewRosterControllerScript(): string {
     var rows = Array.prototype.slice.call(roster.querySelectorAll('[data-test="population-row"]'));
     var pageSize = Number(roster.getAttribute('data-page-size')) || 10;
 
+    var filterButtons = document.querySelectorAll('[data-roster-filter]');
+    var activeFilter = state.filter || 'all';
+
+    function statusMatches(row) {
+      if (activeFilter === 'all') return true;
+      var status = row.getAttribute('data-status') || '';
+      if (activeFilter === 'attention') return status === 'DISRUPTED';
+      if (activeFilter === 'watching') return status === 'AT_RISK' || status === 'RECOVERING';
+      if (activeFilter === 'unconfirmed') return status === 'UNKNOWN';
+      return true;
+    }
+
     function apply() {
       var query = (state.query || '').trim().toLowerCase();
       var matches = rows.filter(function(row) {
-        return !query || (row.textContent || '').toLowerCase().indexOf(query) !== -1;
+        return statusMatches(row) && (!query || (row.textContent || '').toLowerCase().indexOf(query) !== -1);
       });
       var pageCount = Math.max(1, Math.ceil(matches.length / pageSize));
       state.page = Math.max(0, Math.min(Number(state.page) || 0, pageCount - 1));
@@ -61,6 +73,21 @@ export function renderOverviewRosterControllerScript(): string {
       next.setAttribute('data-roster-bound', 'true');
       next.addEventListener('click', function() { state.page += 1; apply(); });
     }
+    filterButtons.forEach(function(button) {
+      var pressed = button.getAttribute('data-roster-filter') === activeFilter;
+      button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+      if (button.getAttribute('data-roster-bound') === 'true') return;
+      button.setAttribute('data-roster-bound', 'true');
+      button.addEventListener('click', function() {
+        activeFilter = button.getAttribute('data-roster-filter') || 'all';
+        state.filter = activeFilter;
+        state.page = 0;
+        filterButtons.forEach(function(other) {
+          other.setAttribute('aria-pressed', other === button ? 'true' : 'false');
+        });
+        apply();
+      });
+    });
     apply();
   }
 

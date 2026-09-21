@@ -28,10 +28,10 @@ export const INTERACTIONS_SCRIPT = String.raw`
     return;
   }
 
-  var MIN_SCALE = 0.5;
+  var MIN_SCALE = 0.22;
   var MAX_SCALE = 1.55;
-  var FIT_MAX = 1.45;
-  var FIT_PAD = 46;
+  var FIT_MAX = 1.15;
+  var FIT_PAD = 72;
   var SEMANTIC_ZOOM_THRESHOLD = 0.76;
   var SVG_NS = 'http://www.w3.org/2000/svg';
   var CLIENT_CLASSES = ['fg-viewdim', 'fg-dimmed', 'fg-highlighted'];

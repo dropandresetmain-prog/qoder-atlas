@@ -34,13 +34,11 @@ function dateLabel(localDate: string): string {
 }
 
 function membershipOf(p: OperatorPopulationFact): Exclude<EventOverviewMembership, 'ATTENTION'> {
-  if (p.evaluation === 'CURRENT') {
-    if (p.status === 'READY') return 'CLEARED';
-    // Tight / below-minimum connection is watchable amber, not definitive red.
-    if (p.status === 'AT_RISK') return 'CHECKING';
-    return 'UNRESOLVED';
-  }
-  return 'CHECKING';
+  if (p.evaluation !== 'CURRENT') return 'CHECKING';
+  if (p.status === 'READY') return 'CLEARED';
+  // Tight connection / recovering stay watchable amber, not definitive red.
+  if (p.status === 'AT_RISK' || p.status === 'RECOVERING') return 'CHECKING';
+  return 'UNRESOLVED';
 }
 
 interface ServiceGroup {
@@ -328,7 +326,7 @@ export function buildEventOverview(input: {
       total: members.length,
       ready: members.filter((m) => m.status === 'READY').length,
       unknown: members.filter((m) => m.status === 'UNKNOWN').length,
-      attention: members.filter((m) => m.status === 'DISRUPTED' || m.status === 'AT_RISK').length,
+      attention: members.filter((m) => m.status === 'DISRUPTED').length,
       ...(landmarkRef ? { landmarkRef } : {}),
     };
   });

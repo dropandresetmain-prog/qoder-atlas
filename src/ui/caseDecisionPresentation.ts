@@ -3,6 +3,8 @@
  * preserve the recorded recommendation, distinguish quoted spend from possible
  * loss, and keep incomplete research incomplete. No provider calls or writes.
  */
+import { sentenceCase } from '../app/target/adapters/surfaceLabels.ts';
+import { executionBlockerLine } from '../app/target/adapters/caseWorkspacePresenter.ts';
 import type {
   PlanningCandidateView, PlanningCostComparisonView, RecoveryCaseView,
   RecoveryStrategyView,
@@ -51,7 +53,9 @@ export function decisionActionState(view: RecoveryCaseView): DecisionActionState
     return {
       kind: 'blocked',
       code: blocker.code,
-      reason: decisionText(blocker.message, 'This option cannot be executed by this runtime yet.'),
+      // The supplied message is written for an engineer; present the operator
+      // wording already mapped for this blocker code. Meaning is unchanged.
+      reason: executionBlockerLine(blocker),
     };
   }
   return { kind: 'ready', strategyRef: options.recommended.strategyRef };
@@ -110,9 +114,10 @@ export function candidateFor(view: RecoveryCaseView, strategy: RecoveryStrategyV
 
 export function decisionTitle(strategy: RecoveryStrategyView): string {
   const kinds = new Set(strategy.changes.map((c) => c.effectKind));
+  // Protected outcome leads. A programme change is the recovery even when travel changes travel with it.
+  if (kinds.has('CHANGE_PROGRAMME_ITEM_TIME')) return 'Reschedule the programme commitment';
   if (kinds.has('SELECT_OFFER')) return kinds.has('ADD_JOURNEY_STAY')
     ? 'Replace the flight and arrange accommodation' : 'Book replacement travel';
-  if (kinds.has('CHANGE_PROGRAMME_ITEM_TIME')) return 'Reschedule the programme commitment';
   if (kinds.has('ADD_JOURNEY_STAY')) return 'Arrange replacement accommodation';
   return 'Proposed whole-trip recovery';
 }
@@ -163,9 +168,11 @@ export function sumDisplayedMoney(amounts: readonly Money[]): string[] | undefin
 export function decisionCosts(comparison: PlanningCostComparisonView | undefined) {
   if (!comparison || comparison.status === 'UNAVAILABLE') return {
     spend: [], exposure: [], other: [],
+    // Supplied reasons arrive mid-sentence; they now stand alone, so they are
+    // sentence-cased here rather than carried behind a restating prefix.
     unavailable: comparison?.status === 'UNAVAILABLE'
-      ? decisionText(comparison.reason, 'The required price or currency evidence is unavailable.')
-      : 'No cost comparison was supplied. This does not mean the recovery is free.',
+      ? `Cost could not be compared: ${decisionText(comparison.reason, 'the required price or currency evidence is unavailable')}.`
+      : 'No cost was compared for this option — which is not the same as free.',
   };
   const spend = comparison.lines.filter((line) => line.kind.code === 'SELECT_OFFER' || line.kind.code === 'ADD_JOURNEY_STAY');
   const exposure = comparison.lines.filter((line) => line.kind.code === 'POLICY_PENALTY_ESTIMATE');
@@ -189,9 +196,11 @@ export function rejectionSummary(candidate: PlanningCandidateView): { label: str
   const blocker = proposal?.blockers.find((check) => check.verdict === 'FAIL') ?? proposal?.blockers[0];
   const recordedReason = failedCommitment?.reasonCode ?? blocker?.reasonCode;
   const reason = recordedReason ? CASE_REASON_SENTENCE[recordedReason] : undefined;
+  const availableText = (minutes: number | undefined): string =>
+    minutes === undefined ? '' : minutes < 0 ? `${-minutes} min short` : `Time available: ${minutes} min`;
   const timings = failedCommitment
-    ? [failedCommitment.availableMinutes === undefined ? '' : `Time available: ${failedCommitment.availableMinutes} min`, failedCommitment.requiredMinutes === undefined ? '' : `Time required: ${failedCommitment.requiredMinutes} min`]
-    : [blocker?.timing?.gapMinutes === undefined ? '' : `Time available: ${blocker.timing.gapMinutes} min`, blocker?.timing?.requiredMinutes === undefined ? '' : `Time required: ${blocker.timing.requiredMinutes} min`];
+    ? [availableText(failedCommitment.availableMinutes), failedCommitment.requiredMinutes === undefined ? '' : `Time required: ${failedCommitment.requiredMinutes} min`]
+    : [availableText(blocker?.timing?.gapMinutes), blocker?.timing?.requiredMinutes === undefined ? '' : `Time required: ${blocker.timing.requiredMinutes} min`];
   const conciseSource = candidate.reasons.map(plain).find((r): r is string => r !== undefined && r.length <= 240);
   const delta = candidate.outcomeDelta[0];
   const outcomeWord = (value: string | undefined): string | undefined =>
@@ -207,9 +216,9 @@ export function rejectionSummary(candidate: PlanningCandidateView): { label: str
     label: decisionText(label, 'Another recovery option'),
     status: DISPOSITION[candidate.disposition.code ?? ''] ?? 'Not selected',
     reason: reason
-      ? `${failedCommitment ? `${decisionText(failedCommitment.label, 'Commitment')}: ` : ''}${reason}${timings.some(Boolean) ? ` (${timings.filter(Boolean).join('; ')})` : ''}.`
+      ? `${failedCommitment ? `${decisionText(failedCommitment.label, 'Commitment')}: ` : ''}${failedCommitment ? reason : sentenceCase(reason)}${timings.some(Boolean) ? ` (${timings.filter(Boolean).join('; ')})` : ''}.`
       : unknownReason
-        ? `${unknownReason}${timings.some(Boolean) ? ` (${timings.filter(Boolean).join('; ')})` : ''}.`
+        ? `${sentenceCase(unknownReason)}${timings.some(Boolean) ? ` (${timings.filter(Boolean).join('; ')})` : ''}.`
       : movement ?? conciseSource ?? fallback,
   };
 }
@@ -259,6 +268,7 @@ export function authorityLabel(value: string): string {
     NOT_REQUESTED: 'Approval not requested', NOT_REQUIRED: 'No additional approval required in the recorded state',
     AUTHORIZED: 'Authority granted', GRANTED: 'Authority granted', APPROVED: 'Approval recorded',
     REJECTED: 'Approval declined', DENIED: 'Authority denied', UNKNOWN: 'Authority not confirmed',
-  } as Record<string, string>)[value] ?? (value.toLowerCase() === 'none'
-    ? 'No authority decision recorded' : plain(value) ?? 'Authority details not confirmed');
+    AWAITING: 'Awaiting approval', PENDING_APPROVAL: 'Awaiting approval',
+  } as Record<string, string>)[value.toUpperCase()] ?? (value.toLowerCase() === 'none'
+    ? 'No authority decision recorded' : sentenceCase(plain(value) ?? '') || 'Authority details not confirmed');
 }

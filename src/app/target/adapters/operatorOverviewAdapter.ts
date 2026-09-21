@@ -11,9 +11,17 @@ import { TONE_DOT_CLASS } from '../../../ui/semantics/grammar.ts';
 import { MANAGED_TRAVEL_LABEL } from '../../../ui/presentationState.ts';
 import type { VisualTone } from '../../../ui/semantics/model.ts';
 
+export interface OverviewFocusOption {
+  tripRef: string;
+  label: string;
+  caseRef?: string;
+  /** Plain what-changed sentence already presented for the attention queue. */
+  context?: string;
+}
 export interface ProductSurfaceModel {
   title: string; summaryHtml: string; attentionHtml: string; attentionCount: number;
   rosterHtml: string; rosterCount: number; itemsHtml: string;
+  focusOptions: readonly OverviewFocusOption[];
 }
 export function operationalStatusLabel(status: ProductOperationalStatus): string { return presentOperationalStatus(status).label; }
 export function operationalStatusTone(status: ProductOperationalStatus): VisualTone { return presentOperationalStatus(status).tone; }
@@ -40,23 +48,41 @@ const BUCKETS: readonly { key: string; label: string; tone: VisualTone; count: (
   { key: 'watching', label: MANAGED_TRAVEL_LABEL.WATCHING, tone: 'watch', count: (c) => c.atRisk + c.recovering },
   { key: 'unconfirmed', label: MANAGED_TRAVEL_LABEL.UNCONFIRMED, tone: 'neutral', count: (c) => c.unknown },
 ];
+/**
+ * Readiness labels read as one sentence beside a number, so the shared
+ * title-cased bucket label is normalised for this row only. The shared
+ * `MANAGED_TRAVEL_LABEL` vocabulary is left untouched.
+ */
+function tileLabel(label: string): string {
+  return label.replace(/(\S)\s+(\S)/g, (_m, a: string, b: string) => `${a} ${b.toLowerCase()}`);
+}
+/** Buckets that only add noise when empty are dropped; the two that an operator reads even at zero always stay. */
+const ALWAYS_SHOWN = new Set(['confirmed', 'needs-attention']);
 function summaryTiles(counted: ReturnType<typeof countedSet>): string {
   return BUCKETS.map(({ key, label, tone, count }) => {
     const n = count(counted.counts);
-    return `<div class="readout-bucket tone-${tone}${key === 'needs-attention' && n > 0 ? ' is-attention' : ''}" data-test="summary-${tone}" data-summary-key="${key}"><strong class="tile-count">${n}</strong><span class="tile-label">${e(label)}</span></div>`;
-  }).join('');
+    if (n === 0 && !ALWAYS_SHOWN.has(key)) return '';
+    return `<div class="readout-bucket tone-${tone}${key === 'needs-attention' && n > 0 ? ' is-attention' : ''}" data-test="summary-${tone}" data-summary-key="${key}"><span class="v5-readiness-dot"></span><strong class="tile-count">${n}</strong><span class="tile-label">${e(tileLabel(label))}</span></div>`;
+  }).filter(Boolean).join('');
 }
-function readoutSegments(counted: ReturnType<typeof countedSet>): string {
-  const c = counted.counts, watching = c.atRisk + c.recovering;
-  return [c.disrupted ? `<span class="seg-bad">${c.disrupted} need${c.disrupted === 1 ? 's' : ''} attention</span>` : '<span class="seg-ok">Nobody needs attention</span>',
-    watching ? `<span class="seg-watch">${watching} watching</span>` : '',
-    c.unknown ? `<span class="seg-unk">${c.unknown} unconfirmed</span>` : ''].join('');
+function barWidth(count: number, total: number): string {
+  if (total <= 0 || count <= 0) return '0';
+  return ((count / total) * 100).toFixed(2);
 }
-function fleetGrid(counted: ReturnType<typeof countedSet>): string {
-  const cells = counted.dots.map((dot, index) => `<i class="${semanticToneDotClass(operationalStatusTone(dot.status))}" style="--i:${index}" title="${e(`${dot.label} — ${operationalStatusLabel(dot.status)}`)}" data-trip-ref="${e(dot.ref)}"></i>`).join('');
-  return `<div class="readout-fleet"><div class="fc-head"><span class="fc-title">${counted.total} participants</span><span class="fc-live">Live</span></div>
-    <div class="dotgrid" role="img" aria-label="Participants at a glance" data-test="product-fleet-grid">${cells}</div>
-    <div class="legend"><span><i class="l-ok"></i>${e(MANAGED_TRAVEL_LABEL.CONFIRMED)}</span><span><i class="l-bad"></i>${e(MANAGED_TRAVEL_LABEL.NEEDS_ATTENTION)}</span><span><i class="l-watch"></i>${e(MANAGED_TRAVEL_LABEL.WATCHING)}</span><span><i class="l-unconfirmed"></i>${e(MANAGED_TRAVEL_LABEL.UNCONFIRMED)}</span></div></div>`;
+/** Compact readiness under the graph. Counts stay authoritative; no fleet hero. */
+function compactReadiness(counted: ReturnType<typeof countedSet>): string {
+  const c = counted.counts;
+  const watching = c.atRisk + c.recovering;
+  const total = counted.total;
+  return `<div class="v5-readiness v5-readiness-top" data-test="overview-readiness"><div class="v5-readiness-title"><h2>Managed travel readiness</h2>
+    <button type="button" class="v5-text-button" data-switch-overview="participants">${total} participants →</button></div>
+    <div class="v5-readiness-bar" role="img" aria-label="Managed travel readiness">
+      <span class="seg-ok" style="width:${barWidth(c.ready, total)}%"></span>
+      <span class="seg-bad" style="width:${barWidth(c.disrupted, total)}%"></span>
+      <span class="seg-watch" style="width:${barWidth(watching, total)}%"></span>
+      <span class="seg-unk" style="width:${barWidth(c.unknown, total)}%"></span>
+    </div>
+    <div class="readout-buckets" data-test="product-summary-tiles">${summaryTiles(counted)}</div></div>`;
 }
 const QUEUE_GLYPH: Record<VisualTone, { className: string; char: string }> = {
   ok: { className: 'g-ok', char: '✓' }, watch: { className: 'g-warn', char: '▲' },
@@ -67,18 +93,18 @@ function overviewItemRow(item: OperatorOverviewItem): string {
     ?? (item.decisionRequired ? 'Decision required before recovery can continue.' : 'No open issues reported.');
   const glyph = item.decisionRequired ? QUEUE_GLYPH.alert : QUEUE_GLYPH[operationalStatusTone(item.status)];
   const body = `<span class="q-glyph ${glyph.className}" aria-hidden="true">${glyph.char}</span>
-    <div><div class="q-name">${e(item.travellerLabel)}</div><div class="q-issue">${e(issue)}</div>
+    <div><div class="q-state tone-${operationalStatusTone(item.status)}"><i aria-hidden="true"></i>${e(operationalStatusLabel(item.status))}</div>
+    <div class="q-name">${e(item.travellerLabel)}</div><div class="q-issue">${e(issue)}</div>
     ${item.unresolvedUncertainty.length ? `<p class="b-extra">${e(item.unresolvedUncertainty.join(' · '))}</p>` : ''}</div>
-    <div class="b-right"><span class="badge tone-${operationalStatusTone(item.status)}">${e(operationalStatusLabel(item.status))}</span>
-      <span class="sr-only">Trip viability: ${e(remainderViabilityLabel(item.remainderViability))}</span>
+    <div class="b-right"><span class="sr-only">Trip viability: ${e(remainderViabilityLabel(item.remainderViability))}</span>
       ${item.caseRef ? '<span class="case-open" data-test="attention-open-case">Open case →</span>' : ''}</div>`;
-  const attrs = `data-trip-ref="${e(item.tripRef)}" data-test="overview-item"`;
+  const attrs = `data-trip-ref="${e(item.tripRef)}" data-test="overview-item"${item.caseRef ? ` data-case-ref="${e(item.caseRef)}"` : ''}`;
   // The complete row is the link. Do not nest an anchor/button inside it.
   return item.caseRef ? `<a class="qrow" href="${e(caseHref(item.caseRef))}" ${attrs} data-test-case-link="${e(item.caseRef)}">${body}</a>`
     : `<div class="qrow" ${attrs}>${body}</div>`;
 }
 function populationRow(entry: OperatorOverview['population'][number], issueOverride?: string): string {
-  const issue = issueOverride ?? `${operationalStatusLabel(entry.status)} · ${entry.obligation === 'REQUIRED' ? 'Required commitment' : 'Optional commitment'}`;
+  const issue = issueOverride ?? (entry.obligation === 'REQUIRED' ? 'Required commitment' : 'Optional commitment');
   const evaluation = entry.evaluation === 'CURRENT' ? '' : `<p class="b-extra">Assessment ${e(entry.evaluation.toLowerCase().split('_').join(' '))}</p>`;
   return `<div class="qrow" data-test="population-row" data-journey-ref="${e(entry.journeyRef)}" data-status="${entry.status}">
     <span class="q-glyph" aria-hidden="true"><i class="${semanticToneDotClass(operationalStatusTone(entry.status))}"></i></span>
@@ -119,15 +145,10 @@ function rosterEntries(view: OperatorOverview, queue: readonly OperatorOverviewI
 export const ROSTER_PAGE_SIZE = 10;
 export function adaptOperatorOverviewToDashboard(view: OperatorOverview): ProductSurfaceModel {
   const counted = countedSet(view), decisions = view.items.filter((item) => item.decisionRequired).length;
-  const eventLine = view.eventContext ? `<p class="sub" data-test="event-context">${e(view.eventContext.title)}${view.eventContext.organiserLabel ? ` · ${e(view.eventContext.organiserLabel)}` : ''}</p>` : '';
-  // Compact bucket counts live inside the readiness block — not four extra cards.
-  const summaryHtml = `${eventLine}<div class="readout" data-test="overview-readiness"><div class="readout-ink"><p class="ri-label">Managed travel readiness</p>
-    <div class="big big-settle">${counted.counts.ready}<span class="unit">/${counted.total}</span></div><p class="ri-confirmed-word">Confirmed</p>
-    <p class="sub ri-scale" data-test="managed-presentation-segments">${readoutSegments(counted)}</p>
-    <div class="readout-buckets" data-test="product-summary-tiles">${summaryTiles(counted)}</div></div>${fleetGrid(counted)}</div>`;
+  const summaryHtml = compactReadiness(counted);
   const queue = dedupeQueue(view.items);
   const decisionNote = decisions > 0
-    ? `<p class="sub" data-test="decisions-needed">${decisions} pending decision${decisions === 1 ? '' : 's'} among the cases below.</p>`
+    ? `<p class="sub" data-test="decisions-needed">${decisions === 1 ? 'One case is' : `${decisions} cases are`} waiting on your decision.</p>`
     : '';
   const attentionHtml = `${decisionNote}${queue.length ? `<div class="queue" data-test="product-overview-queue">${queue.map(overviewItemRow).join('')}</div>`
     : '<p class="empty-note" data-test="no-open-cases">Nothing needs attention right now.</p>'}`;
@@ -141,7 +162,16 @@ export function adaptOperatorOverviewToDashboard(view: OperatorOverview): Produc
     <span class="roster-status" data-roster-status role="status" aria-live="polite"></span>
     <span class="roster-pagination" data-test="roster-pagination"><button type="button" class="btn btn-ghost" data-roster-prev aria-label="Previous participants">Previous</button><button type="button" class="btn btn-ghost" data-roster-next aria-label="Next participants">Next</button></span></div>
     <div class="queue" data-roster data-page-size="${ROSTER_PAGE_SIZE}" data-test="product-population-queue">${rows}</div>` : '<p class="empty-note">No trips in scope.</p>';
+  const focusOptions = queue.map((item) => {
+    const context = plainChangeText(item.whatChanged) ?? plainChangeText(item.recoveryActivity);
+    return {
+      tripRef: item.tripRef,
+      label: item.travellerLabel,
+      ...(item.caseRef ? { caseRef: item.caseRef } : {}),
+      ...(context ? { context } : {}),
+    };
+  });
   return { title: 'Operations overview', summaryHtml, attentionHtml, attentionCount: queue.length,
-    rosterHtml, rosterCount: roster.length, itemsHtml: `${attentionHtml}${rosterHtml}` };
+    rosterHtml, rosterCount: roster.length, itemsHtml: `${attentionHtml}${rosterHtml}`, focusOptions };
 }
 export function overviewCountedTotal(view: OperatorOverview): number { return countedSet(view).total; }

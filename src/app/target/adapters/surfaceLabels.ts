@@ -151,7 +151,17 @@ function fallbackPhrase(command: string): CommandPhrase {
 
 export function activityPhrase(command: string, subjectPhrase: string): CommandPhrase {
   const phrase = COMMAND_PHRASES[command] ?? fallbackPhrase(command);
-  return { ...phrase, text: phrase.text.replace('{subject}', subjectPhrase) };
+  let text = phrase.text.replace('{subject}', subjectPhrase);
+  if (
+    subjectPhrase === 'a recovery option'
+    || subjectPhrase === 'a recovery plan'
+    || subjectPhrase === 'a recovery step'
+    || subjectPhrase === 'a recovery case'
+    || subjectPhrase === 'a record'
+  ) {
+    text = text.replace(` for ${subjectPhrase}`, '').replace(` of ${subjectPhrase}`, '');
+  }
+  return { ...phrase, text };
 }
 
 /** Case lifecycle -> what the coordinator should understand about it. */

@@ -6,6 +6,7 @@ import type { OperatorOverview, PlanningCandidateView, PlanningToolEvidenceView,
 import { renderProductRecoveryCase } from '../src/ui/screens/product-recovery-case.ts';
 import { renderProductOperatorOverview } from '../src/ui/screens/product-operator-overview.ts';
 import { buildOverviewGraphModel } from '../src/ui/overview-graph/model.ts';
+import { activityPhrase } from '../src/app/target/adapters/surfaceLabels.ts';
 import {
   decisionActionState, decisionCosts, decisionOptions, groupedResearch, sameStrategy, sumDisplayedMoney,
 } from '../src/ui/caseDecisionPresentation.ts';
@@ -68,12 +69,15 @@ test('Overview case navigation dominates and the full searchable population rema
   assert.doesNotMatch(html, /Open case →Show interaction/);
   assert.equal((html.match(/data-test="population-row"[^>]*data-journey-ref=/g) ?? []).length, 12);
   assert.equal((html.match(/data-test="population-row" hidden[^>]*data-journey-ref=/g) ?? []).length, 2);
-  assert.ok(html.indexOf('data-poll-region="overview-attention"') < html.indexOf('data-test="simulated-airline-update"'));
+  assert.ok(html.indexOf('data-test="simulated-airline-update"') < html.indexOf('data-poll-region="overview-attention"'),
+    'demo control stays in the main column; Needs attention lives in the sticky rail after it');
   const graphAt = html.indexOf('data-test="event-overview-graph"');
   const attentionAt = html.indexOf('data-poll-region="overview-attention"');
   const summaryAt = html.indexOf('data-poll-region="overview-summary"');
+  const tabsAt = html.indexOf('class="v5-workspace-tabs"');
   if (graphAt >= 0) {
-    assert.ok(summaryAt >= 0 && summaryAt < graphAt, 'readiness summary must precede the event graph');
+    assert.ok(summaryAt >= 0 && summaryAt < tabsAt && summaryAt < graphAt,
+      'compact readiness now lives in the page heading, before the workspace tabs and therefore before the event graph');
     assert.ok(graphAt < attentionAt, 'event graph must precede Needs attention');
   }
   assert.match(html, /data-test="overview-readiness"/);
@@ -82,6 +86,95 @@ test('Overview case navigation dominates and the full searchable population rema
   assert.doesNotMatch(html, /Open an affected case to review the proposed recovery/);
   assert.ok(html.includes('readout-buckets'));
   assert.doesNotMatch(html, /class="tiles" data-test="product-summary-tiles"/);
+  assert.doesNotMatch(html, /data-overview-focus-select/);
+  assert.match(html, /\.v5-focus\[hidden\]/);
+  assert.doesNotMatch(html, /managed-presentation-segments/);
+  assert.doesNotMatch(html, /need attention\d+ unconfirmed/);
+  assert.match(html, /data-poll-region="overview-activity"/);
+  assert.match(html, /data-test="overview-activity-empty"/);
+  assert.match(html, /data-test="overview-activity-log"[^>]*>View log →/);
+  assert.match(html, /\.v5-context-rail[^{]*\{[^}]*overflow:\s*visible/);
+  // Rail stories stack: story text, then the case CTA beneath it on its own row.
+  assert.match(html, /\.v5-context-rail \.qrow[^{]*\{[^}]*grid-template-areas:\s*"main" "right"/);
+  assert.match(html, /\.v5-context-rail \.q-glyph \{ display: none; \}/);
+});
+
+test('Overview activity rail projects the latest real ActivityFeed without inventing entries', () => {
+  const html = renderProductOperatorOverview(overview(), {
+    activity: {
+      generatedAt: at,
+      truncated: false,
+      entries: [
+        {
+          entryRef: 'entry-1',
+          atLabel: 'Today · 09:00',
+          actorLabel: 'Operator',
+          subjectLabel: 'Participant 0',
+          what: 'Opened a recovery case',
+          actorKind: 'HUMAN',
+          caseRef: 'case-alpha',
+        },
+        {
+          entryRef: 'entry-2',
+          atLabel: 'Today · 08:40',
+          actorLabel: 'System',
+          subjectLabel: 'Participant 0',
+          what: 'Recorded a schedule change',
+          actorKind: 'SYSTEM',
+        },
+        {
+          entryRef: 'entry-3',
+          atLabel: 'Today · 08:20',
+          actorLabel: 'Service',
+          subjectLabel: 'Participant 1',
+          what: 'Observed a provider update',
+          actorKind: 'SERVICE',
+        },
+        {
+          entryRef: 'entry-4',
+          atLabel: 'Today · 08:00',
+          actorLabel: 'Operator',
+          subjectLabel: 'Participant 2',
+          what: 'Reviewed evidence',
+          actorKind: 'HUMAN',
+        },
+        {
+          entryRef: 'entry-5',
+          atLabel: 'Yesterday · 17:00',
+          actorLabel: 'System',
+          subjectLabel: 'Participant 3',
+          what: 'Should not appear beyond the rail limit',
+          actorKind: 'SYSTEM',
+        },
+      ],
+    },
+  });
+  assert.match(html, /data-test="overview-activity-rail"/);
+  assert.match(html, /v5-activity-title-icon/);
+  assert.equal((html.match(/data-test="overview-activity-row"/g) ?? []).length, 4);
+  assert.doesNotMatch(html, /Should not appear beyond the rail limit/);
+  assert.match(html, /data-case-ref="case-alpha"/);
+  assert.match(html, /data-test="activity-case-link"[^>]*>Open case →/);
+  assert.match(html, /data-ui-feed-tone=/);
+  assert.doesNotMatch(html, /This rail does not invent a second feed/);
+});
+
+test('generic activity phrases drop a repeated subject noun but keep a real subject', () => {
+  assert.equal(activityPhrase('RECOVERY_PLANNING_COMPLETED', 'a recovery option').text, 'finished comparing recovery options');
+  assert.equal(activityPhrase('RECOVERY_PLANNING_COMPLETED', 'Traveller Alpha\u2019s trip').text, 'finished comparing recovery options for Traveller Alpha\u2019s trip');
+  assert.equal(activityPhrase('EXTERNAL_RECORD_LINKED', 'a record').text, 'linked external record');
+  assert.match(activityPhrase('EXTERNAL_RECORD_OBSERVED', 'a booking').text, /for a booking/);
+});
+
+test('a person label is never rendered as no longer working', () => {
+  const html = renderProductRecoveryCase(view());
+  const body = html.slice(html.indexOf('<main'));
+  assert.doesNotMatch(body, /Traveller Alpha — No longer works/);
+  assert.doesNotMatch(body, /— No longer works/);
+  assert.match(body, /Trip objective/);
+  assert.match(body, /Requires recovery/);
+  assert.ok(body.indexOf('data-poll-region="graph"') < body.indexOf('class="v5-case-rail'));
+  assert.ok(body.indexOf('class="v5-case-layout"') < body.indexOf('data-poll-region="graph"'));
 });
 
 test('the recorded recommendation is not replaced by an executable alternative', () => {
@@ -219,43 +312,50 @@ test('partial and unavailable research are not labelled completed successes', ()
 });
 
 test('active-change footprint excludes unrelated attention travellers', () => {
-  const model = buildOverviewGraphModel({
+  const view = {
     ...overview(),
     eventOverview: {
       days: [{ index: 1, localDate: '2032-04-01', dateLabel: '1 Apr' }],
-      landmarks: [{ ref: 'PROGRAMME_ITEM:opening', title: 'Opening', dayIndex: 1, health: 'GREEN', participantCount: 12, affectedCount: 0 }],
+      landmarks: [{ ref: 'PROGRAMME_ITEM:opening', title: 'Opening', dayIndex: 1, health: 'GREEN' as const, participantCount: 12, affectedCount: 0 }],
       dependencies: [{
         ref: 'SERVICE:shared', kindLabel: 'Flight', label: 'Shared flight', dayIndex: 1,
-        health: 'RED', changed: true, travellerCount: 2, unresolvedCount: 1, clearedCount: 1, checkingCount: 0,
+        health: 'RED' as const, changed: true, travellerCount: 2, unresolvedCount: 1, clearedCount: 1, checkingCount: 0,
       }],
       cohorts: [],
       promotedTravellers: [
-        { journeyRef: 'journey-on-dep', label: 'On dependency', roleLabel: 'Speaker', status: 'DISRUPTED', membership: 'UNRESOLVED', dependencyRef: 'SERVICE:shared' },
-        { journeyRef: 'journey-other', label: 'Other attention', roleLabel: 'Speaker', status: 'DISRUPTED', membership: 'ATTENTION' },
-        { journeyRef: 'journey-cleared', label: 'Cleared', roleLabel: 'Speaker', status: 'READY', membership: 'CLEARED', dependencyRef: 'SERVICE:shared' },
+        { journeyRef: 'journey-on-dep', label: 'On dependency', roleLabel: 'Speaker', status: 'DISRUPTED' as const, membership: 'UNRESOLVED' as const, dependencyRef: 'SERVICE:shared' },
+        { journeyRef: 'journey-other', label: 'Other attention', roleLabel: 'Speaker', status: 'DISRUPTED' as const, membership: 'ATTENTION' as const },
+        { journeyRef: 'journey-cleared', label: 'Cleared', roleLabel: 'Speaker', status: 'READY' as const, membership: 'CLEARED' as const, dependencyRef: 'SERVICE:shared' },
       ],
       promotedOverflow: 0,
       blastRadius: { dependencyRef: 'SERVICE:shared', affectedCount: 2, clearedCount: 1, checkingCount: 0, unresolvedCount: 1, landmarkRefs: ['PROGRAMME_ITEM:opening'] },
       relations: [],
     },
-  });
+  };
+  const model = buildOverviewGraphModel(view);
   assert.ok(model?.focus);
   assert.ok(model!.focus!.incidentIds.includes('journey-on-dep'));
   assert.ok(!model!.focus!.incidentIds.includes('journey-other'));
   assert.equal(model!.focus!.unresolvedTravellerId, 'journey-on-dep');
   assert.match(model!.focus!.message, /Active change · Shared flight/);
+  const html = renderProductOperatorOverview(view);
+  assert.match(html, /<p class="v5-focus" data-overview-focus data-test="overview-focus">Focus <strong>On dependency<\/strong><\/p>/);
+  assert.equal(html.match(/data-test="overview-active-context">On dependency</g)?.length, 1);
+  assert.match(html, /data-overview-panel="participants" hidden/);
+  assert.match(html, /if \(focus\) focus\.hidden = name !== 'event'/);
+  assert.doesNotMatch(html, /<select[^>]*overview-focus/);
 });
 
 test('polling regions, immutable Original, graph and layout order remain composed', () => {
   const v = view(), html = renderProductRecoveryCase(v);
-  for (const name of ['header', 'lead', 'affects', 'graph', 'options', 'approval', 'alternatives', 'activity', 'execution', 'resolution', 'technical']) {
+  for (const name of ['header', 'affects', 'graph', 'options', 'approval', 'alternatives', 'activity', 'execution', 'resolution', 'technical']) {
     assert.equal((html.match(new RegExp(`data-poll-region="${name}"`, 'g')) ?? []).length, 1, name);
   }
   const body = html.slice(html.indexOf('<main'));
-  assert.ok(body.indexOf('data-poll-region="lead"') < body.indexOf('data-poll-region="graph"'));
   assert.ok(body.indexOf('data-poll-region="graph"') < body.indexOf('data-poll-region="affects"'));
-  assert.ok(body.indexOf('data-poll-region="graph"') < body.indexOf('case-decision-grid'));
-  assert.ok(body.indexOf('case-decision-grid') < body.indexOf('data-poll-region="alternatives"'));
+  assert.ok(body.indexOf('data-poll-region="graph"') < body.indexOf('class="v5-case-rail'));
+  assert.ok(body.indexOf('data-poll-region="graph"') < body.indexOf('data-poll-region="options"'));
+  assert.ok(body.indexOf('v5-case-layout') < body.indexOf('data-poll-region="graph"'));
   assert.match(html, /data-test="original-current-toggle"/);
   assert.match(html, /data-test="focused-case-graph"/);
   assert.match(html, /data-change-cursor="91"/);

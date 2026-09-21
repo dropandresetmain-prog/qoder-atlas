@@ -12,6 +12,7 @@ import {
   type ActivitySurfaceItem,
   type ActivitySurfaceView,
 } from '../../app/target/adapters/activityAdapter.ts';
+import { sentenceCase } from '../../app/target/adapters/surfaceLabels.ts';
 import { caseHref } from '../../app/target/productShell.ts';
 import { escapeHtml, formatInstant } from '../html.ts';
 
@@ -66,4 +67,50 @@ export function renderActivitySurface(view: ActivitySurfaceView): string {
 
 export function renderProductActivityFeed(view: ActivityFeed): string {
   return renderActivitySurface(adaptActivityFeedToActivityPage(view));
+}
+
+const ACTIVITY_ICON = `<svg class="v5-activity-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>`;
+
+/**
+ * Compact Overview/Case rail projection of the same ActivityFeed vocabulary.
+ * Does not invent entries or reinterpret actor/source language.
+ */
+export function renderCompactActivityRail(
+  feed: ActivityFeed | undefined,
+  options: { readonly limit?: number; readonly logHref?: string } = {},
+): string {
+  const limit = options.limit ?? 4;
+  const logHref = options.logHref ?? '/activity';
+  const surface = feed ? adaptActivityFeedToActivityPage(feed) : undefined;
+  const seen = new Set<string>();
+  const items = (surface?.days ?? []).flatMap((day) => day.items).filter((item) => {
+    const key = `${item.who}\u0000${item.text}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, limit);
+  const body = items.length === 0
+    ? '<p class="cw-muted" data-test="overview-activity-empty">No activity recorded yet.</p>'
+    : items.map((item) => {
+      const link = item.caseId
+        ? ` <a class="f-link" href="${escapeHtml(caseHref(item.caseId))}" data-test="activity-case-link">Open case →</a>`
+        : '';
+      // The section is already titled "Northstar activity", so repeating the actor
+      // on every row is noise. A non-Northstar actor still earns its prefix.
+      const headline = item.who === 'Northstar'
+        ? sentenceCase(item.text)
+        : `${item.who} — ${item.text}`;
+      // One muted meta line instead of a time line plus a reason line.
+      const meta = [item.sub, item.time].filter((part) => part && part.length > 0).join(' · ');
+      return `<div class="v5-activity-item" data-test="overview-activity-row" data-ui-feed-tone="${item.tone}"${item.caseId ? ` data-case-ref="${escapeHtml(item.caseId)}"` : ''}>
+        <div class="v5-activity-bullet ${TONE_CLASS[item.tone]}" aria-hidden="true">${escapeHtml(item.glyph)}</div>
+        <div><strong>${escapeHtml(headline)}${link}</strong>
+          ${meta ? `<p>${escapeHtml(meta)}</p>` : ''}</div></div>`;
+    }).join('');
+  return `<section class="v5-activity" aria-label="Northstar activity" data-test="overview-activity-rail">
+    <h2 class="v5-rail-title">${ACTIVITY_ICON}Northstar activity</h2>
+    ${body}
+    <div class="v5-activity-footer"><span>Recent material activity</span>
+      <a class="v5-text-button" href="${escapeHtml(logHref)}" data-test="overview-activity-log">View log →</a></div>
+  </section>`;
 }

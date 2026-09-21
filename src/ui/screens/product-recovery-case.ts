@@ -4,7 +4,7 @@
  * survive refresh. Stops before consequential A4 work.
  */
 import type { PlanningCandidateView, RecoveryCaseView, RecoveryStrategyView } from '../../contracts/v2/product/readModels.ts';
-import { presentCaseWorkspace, type CaseRow, type CaseWorkspaceModel } from '../../app/target/adapters/caseWorkspacePresenter.ts';
+import { executionBlockerLine, executionBlockerShort, presentCaseWorkspace, type CaseRow, type CaseWorkspaceModel } from '../../app/target/adapters/caseWorkspacePresenter.ts';
 import { SHELL_LINKS } from '../../app/target/productShell.ts';
 import { CASE_COPY, CASE_CHANGE_TYPE_SENTENCE, CASE_REASON_SENTENCE } from '../copy.ts';
 import { escapeHtml, formatInstant } from '../html.ts';
@@ -12,6 +12,8 @@ import { renderFocusedCaseGraph } from '../graph/index.ts';
 import { buildOriginalCurrentRegion, originalCurrentToggleScript } from '../originalCurrent.ts';
 import { casePollingScript } from '../casePolling.ts';
 import { OPERATOR_WORKSPACE_STYLES } from '../operatorWorkspaceStyles.ts';
+import { renderCaseWorkspaceScript } from '../operatorWorkspaceClient.ts';
+import { presentAssessment } from '../semantics/adapter.ts';
 import {
   authorityLabel, candidateFor, changeSummary, decisionActionState, decisionCosts,
   decisionMoney, decisionOptions, decisionText, decisionTime, decisionTitle,
@@ -29,25 +31,17 @@ function details(key: string, summary: string, body: string): string {
 }
 function badge(label: string, tone: string): string { return `<span class="badge tone-${tone}">${e(label)}</span>`; }
 
-function headerHtml(m: CaseWorkspaceModel): string {
-  return `<div class="page-head"><h1>${e(m.heading)} ${badge(m.statusLabel, m.statusTone)}</h1>
-    <p class="sub">Trip recovery</p><p class="cw-muted"><a href="${SHELL_LINKS.dashboard}" data-test="back-to-overview">${e(CASE_COPY.backToOverview)}</a>
-    · Updated <time datetime="${e(m.generatedAt)}">${e(formatInstant(m.generatedAt))}</time></p></div>`;
-}
-
-/** Situation: what changed + stake. No instructional “review the page” banner. */
-function leadHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
-  const changed = decisionText(view.changeSummary,
+function headerHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
+  const fallback = decisionText(view.changeSummary,
     (view.cause && CASE_CHANGE_TYPE_SENTENCE[view.cause.changeType]) || 'The current trip needs attention.');
-  const reviewing = m.phase === 'awaiting_approval';
-  const statusHint = reviewing
-    ? `<p class="cw-status-hint" data-test="recommendation-status">Recommendation ready · <a href="#cw-recommendation">Review recommendation</a></p>`
-    : '';
-  return `<div class="cw-lead"><div class="callout tone-${m.lead.tone}" data-test="case-lead">
-    <h2>${e(m.lead.title)}</h2><p>${e(changed)}</p>
-    ${m.lead.stake ? `<p><strong>${e(m.lead.stake)}</strong></p>` : ''}
-    ${statusHint}</div>
-    ${m.attention ? `<div class="callout tone-alert" data-test="case-attention"><h2>${e(m.attention.title)}</h2><p>${e(m.attention.body)}</p></div>` : ''}</div>`;
+  const problem = m.whereItBreaks
+    ? `<span data-test="focused-graph-first-breakpoint">Where it breaks: <strong>${e(m.whereItBreaks.label)}</strong> — ${e(m.whereItBreaks.phrase)}.</span>`
+    : e(fallback);
+  return `<div class="page-head v5-case-head">
+    <p class="v5-breadcrumb"><a href="${SHELL_LINKS.dashboard}" data-test="back-to-overview">${e(CASE_COPY.backToOverview)}</a></p>
+    <h1>${e(m.heading)} ${badge(m.statusLabel, m.statusTone)}</h1>
+    <p class="sub" data-test="case-problem">${problem}</p>
+    <p class="cw-muted v5-case-updated">Updated <time datetime="${e(m.generatedAt)}">${e(formatInstant(m.generatedAt))}</time></p></div>`;
 }
 
 function graphHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
@@ -60,16 +54,19 @@ function graphHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
       caseStatus: stored.caseStatusAtCapture, role: 'original', includeAssets: false }),
     capturedAt: stored.capturedAt, capturedLabel: formatInstant(stored.capturedAt),
   } } : {}) });
-  return `<section class="section cw-graph" data-test="focused-case-graph-section"><h2>${e(CASE_COPY.graphHeading)}</h2>
-    ${m.whereItBreaks ? `<p class="graph-caption" data-test="focused-graph-first-breakpoint">Where it breaks: <strong>${e(m.whereItBreaks.label)}</strong> — ${e(m.whereItBreaks.phrase)}.</p>` : ''}
+  return `<section class="section cw-graph" data-test="focused-case-graph-section">
+    <div class="v5-graph-topline"></div>
     ${m.phase === 'recovered' ? `<p class="graph-caption" data-test="graph-resolved-note">${e(CASE_COPY.graphResolvedNote)}</p>` : ''}${toggle}</section>`;
 }
 
 function affectsHtml(m: CaseWorkspaceModel): string {
   if (!m.affects.items.length && !m.affects.healthyNote) return '';
-  return `<section class="section cw-affects" data-test="case-affects"><h2>${e(CASE_COPY.whatThisAffects)}</h2><div class="cw-card">
+  // Preview the already-supplied labels in the summary so the operator can read
+  // what is affected without opening the disclosure.
+  const preview = m.affects.items.map((item) => item.label).join(' · ');
+  return `<details class="cw-details v5-affects" data-test="case-affects" data-region-key="case-affects"><summary><span class="v5-affects-label">${e(CASE_COPY.whatThisAffects)}</span>${preview ? `<span class="v5-affects-preview">${e(preview)}</span>` : ''}</summary>
     <ul class="cw-compact-list">${m.affects.items.map((item) => `<li data-tone="${item.tone}"><strong>${e(item.label)}</strong> — ${e(item.note)}</li>`).join('')}</ul>
-    ${m.affects.healthyNote ? `<p class="cw-muted">${e(m.affects.healthyNote)}</p>` : ''}</div></section>`;
+    ${m.affects.healthyNote ? `<p class="cw-muted">${e(m.affects.healthyNote)}</p>` : ''}</details>`;
 }
 
 function changesHtml(strategy: RecoveryStrategyView): string {
@@ -84,7 +81,11 @@ function changesHtml(strategy: RecoveryStrategyView): string {
 function moneySummaryHtml(candidate: PlanningCandidateView | undefined): string {
   const cost = decisionCosts(candidate?.costComparison);
   if (cost.unavailable) {
-    return `<p class="cw-muted" data-test="cost-unavailable">${e(cost.unavailable.includes('could not be compared') ? cost.unavailable : `Cost could not be compared: ${cost.unavailable}`)}</p>`;
+    return `<div class="cw-metrics cw-metrics-unknown">
+      <div class="cw-metric" data-test="cost-new-spend"><small>NEW SPEND</small><strong>Not compared</strong></div>
+      <div class="cw-metric" data-test="cost-potential-loss"><small>POTENTIAL DISPLACED-BOOKING LOSS</small><strong>Not compared</strong></div>
+    </div>
+    <p class="cw-muted" data-test="cost-unavailable">${e(cost.unavailable)}</p>`;
   }
   const exposureNote = cost.exposure.some((line) => /up to/i.test(line.kind.label))
     ? ' · up to (source maximum)'
@@ -111,10 +112,24 @@ function costBreakdownHtml(candidate: PlanningCandidateView | undefined, key: st
     ${fx.length ? list(fx.map((rate) => `${decisionText(rate.source.label, 'Recorded exchange-rate source')}: ${rate.baseCurrency} → ${rate.homeCurrency} at ${rate.rate}; reference ${formatInstant(rate.observedAt)}${rate.validUntil ? `; valid until ${formatInstant(rate.validUntil)}` : ''}.`)) : '<p>No exchange-rate record was supplied.</p>'}`);
 }
 
-function proposalHtml(candidate: PlanningCandidateView | undefined): string {
+/**
+ * Shared with alternatives/rejected candidates, which must keep rendering
+ * exactly as before (verified by the operator-ui-convergence suite). `parts`
+ * lets the recommendation card pull the itinerary and the programme
+ * commitments into separate steps without changing any other caller.
+ */
+interface ProposalHtmlOptions {
+  readonly parts?: 'itinerary' | 'commitments';
+  /** Step 2 only: tuck each directly-shown check's dense timing line behind a disclosure. */
+  readonly timingDisclosure?: boolean;
+}
+function proposalHtml(candidate: PlanningCandidateView | undefined, options?: ProposalHtmlOptions): string {
   const p = candidate?.proposal;
-  if (!p) return '<p class="cw-muted">Detailed itinerary evidence was not supplied for this option.</p>';
-  const flights = p.flights.map((flight) => `<article><p class="cw-kicker">Flight · proposed — not yet applied</p><h4>${e(decisionText(flight.label, 'Replacement flight'))}</h4>
+  if (!p) {
+    if (options?.parts === 'commitments') return '';
+    return '<p class="cw-muted">Detailed itinerary evidence was not supplied for this option.</p>';
+  }
+  const flights = p.flights.map((flight) => `<article><p class="cw-kicker">Flight</p><h4>${e(decisionText(flight.label, 'Replacement flight'))}</h4>
     ${flight.originLabel || flight.destinationLabel ? `<p>${e(decisionText(flight.originLabel, 'Origin not supplied'))} → ${e(decisionText(flight.destinationLabel, 'Destination not supplied'))}</p>` : ''}
     <dl class="cw-times"><div><dt>Depart</dt><dd>${e(decisionTime(flight.departure, flight.departureTimeZone))}</dd></div><div><dt>Arrive</dt><dd>${e(decisionTime(flight.arrival, flight.arrivalTimeZone))}</dd></div></dl></article>`).join('');
   const stays = p.stays.map((stay) => {
@@ -122,21 +137,33 @@ function proposalHtml(candidate: PlanningCandidateView | undefined): string {
     const placeContext = stay.propertyLabel && stay.propertyLabel !== stay.placeLabel
       ? `<p class="cw-muted">Place context: ${e(stay.placeLabel)}</p>`
       : '';
-    return `<article><p class="cw-kicker">Accommodation · proposed — not yet applied</p><h4>${e(decisionText(property, 'Property not supplied'))}</h4>
+    return `<article><p class="cw-kicker">Accommodation</p><h4>${e(decisionText(property, 'Property not supplied'))}</h4>
     ${placeContext}<p>${e(decisionTime(stay.start, stay.timeZone))} → ${e(decisionTime(stay.end, stay.timeZone))}</p></article>`;
   }).join('');
+  const itineraryHtml = `<div class="cw-itinerary">${flights}${stays}</div>`;
+  if (options?.parts === 'itinerary') return itineraryHtml;
+
   const checks = p.programmeChecks ?? [];
   const primaryChecks = checks.filter((c) => c.verdict !== 'PASS');
   primaryChecks.push(...checks.filter((c) => c.verdict === 'PASS').slice(0, Math.max(0, 3 - primaryChecks.length)));
   const remainingChecks = checks.filter((c) => !primaryChecks.includes(c));
-  const check = (c: typeof checks[number]): string => `<article><h4>${e(decisionText(c.label, 'Programme commitment'))}</h4>
+  const check = (c: typeof checks[number], wrapTiming: boolean): string => {
+    const timingLine = c.availableMinutes === undefined && c.requiredMinutes === undefined ? '' :
+      `${c.availableMinutes === undefined ? '' : `${c.availableMinutes} min available`}${c.requiredMinutes === undefined ? '' : ` · ${c.requiredMinutes} min required`}${c.transferMinutes === undefined ? '' : ` · ${c.transferMinutes} min transfer`}`;
+    const timingBlock = !timingLine ? '' : wrapTiming
+      ? details(`programme-check-timing-${candidate?.candidateKey ?? 'option'}-${checks.indexOf(c)}`, 'Timing detail', `<p class="cw-muted">${timingLine}</p>`)
+      : `<p class="cw-muted">${timingLine}</p>`;
+    return `<article><h4>${e(decisionText(c.label, 'Programme commitment'))}</h4>
     <p>${c.verdict === 'PASS' ? 'Preserved under this proposal' : c.verdict === 'FAIL' ? 'Not satisfied under this proposal' : 'Not confirmed under this proposal'}</p>
     ${c.arrival || c.deadline ? `<p class="cw-muted">${c.arrival ? `Arrives ${e(decisionTime(c.arrival, c.timeZone))}` : ''}${c.deadline ? ` · required by ${e(decisionTime(c.deadline, c.timeZone))}` : ''}</p>` : ''}
-    ${c.availableMinutes !== undefined || c.requiredMinutes !== undefined ? `<p class="cw-muted">${c.availableMinutes === undefined ? '' : `${c.availableMinutes} min available`}${c.requiredMinutes === undefined ? '' : ` · ${c.requiredMinutes} min required`}${c.transferMinutes === undefined ? '' : ` · ${c.transferMinutes} min transfer`}</p>` : ''}</article>`;
-  return `<div class="cw-itinerary">${flights}${stays}</div>
-    ${checks.length ? `<div class="cw-block"><h4>Programme commitments</h4><div class="cw-itinerary">${primaryChecks.map(check).join('')}</div>
-    ${remainingChecks.length ? details(`programme-checks-${candidate?.candidateKey ?? 'option'}`, `${remainingChecks.length} more commitment checks`, `<div class="cw-itinerary">${remainingChecks.map(check).join('')}</div>`) : ''}</div>` : ''}
+    ${timingBlock}</article>`;
+  };
+  const commitmentsHeading = options?.parts === 'commitments' ? '' : '<h4>Programme commitments</h4>';
+  const commitmentsHtml = `${checks.length ? `<div class="cw-block">${commitmentsHeading}<div class="cw-itinerary">${primaryChecks.map((c) => check(c, !!options?.timingDisclosure)).join('')}</div>
+    ${remainingChecks.length ? details(`programme-checks-${candidate?.candidateKey ?? 'option'}`, `${remainingChecks.length} more commitment checks`, `<div class="cw-itinerary">${remainingChecks.map((c) => check(c, false)).join('')}</div>`) : ''}</div>` : ''}
     ${p.blockers.length ? `<div class="cw-block" data-test="proposal-conditions"><h4>Conditions still identified in this proposal</h4>${list(p.blockers.map((b) => `${b.verdict === 'FAIL' ? 'Failed' : 'Unconfirmed'} — ${CASE_REASON_SENTENCE[b.reasonCode] ?? 'a recorded check remains unresolved; see Technical details'}.`))}</div>` : ''}`;
+  if (options?.parts === 'commitments') return commitmentsHtml;
+  return `${itineraryHtml}${commitmentsHtml}`;
 }
 
 function conditionsList(view: RecoveryCaseView, m: CaseWorkspaceModel, candidate: PlanningCandidateView | undefined): string[] {
@@ -155,6 +182,72 @@ function conditionsList(view: RecoveryCaseView, m: CaseWorkspaceModel, candidate
   return notes;
 }
 
+/**
+ * One short sentence: only strategy.projectedSummary and the candidate's
+ * PASS programme checks feed it. Never claims the trip is recovered.
+ */
+function recommendationVerdict(strategy: RecoveryStrategyView, candidate: PlanningCandidateView | undefined): string {
+  const { pass, fail, unknown, total } = strategy.projectedSummary;
+  const checksPart = total === 0
+    ? 'No projected checks were recorded'
+    : fail === 0 && unknown === 0
+      ? `All ${total} projected checks pass`
+      : `${pass} of ${total} projected checks pass`;
+  const passing = (candidate?.proposal?.programmeChecks ?? []).filter((c) => c.verdict === 'PASS');
+  const first = passing[0];
+  const keepsPart = first
+    ? ` · keeps ${truncateForGlance(decisionText(first.label, 'a programme commitment'))}${passing.length > 1 ? ` and ${passing.length - 1} more` : ''}`
+    : '';
+  return `${checksPart}${keepsPart}.`;
+}
+
+/** ~40 chars for a glance cell; the full sentence still appears lower on the card. */
+function truncateForGlance(text: string, max = 40): string {
+  return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
+}
+
+function glanceChangesCell(candidate: PlanningCandidateView | undefined): string {
+  const p = candidate?.proposal;
+  const flight = p?.flights[0];
+  if (flight) {
+    const originLabel = flight.originLabel ? decisionText(flight.originLabel, '') : '';
+    const destinationLabel = flight.destinationLabel ? decisionText(flight.destinationLabel, '') : '';
+    const sub = originLabel && destinationLabel ? `<span class="v5-glance-sub">${e(originLabel)} → ${e(destinationLabel)}</span>` : '';
+    return `${e(decisionText(flight.label, 'Replacement flight'))}${sub}`;
+  }
+  const stay = p?.stays[0];
+  if (stay) return e(decisionText(stay.propertyLabel ?? stay.placeLabel, 'Not supplied'));
+  return 'Not supplied';
+}
+
+function glanceProtectsCell(candidate: PlanningCandidateView | undefined): string {
+  const passing = (candidate?.proposal?.programmeChecks ?? []).filter((c) => c.verdict === 'PASS');
+  const first = passing[0];
+  if (!first) return 'No commitments recorded';
+  const more = passing.length > 1 ? `<span class="v5-glance-sub">+${passing.length - 1} more</span>` : '';
+  return `${e(decisionText(first.label, 'Programme commitment'))}${more}`;
+}
+
+function glanceCostsCell(candidate: PlanningCandidateView | undefined): string {
+  const cost = decisionCosts(candidate?.costComparison);
+  if (cost.unavailable) return 'Not compared';
+  return e(cost.newSpend?.join(' + ') ?? 'Not supplied');
+}
+
+function glanceBlockedByCell(strategy: RecoveryStrategyView): string {
+  if (!strategy.executionBlocker) return 'Nothing blocking';
+  return e(executionBlockerShort(strategy.executionBlocker));
+}
+
+function recommendationGlanceHtml(strategy: RecoveryStrategyView, candidate: PlanningCandidateView | undefined): string {
+  return `<dl class="v5-rec-glance">
+    <div class="v5-glance-cell"><dt>Changes</dt><dd>${glanceChangesCell(candidate)}</dd></div>
+    <div class="v5-glance-cell"><dt>Protects</dt><dd>${glanceProtectsCell(candidate)}</dd></div>
+    <div class="v5-glance-cell"><dt>Costs</dt><dd>${glanceCostsCell(candidate)}</dd></div>
+    <div class="v5-glance-cell"><dt>Blocked by</dt><dd>${glanceBlockedByCell(strategy)}</dd></div>
+  </dl>`;
+}
+
 /** Dominant recommendation card — same strategy/candidate as the decision panel. */
 function recommendationHtml(view: RecoveryCaseView): string {
   const options = decisionOptions(view);
@@ -168,16 +261,26 @@ function recommendationHtml(view: RecoveryCaseView): string {
   const basis = (view.planningEvidence?.recommendation?.basis ?? [])
     .map((b) => decisionText(b.summary, '')).filter((text) => text.length > 0 && text.length <= 240).slice(0, 3);
   const reasons = [...outcomes, ...basis].slice(0, 3);
+  const unresolved = view.uncertainty.map((text) => decisionText(text, '')).filter((text) => text.length > 0).slice(0, 3);
   return `<article class="cw-card cw-rec option-card is-recommended" id="cw-recommendation" data-test="recovery-strategy" data-strategy-ref="${e(strategy.strategyRef)}" data-option-number="${strategy.optionNumber}">
-    <p class="cw-kicker">Recommended recovery · proposed — not yet applied</p>
-    <h3>${e(decisionTitle(strategy))}</h3>
-    ${proposalHtml(candidate)}
-    <div class="cw-block"><h4>Why this proposal</h4>${list(reasons)}
-      <p class="cw-muted">${strategy.projectedSummary.pass} passed · ${strategy.projectedSummary.fail} failed · ${strategy.projectedSummary.unknown} unconfirmed across ${strategy.projectedSummary.total} assessed items.</p>
-      ${details(`outcome-checks-${strategy.strategyRef}`, 'All projected outcome checks', list(strategy.resolves.map((c) => `${c.projectedVerdict === 'PASS' ? 'Passed' : c.projectedVerdict === 'FAIL' ? 'Failed' : 'Unconfirmed'} — ${decisionText(c.personLabel, 'Traveller')}`)))}</div>
+    <div class="v5-rec-head">
+      <p class="cw-kicker">Proposed — not yet applied</p>
+      <h3>${e(decisionTitle(strategy))}</h3>
+      <p class="v5-rec-verdict">${e(recommendationVerdict(strategy, candidate))}</p>
+    </div>
+    ${recommendationGlanceHtml(strategy, candidate)}
+    <section class="v5-rec-step" data-step="1"><h4>What changes</h4>${proposalHtml(candidate, { parts: 'itinerary' })}</section>
+    <section class="v5-rec-step" data-step="2"><h4>What it protects</h4>${proposalHtml(candidate, { parts: 'commitments', timingDisclosure: true })}</section>
+    <section class="v5-rec-step" data-step="3"><h4>Why this one</h4>
+      <div class="cw-block">${list(reasons)}
+        <p class="cw-muted">${strategy.projectedSummary.pass} passed · ${strategy.projectedSummary.fail} failed · ${strategy.projectedSummary.unknown} unconfirmed across ${strategy.projectedSummary.total} assessed item${strategy.projectedSummary.total === 1 ? '' : 's'}.</p>
+        ${unresolved.length ? `<h4>Still unresolved</h4>${list(unresolved)}` : ''}
+        ${details(`outcome-checks-${strategy.strategyRef}`, 'All projected outcome checks', list(strategy.resolves.map((c) => `${c.projectedVerdict === 'PASS' ? 'Passed' : c.projectedVerdict === 'FAIL' ? 'Failed' : 'Unconfirmed'} — ${decisionText(c.personLabel, 'Traveller')}`)))}
+      </div>
+    </section>
     ${strategy.changes.some((c) => c.effectKind === 'CANCEL_STAY') ? '<p class="cw-muted">Cancellation of the displaced stay is proposed, not completed.</p>' : ''}
     ${costBreakdownHtml(candidate, strategy.strategyRef)}
-    ${strategy.executionBlocker ? `<p class="cw-muted" data-test="option-execution-blocker"><strong>Execution unavailable:</strong> ${e(decisionText(strategy.executionBlocker.message, 'This runtime cannot execute this option yet.'))}</p>` : ''}
+    ${strategy.executionBlocker ? `<p class="cw-muted" data-test="option-execution-blocker"><strong>Cannot be carried out yet:</strong> ${e(executionBlockerLine(strategy.executionBlocker))}</p>` : ''}
   </article>`;
 }
 
@@ -215,17 +318,34 @@ function rejectedHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
   const considered = (view.planningEvidence?.candidates ?? []).filter((c) =>
     c.disposition.code === 'REJECTED_VALIDATION' || c.disposition.code === 'REJECTED_DETERMINISTIC');
   if (!considered.length) return '';
-  const preview = considered.slice(0, 3).map((candidate) => {
-    const c = rejectionSummary(candidate);
-    return `<div class="cw-rejection" data-candidate-key="${e(candidate.candidateKey)}">
-      <div><strong>${e(c.label)}</strong><p class="cw-muted">${e(c.status)}</p></div>
+  // Candidates that present identically (same option name, status and recorded
+  // reason) are one row with a count. Presentation-only: nothing is dropped, and
+  // every candidate keeps its own evaluation disclosure.
+  const buckets: { summary: ReturnType<typeof rejectionSummary>; members: typeof considered }[] = [];
+  for (const candidate of considered) {
+    const summary = rejectionSummary(candidate);
+    const hit = buckets.find((bucket) => bucket.summary.label === summary.label
+      && bucket.summary.status === summary.status && bucket.summary.reason === summary.reason);
+    if (hit) hit.members.push(candidate);
+    else buckets.push({ summary, members: [candidate] });
+  }
+  const shown = buckets.slice(0, 3);
+  const preview = shown.map(({ summary: c, members }) => {
+    const first = members[0]!;
+    const evaluations = members.length === 1
+      ? details(`rejection-eval-${first.candidateKey}`, 'Inspect evaluation', proposalHtml(first))
+      : details(`rejection-eval-${first.candidateKey}`, `Inspect ${members.length} evaluations`,
+        members.map((member) => `<div data-candidate-key="${e(member.candidateKey)}">${proposalHtml(member)}</div>`).join(''));
+    return `<div class="cw-rejection" data-candidate-key="${e(first.candidateKey)}" data-grouped="${members.length}">
+      <div><strong>${e(c.label)}</strong><p class="cw-muted">${e(c.status)}${members.length > 1 ? ` · ${members.length} options` : ''}</p></div>
       <div><p>${e(c.reason)}</p>
-        ${details(`rejection-eval-${candidate.candidateKey}`, 'Inspect evaluation', proposalHtml(candidate))}
+        ${evaluations}
       </div></div>`;
   }).join('');
+  const shownCount = shown.reduce((sum, bucket) => sum + bucket.members.length, 0);
   return `<div class="cw-card cw-block" data-test="rejected-summary"><h3>${m.noPlan ? 'Why the automatic options stopped' : 'Why other options were not chosen'}</h3>
     ${preview}
-    ${considered.length > 3 ? `<p class="cw-muted">Showing 3 of ${considered.length} rejected options. Every recorded evaluation remains below.</p>` : ''}
+    ${shownCount < considered.length ? `<p class="cw-muted">Showing ${shownCount} of ${considered.length} rejected options. Every recorded evaluation remains below.</p>` : ''}
   </div>`;
 }
 
@@ -261,13 +381,13 @@ function approvalHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
   }
   return `<section class="cw-card cw-approve cw-approve-sticky" data-test="approval-panel" data-strategy-ref="${strategy ? e(strategy.strategyRef) : ''}">
     <p class="cw-kicker">Decision</p>
-    <h2>${strategy ? e(decisionTitle(strategy)) : 'Recommendation not ready'}</h2>
+    <h2>Approval required before action.</h2>
+    <p class="cw-muted v5-decision-intro">Authority is checked separately from whether the trip works.</p>
     <dl class="cw-approval-facts">
-      <dt>Current decision status</dt><dd>${e(authorityLabel(view.authorityState))}</dd>
-      <dt>Approving party</dt><dd>The named approving party is not supplied in this case view. No organiser or traveller authority is assumed.</dd>
+      <dt>Approval</dt><dd>${e(authorityLabel(view.authorityState))}</dd>
     </dl>
     ${moneySummaryHtml(candidate)}
-    ${conditions.length ? `<h4>Material conditions</h4>${list(conditions.slice(0, 4))}${conditions.length > 4 ? `<p class="cw-muted">${conditions.length - 4} more in research details.</p>` : ''}<p class="cw-muted">Eligibility checks do not confirm admission or completed arrival formalities.</p>` : ''}
+    ${conditions.length ? `<p class="cw-muted">${conditions.length} material condition${conditions.length === 1 ? '' : 's'} recorded on the recommendation.</p>` : ''}
     ${actionControls}
     <p data-test="recovery-controls-status" data-action-status role="status"></p>
   </section>`;
@@ -292,7 +412,7 @@ function researchHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
   const sources = m.researchSources;
   const sourceList = sources.map((source) => `<li><a href="${e(source.url)}" target="_blank" rel="noopener noreferrer">${e(source.publisher)}</a><br><span class="cw-muted">Checked ${e(source.checkedAt)}</span></li>`).join('');
   const total = evidence.tools.length + (evidence.modelActivities?.length ?? 0);
-  return `<section class="cw-card" data-test="case-activity"><h3>NORTHSTAR activity</h3>
+  return `<section class="cw-card" data-test="case-activity"><h3>What Northstar checked</h3>
     ${groups.length ? `<table class="cw-research-table"><thead><tr><th scope="col">Category</th><th scope="col">Observed outcome</th><th scope="col">Provider / source</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
     ${!groups.length && evidence.domains.length ? list(evidence.domains.map((d) => `${decisionText(d.domain.label, 'Research domain')}: ${decisionText(d.disposition.label, 'Status not supplied')}`)) : ''}
     ${evidence.candidates.length ? `<p class="cw-muted">${evidence.candidates.length} material options evaluated. Rejection and alternative evidence are preserved above.</p>` : ''}
@@ -323,31 +443,76 @@ function technicalHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
     ${m.technical.unmappedSteps.length ? `<div data-test="focused-graph-unmapped"><p>${m.technical.unmappedSteps.length} causal ${m.technical.unmappedSteps.length === 1 ? 'step' : 'steps'} not shown on the graph</p>${list(m.technical.unmappedSteps)}</div>` : ''}${raw(m.technical)}`);
 }
 
+function recommendSheet(view: RecoveryCaseView): string {
+  const strategy = decisionOptions(view).recommended;
+  const title = strategy ? decisionTitle(strategy) : 'Recommendation not ready';
+  return `<section class="v5-recommend-sheet" data-test="recommend-sheet"><p class="cw-kicker">Recommended recovery</p>
+    <h2>${e(title)}</h2>
+    <a class="btn btn-primary" href="#cw-recommendation">Review recommendation →</a></section>`;
+}
+function compactActivity(m: CaseWorkspaceModel): string {
+  const rows = m.activity.rows.slice(0, 4);
+  const body = rows.length
+    ? rows.map((row) => `<div class="v5-activity-item"><div aria-hidden="true">${ROW_ICON[row.state]}</div><div><strong>${e(row.label)}</strong>${row.note ? `<p>${e(row.note)}</p>` : ''}</div></div>`).join('')
+    : '<p class="cw-muted">No observable activity has been recorded for this case yet.</p>';
+  return `<section aria-label="Northstar activity"><h2 class="v5-rail-title">Northstar activity</h2>${body}
+    <button type="button" class="v5-text-button" data-drawer-from="[data-poll-region='activity']" data-drawer-title="Northstar activity">View log →</button></section>`;
+}
+/**
+ * Whole-trip state in the rail foot. The supplied verdict is unchanged; only the
+ * word an operator reads is. A trip is never implied recovered here unless the
+ * supplied verdict says so.
+ */
+const TRIP_FOOT_LABEL: Record<string, string> = {
+  PASS: 'Recovered', FAIL: 'Not yet recovered', UNKNOWN: 'Not confirmed',
+};
+function wholeTripFoot(view: RecoveryCaseView): string {
+  const verdict = view.tripViability.verdict;
+  const presented = presentAssessment(verdict);
+  const label = TRIP_FOOT_LABEL[verdict] ?? presented.label;
+  return `<div class="v5-trip-foot" data-test="whole-trip-state" data-trip-verdict="${e(verdict)}"><span>Whole trip</span><strong class="tone-${presented.tone}">${e(label)}</strong></div>`;
+}
+
 export function renderProductRecoveryCase(view: RecoveryCaseView): string {
   const m = presentCaseWorkspace(view);
   const attrs = `data-case-ref="${e(view.caseRef)}" data-case-status="${e(view.status)}" data-case-phase="${m.phase}" data-projection-revision="${e(String(view.change.projectionRevision))}"${view.change.changeCursor ? ` data-change-cursor="${e(view.change.changeCursor)}"` : ''}`;
   const optionsRegion = `<div data-test="recovery-controls" data-case-ref="${e(view.caseRef)}">
     ${recommendationHtml(view)}${findRecoveryHtml(view, m)}
   </div>`;
-  return `${OPERATOR_WORKSPACE_STYLES}<main class="shell product-recovery-case case-workspace" data-test="product-recovery-case" ${attrs}>
-    ${region('header', headerHtml(m))}
-    ${region('lead', leadHtml(view, m))}
-    ${region('graph', graphHtml(view, m))}
-    ${region('affects', affectsHtml(m))}
-    <div class="case-decision-grid">
-      <div class="case-decision-main">
-        ${region('options', optionsRegion)}
+  return `${OPERATOR_WORKSPACE_STYLES}<main class="shell product-recovery-case case-workspace v5-workspace" data-test="product-recovery-case" ${attrs}>
+    ${region('header', headerHtml(view, m))}
+    <div class="v5-case-layout">
+      <div class="v5-case-main">
+        ${region('graph', graphHtml(view, m))}
+        ${region('affects', affectsHtml(m))}
+        <div class="v5-case-tabs" role="tablist" aria-label="Recovery evidence">
+          <button type="button" class="v5-tab v5-tab-recommended is-active" data-case-tab="recovery" role="tab" aria-selected="true">Recommended recovery</button>
+          <button type="button" class="v5-tab" data-case-tab="options" role="tab" aria-selected="false">Other options</button>
+          <button type="button" class="v5-tab" data-case-tab="checks" role="tab" aria-selected="false">Checks &amp; sources</button>
+        </div>
+        <div class="v5-panel" data-case-panel="recovery">
+          ${region('options', optionsRegion)}
+          ${region('execution', executionHtml(m))}
+          ${region('resolution', resolutionHtml(m))}
+        </div>
+        <div class="v5-panel" data-case-panel="options" hidden>
+          ${region('alternatives', `${alternativesHtml(view)}${rejectedHtml(view, m)}${allCandidatesHtml(view)}`)}
+        </div>
+        <div class="v5-panel" data-case-panel="checks" hidden>
+          ${region('activity', researchHtml(view, m))}
+          ${region('technical', technicalHtml(view, m))}
+        </div>
       </div>
-      <aside class="case-decision-rail" aria-label="Decision">
+      <aside class="v5-case-rail case-decision-rail" aria-label="Decision">
+        ${recommendSheet(view)}
         ${region('approval', approvalHtml(view, m), 'cw-poll-approval')}
+        ${compactActivity(m)}
+        ${wholeTripFoot(view)}
       </aside>
     </div>
-    <div class="case-follow">
-      ${region('alternatives', `${alternativesHtml(view)}${rejectedHtml(view, m)}${allCandidatesHtml(view)}`)}
-      ${region('activity', researchHtml(view, m))}
-      ${region('execution', executionHtml(m))}
-      ${region('resolution', resolutionHtml(m))}
-      ${region('technical', technicalHtml(view, m))}
-    </div>
-  </main>${originalCurrentToggleScript()}${casePollingScript({ caseRef: view.caseRef })}`;
+    <dialog class="v5-drawer" data-v5-drawer>
+      <div class="v5-drawer-head"><h2 data-v5-drawer-title>Details</h2><button type="button" data-v5-drawer-close>Close</button></div>
+      <div class="v5-drawer-body" data-v5-drawer-body></div>
+    </dialog>
+  </main>${originalCurrentToggleScript()}${casePollingScript({ caseRef: view.caseRef })}${renderCaseWorkspaceScript()}`;
 }
