@@ -69,6 +69,15 @@ export interface TransportProposerOptions extends TransportPassengerSource {
   resolveAirport: AirportResolver;
   /** Max ranked offers proposed per corridor (bounded; defaults to 6). */
   maxOffersPerCorridor?: number;
+  /**
+   * Optional model-influenced preferred offer keys keyed by flight.search
+   * requestId. Only keys that already exist in the boardable ranked set are
+   * honoured; unknown keys are ignored. Absence / empty → deterministic rank.
+   * May be a live getter so the coordinator can bind selection after research.
+   */
+  preferredOfferKeysByRequestId?:
+    | Readonly<Record<string, readonly string[]>>
+    | (() => Readonly<Record<string, readonly string[]>> | undefined);
 }
 
 /** Deterministic digest binding an offer to the journey item it was researched for. */
@@ -173,17 +182,66 @@ function comparePrice(a: CorrelatedOffer, b: CorrelatedOffer): number {
 }
 
 /**
+ * Reorder a deterministically ranked boardable set using optional preferred
+ * offer keys, then slice to the corridor cap. Preferred keys that are not in
+ * the ranked set are ignored (fail closed). Empty preference → identical to
+ * `ranked.slice(0, max)`. Pure — never invents offers or claims viability.
+ */
+export function applyPreferredOfferSelection(
+  ranked: readonly CorrelatedOffer[],
+  preferredKeys: readonly string[] | undefined,
+  maxOffersPerCorridor: number,
+): CorrelatedOffer[] {
+  const cap = Math.max(1, maxOffersPerCorridor);
+  if (!preferredKeys || preferredKeys.length === 0) {
+    return ranked.slice(0, cap);
+  }
+  const byKey = new Map(ranked.map((offer) => [offer.offerKey, offer]));
+  const selected: CorrelatedOffer[] = [];
+  const used = new Set<string>();
+  for (const key of preferredKeys) {
+    if (used.has(key)) continue;
+    const offer = byKey.get(key);
+    if (!offer) continue;
+    selected.push(offer);
+    used.add(key);
+    if (selected.length >= cap) return selected;
+  }
+  for (const offer of ranked) {
+    if (used.has(offer.offerKey)) continue;
+    selected.push(offer);
+    used.add(offer.offerKey);
+    if (selected.length >= cap) break;
+  }
+  return selected;
+}
+
+function resolvePreferredMap(
+  preferred:
+    | Readonly<Record<string, readonly string[]>>
+    | (() => Readonly<Record<string, readonly string[]>> | undefined)
+    | undefined,
+): Readonly<Record<string, readonly string[]>> | undefined {
+  if (typeof preferred === 'function') return preferred();
+  return preferred;
+}
+
+/**
  * Pure: correlate the gathered `flight.search` evidence to corridors and produce
  * the boardable, ranked offers per journey item. Shared by the proposer (which
  * emits candidates) and `resolveTransportOffers` (which builds the evaluation
  * input), so the offer keys always align. Boardability drops an offer whose first
  * segment departs before `now` — an honest filter, never a viability claim.
+ *
+ * Optional preferred keys (model-influenced) only reorder within the existing
+ * boardable set and corridor cap; they cannot invent offers.
  */
 export function correlatedTransportOffers(input: {
   corridors: readonly TransportCorridor[];
   toolResults: readonly PlanningToolResult[];
   now: Instant;
   maxOffersPerCorridor: number;
+  preferredOfferKeysByRequestId?: Readonly<Record<string, readonly string[]>>;
 }): { offers: CorrelatedOffer[]; resolvedOffers: ResolvedOffer[] } {
   const offers: CorrelatedOffer[] = [];
   const resolvedOffers: ResolvedOffer[] = [];
@@ -216,8 +274,13 @@ export function correlatedTransportOffers(input: {
         segmentCount: offer.segments.length,
       });
     }
-    const ranked = rankOffers(correlated).slice(0, input.maxOffersPerCorridor);
-    for (const c of ranked) {
+    const ranked = rankOffers(correlated);
+    const selected = applyPreferredOfferSelection(
+      ranked,
+      input.preferredOfferKeysByRequestId?.[requestId],
+      input.maxOffersPerCorridor,
+    );
+    for (const c of selected) {
       offers.push(c);
       resolvedOffers.push({ offerId: c.offerKey, transportServiceId: c.transportServiceId });
     }
@@ -240,17 +303,22 @@ export function resolveTransportOffers(input: TransportPassengerSource & {
   now: Instant;
   resolveAirport: AirportResolver;
   maxOffersPerCorridor?: number;
+  preferredOfferKeysByRequestId?:
+    | Readonly<Record<string, readonly string[]>>
+    | (() => Readonly<Record<string, readonly string[]>> | undefined);
 }): { resolvedOffers: ResolvedOffer[]; corridors: TransportCorridor[] } {
   const { corridors } = transportCorridors(input.world, input.failing, {
     resolveAirport: input.resolveAirport,
     ...(input.passengers ? { passengers: input.passengers } : {}),
     ...(input.passengersFor ? { passengersFor: input.passengersFor } : {}),
   });
+  const preferred = resolvePreferredMap(input.preferredOfferKeysByRequestId);
   const { resolvedOffers } = correlatedTransportOffers({
     corridors,
     toolResults: input.toolResults,
     now: input.now,
     maxOffersPerCorridor: input.maxOffersPerCorridor ?? DEFAULT_MAX_OFFERS_PER_CORRIDOR,
+    ...(preferred ? { preferredOfferKeysByRequestId: preferred } : {}),
   });
   return { resolvedOffers, corridors };
 }
@@ -273,11 +341,13 @@ export function createTransportProposer(options: TransportProposerOptions): Doma
         ...(options.passengers ? { passengers: options.passengers } : {}),
         ...(options.passengersFor ? { passengersFor: options.passengersFor } : {}),
       });
+      const preferred = resolvePreferredMap(options.preferredOfferKeysByRequestId);
       const { offers } = correlatedTransportOffers({
         corridors,
         toolResults: input.evidence.toolResults,
         now: input.now,
         maxOffersPerCorridor,
+        ...(preferred ? { preferredOfferKeysByRequestId: preferred } : {}),
       });
 
       const candidates: ProposalCandidate[] = [];

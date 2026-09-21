@@ -179,16 +179,24 @@ export interface CoordinatorCoreDeps {
    * Optional planning-local evidence materialization. It may enrich only an
    * isolated captured-world copy (for example a searched flight offer) before
    * RC-6; it cannot mutate canonical state or create a reservation.
+   * May be async when a bounded model call refines offer selection first.
    */
   materializeWorldForDomain?: (ctx: {
     domainId: RecoveryDomainId;
     evidence: PlanningEvidenceContext;
     basis: PlanningBasis;
-  }) => {
-    world: CapturedWorld;
-    resolvedOffers?: readonly ResolvedOffer[];
-    resolvedStayOffers?: readonly ResolvedStayOffer[];
-  } | undefined;
+  }) =>
+    | {
+        world: CapturedWorld;
+        resolvedOffers?: readonly ResolvedOffer[];
+        resolvedStayOffers?: readonly ResolvedStayOffer[];
+      }
+    | undefined
+    | Promise<{
+        world: CapturedWorld;
+        resolvedOffers?: readonly ResolvedOffer[];
+        resolvedStayOffers?: readonly ResolvedStayOffer[];
+      } | undefined>;
   /**
    * Optional captured cost context. It runs only after research and candidate
    * effects exist; it cannot alter RC-6, provider prices, or canonical state.
@@ -418,11 +426,11 @@ export async function runRecoveryPlanning(
     // passes the same base ProposerInput it always received).
     const evidenceContext = evidenceContextForDomain(evidence, domain.domainId);
     const domainBasis: PlanningBasis = { ...basis, world: planningWorld, effective: planningEffective };
-    const materialized = deps.materializeWorldForDomain?.({
+    const materialized = await Promise.resolve(deps.materializeWorldForDomain?.({
       domainId: domain.domainId,
       evidence: evidenceContext,
       basis: domainBasis,
-    });
+    }));
     if (materialized) {
       planningWorld = materialized.world;
       planningEffective = projectEffectiveWorld(planningWorld);

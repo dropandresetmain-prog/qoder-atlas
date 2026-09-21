@@ -217,7 +217,10 @@ export type MaterialCandidateEvidence = z.infer<typeof MaterialCandidateEvidence
  * Prompts, raw responses, rationales and hidden reasoning never belong here.
  */
 export const PlanningModelActivitySchema = z.strictObject({
-  operation: z.literal('recovery.domain_suggestion'),
+  operation: z.union([
+    z.literal('recovery.domain_suggestion'),
+    z.literal('recovery.offer_selection'),
+  ]),
   providerId: z.string().min(1).max(128),
   model: z.string().min(1).max(256),
   mode: z.enum(['LIVE', 'REPLAY']),

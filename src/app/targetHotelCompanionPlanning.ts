@@ -359,6 +359,9 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
   now: Instant;
   resolveAirport: AirportResolver;
   maxOffersPerCorridor?: number;
+  preferredOfferKeysByRequestId?:
+    | Readonly<Record<string, readonly string[]>>
+    | (() => Readonly<Record<string, readonly string[]>> | undefined);
   hotel: HotelPlanningOptions;
 }) {
   const maxProperties = finiteCap(input.hotel.maxPropertiesPerSearch, DEFAULT_MAX_PROPERTIES);
@@ -377,10 +380,12 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
       world: input.world, failing: input.failing, toolResults: results, now: input.now,
       resolveAirport: input.resolveAirport, ...passengerSource,
       ...(input.maxOffersPerCorridor !== undefined ? { maxOffersPerCorridor: input.maxOffersPerCorridor } : {}),
+      ...(input.preferredOfferKeysByRequestId ? { preferredOfferKeysByRequestId: input.preferredOfferKeysByRequestId } : {}),
     });
     const base = createTransportProposer({
       resolveAirport: input.resolveAirport, ...passengerSource,
       ...(input.maxOffersPerCorridor !== undefined ? { maxOffersPerCorridor: input.maxOffersPerCorridor } : {}),
+      ...(input.preferredOfferKeysByRequestId ? { preferredOfferKeysByRequestId: input.preferredOfferKeysByRequestId } : {}),
     });
     const candidates = await base.propose({
       workspaceId: 'planning-local', recoveryCaseId: 'planning-local', now: input.now,
@@ -585,9 +590,23 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
   const proposer: DomainStrategyProposer = {
     id: 'proposer.transport-offer-with-overnight', version: '1', domains: ['TRANSPORT'],
     async propose(domainInput: DomainProposerInput): Promise<ProposalCandidate[]> {
-      const base = createTransportProposer({ resolveAirport: input.resolveAirport, ...passengerSource, ...(input.maxOffersPerCorridor !== undefined ? { maxOffersPerCorridor: input.maxOffersPerCorridor } : {}) });
+      const base = createTransportProposer({
+        resolveAirport: input.resolveAirport,
+        ...passengerSource,
+        ...(input.maxOffersPerCorridor !== undefined ? { maxOffersPerCorridor: input.maxOffersPerCorridor } : {}),
+        ...(input.preferredOfferKeysByRequestId ? { preferredOfferKeysByRequestId: input.preferredOfferKeysByRequestId } : {}),
+      });
       const candidates = await base.propose(domainInput);
-      const resolvedOffers = resolveTransportOffers({ world: domainInput.world, failing: domainInput.failing, toolResults: domainInput.evidence.toolResults, now: domainInput.now, resolveAirport: input.resolveAirport, ...passengerSource, ...(input.maxOffersPerCorridor !== undefined ? { maxOffersPerCorridor: input.maxOffersPerCorridor } : {}) }).resolvedOffers;
+      const resolvedOffers = resolveTransportOffers({
+        world: domainInput.world,
+        failing: domainInput.failing,
+        toolResults: domainInput.evidence.toolResults,
+        now: domainInput.now,
+        resolveAirport: input.resolveAirport,
+        ...passengerSource,
+        ...(input.maxOffersPerCorridor !== undefined ? { maxOffersPerCorridor: input.maxOffersPerCorridor } : {}),
+        ...(input.preferredOfferKeysByRequestId ? { preferredOfferKeysByRequestId: input.preferredOfferKeysByRequestId } : {}),
+      }).resolvedOffers;
       const materialized = materialize(domainInput.evidence.toolResults);
       const options: QuotedStayOption[] = materialized.quotedStays.filter((quote) => quote.replacement === undefined).map((quote) => ({
         baseCandidateKey: quote.baseCandidateKey, journeyId: quote.journeyId, offerId: quote.offer.offerId, offer: quote.offer,

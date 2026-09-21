@@ -715,7 +715,10 @@ export type PlanningRecommendationView = z.infer<typeof PlanningRecommendationVi
 
 /** Bounded model-call provenance captured with the planning attempt. */
 export const PlanningModelActivityViewSchema = z.strictObject({
-  operation: z.literal('recovery.domain_suggestion'),
+  operation: z.union([
+    z.literal('recovery.domain_suggestion'),
+    z.literal('recovery.offer_selection'),
+  ]),
   providerId: z.string().min(1),
   model: z.string().min(1),
   mode: z.enum(['LIVE', 'REPLAY']),

@@ -14,13 +14,13 @@
 - [x] CP1 investigation + contract decisions (complete)
 - [x] CP2 FIX1 D2 monitoring + FIX2 connection classification — focused tests green — push
 - [x] CP3 FIX3 controlled runtime clock — background-worker/progression proof — push
-- [ ] CP4 FIX4 causal Qwen planning seam — safety + causal acceptance proof — push
+- [x] CP4 FIX4 causal Qwen planning seam — safety + causal acceptance proof — push
 - [ ] CP5 FIX6 demo preflight + integration + anti-hardcoding + docs — push
 - [x] INV5 multi-subject progression — **Park for Later** (production cases single-subject; settledBasis untouched)
 
 ## Current checkpoint
 
-CP3 COMPLETE — controlled evaluation clock implemented and verified. Next: CP4 (FIX4 causal Qwen planning seam).
+CP4 COMPLETE — bounded Qwen TRANSPORT offer selection is causal within the researched boardable set + corridor cap. Next: CP5 demo preflight + integration.
 
 ## CP1 investigation results (subagents, verified against code)
 
@@ -113,6 +113,23 @@ CP3 COMPLETE — controlled evaluation clock implemented and verified. Next: CP4
 - `npm run typecheck` clean.
 - Suites classified in `test/suites.json` (CURRENT_TARGET + POSTGRES).
 
+### CP4 — FIX4 causal Qwen TRANSPORT offer selection (IMPLEMENTED)
+
+**Before:** Qwen `recovery.domain_suggestion` ran after deterministic registry already INVESTIGATED every registered domain → AI suggestions filtered against `already` → causally inert activity/provenance only.
+
+**After:** Bounded StrategyProposer/DomainStrategyProposer seam — `recovery.offer_selection` prefers real boardable researched offer keys within the existing corridor cap. Deterministic ranking remains fallback. RC-6 / comparator / authority / execution untouched.
+
+**Design:**
+- Pure `applyPreferredOfferSelection` + `correlatedTransportOffers` optional preferred keys (proposer + materialize share the same selection).
+- `planningOfferSelection.ts`: schema-validated model call; sanitize drops unknown requestIds/keys; fail-closed empty preference on INVALID_OUTPUT / FAILED.
+- Coordinator: after TRANSPORT research, materializeWorldForDomain (now awaitable) calls offer selection once, records model activity, late-binds preference into transport proposer + hotel companion via getter.
+- Schema: `PlanningModelActivity` / view operation union includes `recovery.offer_selection`.
+
+**Evidence:**
+- `test/a5-offer-selection.test.ts` 5/5 — causal reorder within cap; sanitize fail-closed; schema accepts offer_selection; INVALID_OUTPUT empty preference; unsupported effect fields rejected.
+- Adjacent: `test/r1-transport-proposer.test.ts` + `test/r1-evidence-seam.test.ts` 9/9.
+- `npm run typecheck` clean.
+
 ## Next action
 
-CP4 (FIX4 causal Qwen planning seam): bounded StrategyProposer / offer-selection influence so model output can change a legitimate candidate that reaches deterministic evaluation; fail-closed; RC-6/authority untouched. Then CP5 preflight + integration.
+CP5 (FIX6 demo readiness preflight + Sarah/Jordan coexistence integration verification). Then anti-hardcoding + final report.

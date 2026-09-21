@@ -132,6 +132,7 @@
       "test/r2-focused-case-graph.test.ts",
       "test/a5-founder-qc-progression.test.ts",
       "test/a5-evaluation-clock.test.ts",
+      "test/a5-offer-selection.test.ts",
       "test/a5-backend-truth-closure.test.ts",
       "test/r2-focused-graph-projection.test.ts",
       "test/r2-graph-renderer.test.ts",

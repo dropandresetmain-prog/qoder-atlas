@@ -76,6 +76,7 @@ import {
 } from '../../resolution/planning/coordinatorCore.ts';
 import { loadPlanningPreferences, preferenceOwnerIds } from './planningPreferences.ts';
 import { suggestRecoveryDomains } from './planningDomainSuggestion.ts';
+import { suggestTransportOfferSelection } from './planningOfferSelection.ts';
 import { advanceCasePhase } from './recoveryPlanning.ts';
 import { deterministicUuid, RUNTIME_ID_NAMESPACES } from './deterministicId.ts';
 import { applicationError } from './applicationCommands.ts';
@@ -162,8 +163,12 @@ export interface RecoveryPlanningCoordinatorDeps {
     evidence?: readonly PlanningEvidenceRecord[];
   }>;
   /**
-   * Optional Model Studio / Qwen client for hybrid domain suggestion.
-   * Suggestions are registry-validated fail-closed; absence is honest (no AI).
+   * Optional Model Studio / Qwen client. Used for:
+   *   - hybrid domain suggestion (registry-validated additive only);
+   *   - bounded TRANSPORT offer selection within the researched boardable
+   *     set and corridor cap (fail-closed to deterministic ranking).
+   * Absence is honest (no AI). Neither path can declare viability, grant
+   * authority, or execute.
    */
   intelligence?: IntelligenceClient;
 }
@@ -359,6 +364,11 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
           : { passengers: transportPlanning.passengers! })
         : undefined;
       const hotelPlanning = prepared?.hotelPlanning ?? deps.hotelPlanning;
+      // Shared late-bound offer preference: filled during TRANSPORT materialize
+      // after research evidence exists; proposer/materialize both read it.
+      const transportOfferPreference: { byRequestId?: Readonly<Record<string, readonly string[]>> } = {};
+      const preferredOfferKeysByRequestId = (): Readonly<Record<string, readonly string[]>> | undefined =>
+        transportOfferPreference.byRequestId;
       const hotelCompanionPlanning = transportPlanning && hotelPlanning
         ? createHotelCompanionPlanning({
             world: basis.world,
@@ -367,6 +377,7 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
             resolveAirport: resolveAirport!,
             ...passengerSource!,
             ...(transportPlanning.maxOffersPerCorridor !== undefined ? { maxOffersPerCorridor: transportPlanning.maxOffersPerCorridor } : {}),
+            preferredOfferKeysByRequestId,
             hotel: hotelPlanning,
           })
         : undefined;
@@ -378,6 +389,7 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
             resolveAirport: resolveAirport!,
             ...passengerSource!,
             ...(transportPlanning.maxOffersPerCorridor ? { maxOffersPerCorridor: transportPlanning.maxOffersPerCorridor } : {}),
+            preferredOfferKeysByRequestId,
           }),
         });
       }
@@ -474,8 +486,38 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
               requestsByDomain: { TRANSPORT: [transportResearch] },
               ...(hotelCompanionPlanning ? { budget: hotelCompanionPlanning.budget, nextRound: hotelCompanionPlanning.nextRound } : {}),
             },
-            materializeWorldForDomain: ({ domainId, evidence, basis: domainBasis }) => {
+            materializeWorldForDomain: async ({ domainId, evidence, basis: domainBasis }) => {
               if (domainId !== 'TRANSPORT') return undefined;
+              // CP4: bounded Qwen offer selection AFTER research, BEFORE propose.
+              // Only real boardable offer keys; fail-closed to deterministic rank.
+              if (deps.intelligence?.isConfigured() && !transportOfferPreference.byRequestId) {
+                const { corridors } = transportCorridors(domainBasis.world, domainBasis.failing, {
+                  resolveAirport: resolveAirport!,
+                  ...passengerSource!,
+                });
+                const selection = await suggestTransportOfferSelection(deps.intelligence, {
+                  corridors,
+                  toolResults: evidence.toolResults,
+                  now: domainBasis.now,
+                  maxOffersPerCorridor: transportPlanning.maxOffersPerCorridor ?? 6,
+                });
+                modelActivities.push({
+                  operation: 'recovery.offer_selection',
+                  ...selection.activity,
+                  observedAt: new Date().toISOString(),
+                });
+                if (Object.keys(selection.preferredOfferKeysByRequestId).length > 0) {
+                  transportOfferPreference.byRequestId = selection.preferredOfferKeysByRequestId;
+                }
+                if (selection.activity.status === 'SUCCEEDED') {
+                  const preferredCount = Object.values(selection.preferredOfferKeysByRequestId)
+                    .reduce((n, keys) => n + keys.length, 0);
+                  console.log(
+                    `[qwen] offer selection mode=${selection.activity.mode} model=${selection.activity.model}` +
+                      (preferredCount > 0 ? ` preferredKeys=${preferredCount}` : ' (deterministic fallback)'),
+                  );
+                }
+              }
               const materialized = materializeTransportOffers({
                 world: domainBasis.world,
                 failing: domainBasis.failing,
@@ -484,6 +526,7 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
                 resolveAirport: resolveAirport!,
                 ...passengerSource!,
                 ...(transportPlanning.maxOffersPerCorridor ? { maxOffersPerCorridor: transportPlanning.maxOffersPerCorridor } : {}),
+                preferredOfferKeysByRequestId,
               });
               capturedOfferServices.push(...materialized.capturedServices);
               capturedResolvedOffers.push(...materialized.resolvedOffers);

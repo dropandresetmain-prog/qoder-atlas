@@ -85,17 +85,24 @@ export function materializeTransportOffers(input: TransportPassengerSource & {
   now: Instant;
   resolveAirport: AirportResolver;
   maxOffersPerCorridor?: number;
+  preferredOfferKeysByRequestId?:
+    | Readonly<Record<string, readonly string[]>>
+    | (() => Readonly<Record<string, readonly string[]>> | undefined);
 }): MaterializedTransportOffers {
   const { corridors } = transportCorridors(input.world, input.failing, {
     resolveAirport: input.resolveAirport,
     ...(input.passengers ? { passengers: input.passengers } : {}),
     ...(input.passengersFor ? { passengersFor: input.passengersFor } : {}),
   });
+  const preferred = typeof input.preferredOfferKeysByRequestId === 'function'
+    ? input.preferredOfferKeysByRequestId()
+    : input.preferredOfferKeysByRequestId;
   const correlated = correlatedTransportOffers({
     corridors,
     toolResults: input.toolResults,
     now: input.now,
     maxOffersPerCorridor: input.maxOffersPerCorridor ?? 6,
+    ...(preferred ? { preferredOfferKeysByRequestId: preferred } : {}),
   });
   const corridorByRequest = new Map(corridors.map((corridor) => [transportRequestId(corridor), corridor]));
   const resultByRequest = new Map(input.toolResults.map((result) => [result.requestId, result]));
