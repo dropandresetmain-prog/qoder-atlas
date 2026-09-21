@@ -12,6 +12,8 @@ import { renderFocusedCaseGraph } from '../graph/index.ts';
 import { buildOriginalCurrentRegion, originalCurrentToggleScript } from '../originalCurrent.ts';
 import { casePollingScript } from '../casePolling.ts';
 import { OPERATOR_WORKSPACE_STYLES } from '../operatorWorkspaceStyles.ts';
+import { renderCaseWorkspaceScript } from '../operatorWorkspaceClient.ts';
+import { presentAssessment } from '../semantics/adapter.ts';
 import {
   authorityLabel, candidateFor, changeSummary, decisionActionState, decisionCosts,
   decisionMoney, decisionOptions, decisionText, decisionTime, decisionTitle,
@@ -261,7 +263,8 @@ function approvalHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
   }
   return `<section class="cw-card cw-approve cw-approve-sticky" data-test="approval-panel" data-strategy-ref="${strategy ? e(strategy.strategyRef) : ''}">
     <p class="cw-kicker">Decision</p>
-    <h2>${strategy ? e(decisionTitle(strategy)) : 'Recommendation not ready'}</h2>
+    <h2>Approval required before action.</h2>
+    <p class="cw-muted">Authority is checked separately from trip viability.</p>
     <dl class="cw-approval-facts">
       <dt>Current decision status</dt><dd>${e(authorityLabel(view.authorityState))}</dd>
       <dt>Approving party</dt><dd>The named approving party is not supplied in this case view. No organiser or traveller authority is assumed.</dd>
@@ -323,31 +326,71 @@ function technicalHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
     ${m.technical.unmappedSteps.length ? `<div data-test="focused-graph-unmapped"><p>${m.technical.unmappedSteps.length} causal ${m.technical.unmappedSteps.length === 1 ? 'step' : 'steps'} not shown on the graph</p>${list(m.technical.unmappedSteps)}</div>` : ''}${raw(m.technical)}`);
 }
 
+function recommendSheet(view: RecoveryCaseView): string {
+  const strategy = decisionOptions(view).recommended;
+  const title = strategy ? decisionTitle(strategy) : 'Recommendation not ready';
+  return `<section class="v5-recommend-sheet" data-test="recommend-sheet"><p class="cw-kicker">Recommended recovery</p>
+    <h2>${e(title)}</h2>
+    <a class="btn btn-primary" href="#cw-recommendation">Review recommendation →</a></section>`;
+}
+function compactActivity(m: CaseWorkspaceModel): string {
+  const rows = m.activity.rows.slice(0, 4);
+  const body = rows.length
+    ? rows.map((row) => `<div class="v5-activity-item"><div aria-hidden="true">${ROW_ICON[row.state]}</div><div><strong>${e(row.label)}</strong>${row.note ? `<p>${e(row.note)}</p>` : ''}</div></div>`).join('')
+    : '<p class="cw-muted">No observable activity has been recorded for this case yet.</p>';
+  return `<section aria-label="Northstar activity"><h2 class="v5-rail-title">Northstar activity</h2>${body}
+    <button type="button" class="v5-text-button" data-drawer-from="[data-poll-region='activity']" data-drawer-title="Northstar activity">View log →</button></section>`;
+}
+function wholeTripFoot(view: RecoveryCaseView): string {
+  const presented = presentAssessment(view.tripViability.verdict);
+  return `<div class="v5-trip-foot" data-test="whole-trip-state"><span>Whole trip</span><strong>${e(presented.label)}</strong></div>`;
+}
+
 export function renderProductRecoveryCase(view: RecoveryCaseView): string {
   const m = presentCaseWorkspace(view);
   const attrs = `data-case-ref="${e(view.caseRef)}" data-case-status="${e(view.status)}" data-case-phase="${m.phase}" data-projection-revision="${e(String(view.change.projectionRevision))}"${view.change.changeCursor ? ` data-change-cursor="${e(view.change.changeCursor)}"` : ''}`;
   const optionsRegion = `<div data-test="recovery-controls" data-case-ref="${e(view.caseRef)}">
     ${recommendationHtml(view)}${findRecoveryHtml(view, m)}
   </div>`;
-  return `${OPERATOR_WORKSPACE_STYLES}<main class="shell product-recovery-case case-workspace" data-test="product-recovery-case" ${attrs}>
+  return `${OPERATOR_WORKSPACE_STYLES}<main class="shell product-recovery-case case-workspace v5-workspace" data-test="product-recovery-case" ${attrs}>
     ${region('header', headerHtml(m))}
     ${region('lead', leadHtml(view, m))}
     ${region('graph', graphHtml(view, m))}
     ${region('affects', affectsHtml(m))}
-    <div class="case-decision-grid">
-      <div class="case-decision-main">
-        ${region('options', optionsRegion)}
+    <div class="v5-case-layout">
+      <div class="v5-case-main">
+        <div class="v5-case-tabs" role="tablist" aria-label="Recovery evidence">
+          <button type="button" class="v5-tab v5-tab-recommended is-active" data-case-tab="recovery" role="tab" aria-selected="true">Recommended recovery</button>
+          <button type="button" class="v5-tab" data-case-tab="options" role="tab" aria-selected="false">Other options</button>
+          <button type="button" class="v5-tab" data-case-tab="checks" role="tab" aria-selected="false">Checks &amp; sources</button>
+        </div>
+        <div class="case-decision-grid">
+          <div class="case-decision-main">
+            <div class="v5-panel" data-case-panel="recovery">
+              ${region('options', optionsRegion)}
+              ${region('execution', executionHtml(m))}
+              ${region('resolution', resolutionHtml(m))}
+            </div>
+            <div class="v5-panel" data-case-panel="options" hidden>
+              ${region('alternatives', `${alternativesHtml(view)}${rejectedHtml(view, m)}${allCandidatesHtml(view)}`)}
+            </div>
+            <div class="v5-panel" data-case-panel="checks" hidden>
+              ${region('activity', researchHtml(view, m))}
+              ${region('technical', technicalHtml(view, m))}
+            </div>
+          </div>
+        </div>
       </div>
-      <aside class="case-decision-rail" aria-label="Decision">
+      <aside class="v5-case-rail case-decision-rail" aria-label="Decision">
+        ${recommendSheet(view)}
         ${region('approval', approvalHtml(view, m), 'cw-poll-approval')}
+        ${compactActivity(m)}
+        ${wholeTripFoot(view)}
       </aside>
     </div>
-    <div class="case-follow">
-      ${region('alternatives', `${alternativesHtml(view)}${rejectedHtml(view, m)}${allCandidatesHtml(view)}`)}
-      ${region('activity', researchHtml(view, m))}
-      ${region('execution', executionHtml(m))}
-      ${region('resolution', resolutionHtml(m))}
-      ${region('technical', technicalHtml(view, m))}
-    </div>
-  </main>${originalCurrentToggleScript()}${casePollingScript({ caseRef: view.caseRef })}`;
+    <dialog class="v5-drawer" data-v5-drawer>
+      <div class="v5-drawer-head"><h2 data-v5-drawer-title>Details</h2><button type="button" data-v5-drawer-close>Close</button></div>
+      <div class="v5-drawer-body" data-v5-drawer-body></div>
+    </dialog>
+  </main>${originalCurrentToggleScript()}${casePollingScript({ caseRef: view.caseRef })}${renderCaseWorkspaceScript()}`;
 }

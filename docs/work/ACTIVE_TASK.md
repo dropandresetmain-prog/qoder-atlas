@@ -1,54 +1,50 @@
-# ACTIVE TASK — A5.1 FINAL PRODUCT TRUTH + FOUNDER E2E PASS
+# ACTIVE TASK — Operator Workspace V5 Implementation
 
 ## Identity
 
-- Worktree: `.worktrees/a5-final-truth`
-- Branch: `finish/a5-final-truth-repeat-freeze`
-- Base: `docs/a4-final-reconcile` @ `30374c56308c92e6a8bdf7d79ccf260b48fbec03`
-- Accepted A4 product: `finish/a4-destination-hotel-robustness` @ `546adf210db8ead343ecdac22b410515665c176a`
-- Current phase: **A5.1** (not A5.2 LIVE repeat, not A5.3 gates)
+- Branch: `ui/operator-workspace-v5`
+- Worktree: `.worktrees/ui-operator-workspace-v5`
+- Starting SHA: `b1727887143deb5307fdea27157994ceb1bcb47b`
+- Role: PRIMARY IMPLEMENTATION OWNER
 
-## A5.1 objective
+## Goal
 
-Min Htet can click through Sarah and Jordan from healthy → resolved presentation, understand the product without interpreting internals, and decide whether this is the final recording candidate.
+Founder-approved Overview + Case V5 composition on the real frontend, using production V7.2 / V5.6 graphs and authoritative read models.
 
-## Amber FAIL diagnosis (frozen)
+## Current checkpoint
 
-**WHAT WE KNOW**
+**CP1–CP5 implemented and focused-tested. CP6 physical hero walkthrough not run** (needs the live demo database). Verdict for this commit: **PARTIAL**.
 
-- Frontend adapter already maps `FAILED → alert/red`. Not a CSS-only bug.
-- During definitive connection failure, `firstBreakpoint` is typically the delayed **TIMING** arrival node with `semanticState: CHANGED` (amber/watch) — correct for delay.
-- Consecutive connection `MUST_HAPPEN_BEFORE` edges previously had **no** `semanticState` → renderer showed **neutral**, so the causal story lacked an unmistakable red failure.
-- D2 (`connection_below_minimum`) must stay AFFECTED/watch; D3 (`connection_broken` / negative gap) must be FAILED/alert.
+## Acceptance checklist
 
-**WHAT WE DO NOT KNOW**
+- [x] CP1 V5 layout primitives in `operatorWorkspaceStyles.ts` + tab/focus/drawer client
+- [x] CP2 Overview: Event health / All participants tabs, real `renderEventOverviewGraph()`, compact readiness, sticky attention rail, focus selector that does not drop other stories
+- [x] CP3 Case: real `renderFocusedCaseGraph()`, Recommended recovery default tab, sticky decision rail, trip viability separate from approval
+- [x] CP4 Compact case activity from the existing case activity rows; Overview rail links to the real activity log (no second feed)
+- [x] CP5 Tight connection (`connection_below_minimum` only) presents AT_RISK / CHECKING, not DISRUPTED / UNRESOLVED. Broken or other blocking failures stay DISRUPTED
+- [ ] CP6 Physical Sarah + Jordan demo walkthrough on the running product
+- [x] Anti-hardcoding CLEAN
+- [x] Focused UI tests + `tsc --noEmit`
 
-- Whether every recovered Original snapshot in historical Cases already carried connection edge states (old snapshots stay immutable).
+## Checks
 
-**KEY ASSUMPTION**
+- `test/operator-ui-convergence.test.ts`, `test/m9-product-surfaces.test.ts`, `test/eventOverview.test.ts`, `test/r2-case-workspace-integration.test.ts`: pass
+- `test/r4-f1-overview-hit-targets.test.ts`: 65/66 then Apply/Reset click re-run pass after moving the demo control into the main column
+- `tsc -p tsconfig.json --noEmit`: pass
+- `node scripts/anti-hardcoding-gate.mjs`: CLEAN
+- Not run: full `npm test`, `test:postgres`, live Sarah/Jordan browser rehearsal
 
-- Annotating producer-owned connection edges from evaluator reason codes is sufficient without painting every CHANGED object red.
+## Issue disposition
 
-**WHAT SHOULD BE TESTED NEXT**
+| Issue | Class | Notes |
+|---|---|---|
+| V5 composition vs old vertical stack | Act Now | Done in product overview/case screens |
+| Fleet hero | Act Now | Removed from overview readiness |
+| Tight connection painted red | Act Now | Read-model status + overview membership |
+| Overview activity rail without a feed on `OperatorOverview` | Ignore / Accept Risk | Link to Activity; do not invent entries |
+| Live Sarah/Jordan D1–D3 click-through | Act Now (next) | Needs demo runtime; not faked here |
+| Legacy `/operator` screens | Ignore / Accept Risk | Product path is product-* |
 
-- Founder browser QC of D1→D2→D3 on REPLAY; Sarah smoke after shared UI changes.
+## Next action
 
-## Act Now checklist
-
-- [x] Graph truth: connection edge AFFECTED/FAILED from evaluator
-- [x] Case graph above affects; Overview graph above Needs attention
-- [x] Cost labels: NEW SPEND vs POTENTIAL DISPLACED-BOOKING LOSS
-- [x] Overview camera: reframe on new focus identity only
-- [x] Jordan progression harness + founder runbook
-- [ ] Founder physical click-through (Min Htet)
-- [ ] A5.2 LIVE/SANDBOX on frozen candidate (blocked on founder approval)
-
-## Park
-
-- Full release gates (`npm test`, `test:postgres`, `test:migration`) — A5.3
-- Destructive Jordan provider bookings — A5.2
-- V5.6/V7.2 semantic redesign; planner/continuation/authority reopen
-
-## Exact next step
-
-Run focused tests for changed modules; push coherent A5.1 checkpoint when green; hand founder runbook.
+Boot the accepted demo runtime and walk Overview + Case for two simultaneous open cases, including connection at-risk then broken, against the V5 reference PNGs.

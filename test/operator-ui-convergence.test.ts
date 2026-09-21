@@ -73,7 +73,7 @@ test('Overview case navigation dominates and the full searchable population rema
   const attentionAt = html.indexOf('data-poll-region="overview-attention"');
   const summaryAt = html.indexOf('data-poll-region="overview-summary"');
   if (graphAt >= 0) {
-    assert.ok(summaryAt >= 0 && summaryAt < graphAt, 'readiness summary must precede the event graph');
+    assert.ok(graphAt < summaryAt, 'event graph must precede compact readiness');
     assert.ok(graphAt < attentionAt, 'event graph must precede Needs attention');
   }
   assert.match(html, /data-test="overview-readiness"/);

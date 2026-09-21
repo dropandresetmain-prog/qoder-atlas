@@ -96,9 +96,10 @@ export function candidateFor(view: RecoveryCaseView, strategy: RecoveryStrategyV
 
 export function decisionTitle(strategy: RecoveryStrategyView): string {
   const kinds = new Set(strategy.changes.map((c) => c.effectKind));
+  // Protected outcome leads. A programme change is the recovery even when travel changes travel with it.
+  if (kinds.has('CHANGE_PROGRAMME_ITEM_TIME')) return 'Reschedule the programme commitment';
   if (kinds.has('SELECT_OFFER')) return kinds.has('ADD_JOURNEY_STAY')
     ? 'Replace the flight and arrange accommodation' : 'Book replacement travel';
-  if (kinds.has('CHANGE_PROGRAMME_ITEM_TIME')) return 'Reschedule the programme commitment';
   if (kinds.has('ADD_JOURNEY_STAY')) return 'Arrange replacement accommodation';
   return 'Proposed whole-trip recovery';
 }

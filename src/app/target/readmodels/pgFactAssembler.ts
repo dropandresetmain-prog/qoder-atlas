@@ -77,6 +77,21 @@ function checkedRevisionNumber(stamp: bigint): number {
 /** Shared PASS/FAIL/UNKNOWN -> node semanticState mapping (FIG-6 fidelity). */
 const TONE_TO_STATE = { PASS: 'HEALTHY', FAIL: 'FAILED', UNKNOWN: 'UNKNOWN' } as const;
 
+/** A blocking failure that is only a below-minimum connection is watch/amber, not a broken trip. */
+function failingReasonCodes(dimensions: readonly { applicable: boolean; blocking: boolean; verdict: string; explanations: readonly { status: string; reasonCode: string }[] }[] | undefined): string[] {
+  const codes: string[] = [];
+  for (const dimension of dimensions ?? []) {
+    if (!dimension.applicable || !dimension.blocking || dimension.verdict !== 'FAIL') continue;
+    for (const explanation of dimension.explanations) {
+      if (explanation.status === 'FAIL' && explanation.reasonCode) codes.push(explanation.reasonCode);
+    }
+  }
+  return codes;
+}
+function tightConnectionOnly(reasonCodes: readonly string[]): boolean {
+  return reasonCodes.length > 0 && reasonCodes.every((code) => code === 'connection_below_minimum');
+}
+
 /**
  * Defect-1 fix. Stamps are `pg_current_xact_id()`, assigned at a
  * transaction's first write, not at commit — a transaction that starts
@@ -1261,18 +1276,20 @@ async function loadOperatorOverviewFactsInner(
     const facts = await loadRecoveryCaseFactsInner(client, workspaceId, c.id, generatedAt, undefined);
     if (!facts) continue;
     caseStamps.push(BigInt(facts.projectionRevision));
-    const status = facts.tripViability.verdict === 'FAIL'
-      ? 'DISRUPTED' as const
-      : facts.tripViability.verdict === 'PASS'
-        ? 'READY' as const
+    const status = facts.tripViability.verdict === 'PASS'
+      ? 'READY' as const
+      : facts.tripViability.verdict === 'FAIL'
+        ? (tightConnectionOnly((facts.causalPath ?? []).map((step) => step.reasonCode)) ? 'AT_RISK' as const : 'DISRUPTED' as const)
         : facts.status === 'EXECUTING'
           ? 'RECOVERING' as const
           : 'UNKNOWN' as const;
-    const remainder: RemainderViability = facts.tripViability.verdict === 'FAIL'
-      ? 'NOT_VIABLE'
-      : facts.tripViability.verdict === 'PASS'
-        ? 'VIABLE'
-        : 'UNKNOWN';
+    const remainder: RemainderViability = status === 'AT_RISK'
+      ? 'AT_RISK'
+      : facts.tripViability.verdict === 'FAIL'
+        ? 'NOT_VIABLE'
+        : facts.tripViability.verdict === 'PASS'
+          ? 'VIABLE'
+          : 'UNKNOWN';
     const affected = facts.affectedItems ?? [];
     let travellerLabel = affected[0] ?? 'Traveller';
     const firstJourney = affected.find((a) => a.startsWith('JOURNEY:'));
@@ -1397,6 +1414,8 @@ async function loadOperatorOverviewFactsInner(
     const tone: AssessmentTone = view.status === 'CURRENT' && view.assessment
       ? (view.assessment.overallVerdict === 'PASS' ? 'PASS' : view.assessment.overallVerdict === 'FAIL' ? 'FAIL' : 'UNKNOWN')
       : 'UNKNOWN';
+    const tightOnly = tone === 'FAIL' && tightConnectionOnly(failingReasonCodes(view.assessment?.dimensions));
+    const populationStatus = tone === 'PASS' ? 'READY' as const : tightOnly ? 'AT_RISK' as const : tone === 'FAIL' ? 'DISRUPTED' as const : 'UNKNOWN' as const;
     const programmeDimension = view.assessment?.dimensions.find((dimension) => dimension.dimension === 'programme_participation');
     for (const explanation of programmeDimension?.explanations ?? []) {
       const programmeRefs = [explanation.cause.subjectRef, ...explanation.relatedSubjects]
@@ -1452,8 +1471,8 @@ async function loadOperatorOverviewFactsInner(
       tripRef: `TRIP:${p.trip_id}`,
       travellerLabel: p.traveller_label,
       obligation: p.obligation,
-      status: tone === 'PASS' ? 'READY' : tone === 'FAIL' ? 'DISRUPTED' : 'UNKNOWN',
-      remainderViability: tone === 'PASS' ? 'VIABLE' : tone === 'FAIL' ? 'NOT_VIABLE' : 'UNKNOWN',
+      status: populationStatus,
+      remainderViability: populationStatus === 'READY' ? 'VIABLE' : populationStatus === 'AT_RISK' ? 'AT_RISK' : populationStatus === 'DISRUPTED' ? 'NOT_VIABLE' : 'UNKNOWN',
       evaluation: view.status,
       ...(linkedCaseId ? { caseRef: linkedCaseId } : {}),
     });
@@ -1463,7 +1482,7 @@ async function loadOperatorOverviewFactsInner(
       ref,
       kind: 'TRAVELLER' as const,
       label: p.traveller_label,
-      semanticState: TONE_TO_STATE[tone],
+      semanticState: populationStatus === 'AT_RISK' ? 'AFFECTED' as const : TONE_TO_STATE[tone],
       authority: 'AUTHORITATIVE' as const,
       ...(linkedCaseId ? { caseRef: linkedCaseId } : {}),
       evaluation: view.status,

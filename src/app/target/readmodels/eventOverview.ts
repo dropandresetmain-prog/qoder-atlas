@@ -34,8 +34,11 @@ function dateLabel(localDate: string): string {
 }
 
 function membershipOf(p: OperatorPopulationFact): Exclude<EventOverviewMembership, 'ATTENTION'> {
-  if (p.evaluation === 'CURRENT') return p.status === 'READY' ? 'CLEARED' : 'UNRESOLVED';
-  return 'CHECKING';
+  if (p.evaluation !== 'CURRENT') return 'CHECKING';
+  if (p.status === 'READY') return 'CLEARED';
+  // A tight connection is at risk, not a definitive break. Definitive failure stays unresolved/red.
+  if (p.status === 'AT_RISK' || p.status === 'RECOVERING') return 'CHECKING';
+  return 'UNRESOLVED';
 }
 
 interface ServiceGroup {
