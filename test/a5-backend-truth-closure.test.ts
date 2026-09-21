@@ -18,6 +18,7 @@ import { buildTravellerTripFacts } from '../src/app/target/readmodels/pgFactAsse
 import { projectFocusedGraph } from '../src/app/target/readmodels/projectFocusedGraph.ts';
 import { buildEventOverview } from '../src/app/target/readmodels/eventOverview.ts';
 import { decisionActionState, decisionOptions } from '../src/ui/caseDecisionPresentation.ts';
+import { TRUTH_LABEL } from '../src/ui/semantics/grammar.ts';
 import type { RecoveryCaseView } from '../src/contracts/v2/product/readModels.ts';
 import type { OperatorPopulationFact } from '../src/app/target/readmodels/types.ts';
 
@@ -369,4 +370,9 @@ test('A5: a tight connection paints the trip amber while a separate failure stay
   const broken = buildTravellerTripFacts({ tripRef: 'trip-1', amIOkay: 'NO', doesTheRestWork: 'NOT_VIABLE' });
   assert.equal(broken.currentSemanticState, 'FAILED');
   assert.equal(semanticStateFromAssessment('FAIL', 'TIGHT', true), 'FAILED');
+  const tones = ['PASS', 'PASS', 'PASS', 'PASS', 'FAIL'] as const;
+  const colours = tones.map((tone, index) => semanticStateFromAssessment(tone, undefined, index === 4));
+  assert.deepEqual(colours, ['HEALTHY', 'HEALTHY', 'HEALTHY', 'HEALTHY', 'FAILED']);
+  assert.equal(TRUTH_LABEL.proposed, 'Proposed · not committed');
+  assert.equal(TRUTH_LABEL.current, 'Current · authoritative');
 });

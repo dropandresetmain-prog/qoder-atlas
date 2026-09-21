@@ -11,7 +11,7 @@
 
 - [x] CP1 — programme horizon, validation limit, cost-before-blast comparator. Focused tests 23 PASS / 0 FAIL. Do not redesign unless a later focused test shows a defect.
 - [x] CP2 — seed/world truth. Jordan stay is confirmed lyf Bugis `z-xdzAxcv` (`lp6d67d`), four nights 29 Sep–3 Oct. Checked-in cancel tier is USD 670.77 with no zero-amount window, so the represented penalty is that full price, not zero and not the search-preview USD 167.69.
-- [ ] CP3 — backend/read-model/graph truth
+- [x] CP3 — read-model/graph contract. Shared service CHANGED on schedule change and RECOVERED after reprotection. Four PASS travellers stay HEALTHY; a separate blocking failure stays FAILED. Proposed truth label is “Proposed · not committed”. Colour fix `617ed6a`. Focused graph tests 45 PASS / 0 FAIL.
 - [ ] CP4 — Sarah full vertical
 - [ ] CP5 — Jordan full vertical
 - [ ] CP6 — same-world Sarah + Jordan product proof
@@ -38,4 +38,4 @@ Polling replaces the graph region only when `data-graph-scene-hash` changes, the
 
 ## Exact next step
 
-Checkpoint 3 still needs the Sarah schedule-change and reprotection graph states proven on the read model, then proposed-versus-committed programme detail. Do not reopen hotel penalty or the 95/82/impossible progression.
+Checkpoint 4: run Sarah through the normal product path and record why the programme swap beats the paid travel alternative. Do not reopen hotel penalty, the 95/82/impossible progression, or the graph colour rule.

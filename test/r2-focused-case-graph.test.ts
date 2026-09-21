@@ -680,3 +680,38 @@ test('A1 enrichment: programme commitment detail uses its canonical zone and UTC
   });
   assert.equal(result.nodes.find((node) => node.ref === 'PROGRAMME_ITEM:programme-1')?.detail, '5 Apr 11:30 → 12:30 GMT+8');
 });
+
+test('shared-flight cohort: a schedule change marks the service changed, and reprotection marks the replacement recovered', () => {
+  const ids = ['journey-1', 'journey-2', 'journey-3', 'journey-4', 'journey-5'];
+  const confirmed = ids.map((journeyId) => ({
+    journeyId,
+    serviceId: 'service-shared',
+    lineCount: 1,
+    lineStatus: 'CONFIRMED' as const,
+    reservationStatus: 'CONFIRMED' as const,
+  }));
+  const base = {
+    caseSubjects: ids.map((id) => ({ subject_kind: 'JOURNEY', subject_id: id, role: 'AFFECTED_TRAVELLER' })),
+    journeys: ids.map((id) => ({ id, trip_id: `trip-${id}`, traveller_id: `traveller-${id}`, lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null })),
+    journeyItems: ids.map((id, index) => ({ id: `item-${index}`, journey_id: id, kind: 'TRANSPORT' as const, order_key: String(index).padStart(3, '0'), lifecycle_status: 'PLANNED', intended_window_start: null, intended_window_end: null, selectedServiceId: 'service-shared' })),
+    transportServices: [{ id: 'service-shared', mode: 'AIR', operator: 'ID', origin_place_id: 'origin', destination_place_id: 'destination', published_departure: null, published_arrival: null }],
+    participations: [],
+    programmeItems: [],
+    objectives: [],
+    assessmentViews: new Map(),
+    travellerLabelsByJourney: new Map(ids.map((id) => [id, id])),
+    caseId: 'case-shared',
+    transportBookingFacts: confirmed,
+  };
+  const changed = projectFocusedCaseGraphEnrichment({
+    ...base,
+    changedTransportServiceRefs: new Set(['service-shared']),
+  });
+  assert.equal(changed.nodes.filter((node) => node.ref === 'SERVICE_BOOKING:service-shared' && node.semanticState === 'CHANGED').length, 1);
+  const reprotected = projectFocusedCaseGraphEnrichment({
+    ...base,
+    changedTransportServiceRefs: new Set(['service-shared']),
+    reprotectedTransportServiceRefs: new Set(['service-shared']),
+  });
+  assert.equal(reprotected.nodes.filter((node) => node.ref === 'SERVICE_BOOKING:service-shared' && node.semanticState === 'RECOVERED').length, 1);
+});
