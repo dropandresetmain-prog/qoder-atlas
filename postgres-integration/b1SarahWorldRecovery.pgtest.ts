@@ -198,7 +198,22 @@ describe('B1 internal recovery loop on the canonical programme world', () => {
     const planned = projectRecoveryCase((await loadRecoveryCaseFacts(pool, workspaceId, caseId, NOW))!);
     assert.ok(planned.planningEvidence, 'planning evidence visible on the Case read model');
     assert.ok(planned.planningEvidence!.candidates.length >= 1, JSON.stringify(planned.planningEvidence!.candidates));
-    const strategyId = planned.strategies.find((s) => s.viability === 'VIABLE')?.strategyRef ?? planningResult.viableStrategyRefs[0]!;
+    const recommendation = planningResult.recommendation;
+    assert.ok(recommendation, 'comparator produced a recommendation');
+    const strategyId = recommendation.recommendedStrategyRef;
+    const recommended = planned.planningEvidence!.candidates.find((candidate) => candidate.strategyRef === strategyId);
+    assert.ok(recommended, 'recommended candidate is on the case evidence');
+    assert.equal(recommended.domain.code, 'PROGRAMME', JSON.stringify({
+      basis: recommendation.recommendationBasis,
+      candidates: planned.planningEvidence!.candidates.map((candidate) => ({
+        domain: candidate.domain.code,
+        disposition: candidate.disposition.code,
+        strategyRef: candidate.strategyRef,
+        cost: candidate.costComparison,
+        blast: candidate.blastRadius,
+      })),
+    }));
+    assert.ok(recommendation.recommendationBasis.some((entry) => entry.code === 'deterministic_comparison'), JSON.stringify(recommendation.recommendationBasis));
 
     const approved = await callHandler(app, 'POST', `/api/v2/cases/${caseId}/strategies/${strategyId}/approve`, { now: NOW });
     assert.equal(approved.status, 200, JSON.stringify(approved.json));

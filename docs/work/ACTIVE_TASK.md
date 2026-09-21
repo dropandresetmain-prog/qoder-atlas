@@ -12,7 +12,7 @@
 - [x] CP1 — programme horizon, validation limit, cost-before-blast comparator. Focused tests 23 PASS / 0 FAIL. Do not redesign unless a later focused test shows a defect.
 - [x] CP2 — seed/world truth. Jordan stay is confirmed lyf Bugis `z-xdzAxcv` (`lp6d67d`), four nights 29 Sep–3 Oct. Checked-in cancel tier is USD 670.77 with no zero-amount window, so the represented penalty is that full price, not zero and not the search-preview USD 167.69.
 - [x] CP3 — read-model/graph contract. Shared service CHANGED on schedule change and RECOVERED after reprotection. Four PASS travellers stay HEALTHY; a separate blocking failure stays FAILED. Proposed truth label is “Proposed · not committed”. Colour fix `617ed6a`. Focused graph tests 45 PASS / 0 FAIL.
-- [ ] CP4 — Sarah full vertical
+- [x] CP4 — Sarah product path. `b1SarahWorldRecovery.pgtest.ts` 1 PASS / 0 FAIL. Reprotection now runs because pending reassessments are claimable when the scenario clock is behind wall time. Planning evidence fits after the candidate jsonb cap moved to 1 MiB. Recommended domain PROGRAMME. Basis: 0 regressions, 1 improvement, blast radius 3. No declared cost on that candidate, so cost did not break the tie. Approved that recommendation, executed, reassessment PASS, case RESOLVED.
 - [ ] CP5 — Jordan full vertical
 - [ ] CP6 — same-world Sarah + Jordan product proof
 - [ ] Final gates
@@ -36,10 +36,6 @@ Case and traveller-trip nodes use the connection-aware colour (`617ed6a`). A tig
 
 Polling replaces the graph region only when `data-graph-scene-hash` changes, then restores camera, view, and selection from `window.__northstarGraphState`. An unchanged hash correctly leaves the canvas alone. Do not add a second in-place update path.
 
-## CP4 started — Act Now
-
-`postgres-integration/b1SarahWorldRecovery.pgtest.ts` failed on a fresh world: airline reprotection ingress returned APPLIED, drain finished EMPTY, and `runCaseEscalation` had zero candidates (`outcomes=[]`). No current VIABILITY assessment was FAIL, so no case was linked to the change signal. Do not treat that as a graph-colour bug.
-
 ## Exact next step
 
-Find why the reprotected journeys are not FAIL after that ingress, then continue Sarah’s product path. Do not reopen hotel penalty, the 95/82/impossible progression, or the graph colour rule.
+Checkpoint 5: Jordan healthy → D1 → D2 → D3 → recovery → approval → execution → observation → reassessment on REPLAY, ending CURRENT/PASS and RESOLVED. Do not reopen Sarah’s comparator, hotel penalty amount, or the graph colour rule.

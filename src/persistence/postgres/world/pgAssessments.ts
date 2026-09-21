@@ -323,7 +323,13 @@ export class PgReassessmentWorker {
               lease_expires_at = $2::timestamptz + ($3 * interval '1 second'), updated_at = now()
         WHERE id = (
           SELECT id FROM scheduled_reassessments
-           WHERE ((state = 'PENDING' AND next_run_at <= $2::timestamptz) OR (state = 'CLAIMED' AND lease_expires_at < $2::timestamptz))
+           WHERE ((state = 'PENDING' AND (
+                    next_run_at <= $2::timestamptz
+                    -- Input-change rows are stamped with wall-clock next_run_at.
+                    -- A scenario clock behind that wall time must still run them
+                    -- once; retries (attempts > 0) keep their backoff.
+                    OR (attempts = 0 AND next_run_at <= clock_timestamp())
+                  )) OR (state = 'CLAIMED' AND lease_expires_at < $2::timestamptz))
              AND ($4::uuid IS NULL OR workspace_id = $4::uuid)
            ORDER BY next_run_at, id
            FOR UPDATE SKIP LOCKED
