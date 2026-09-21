@@ -55,12 +55,16 @@ function graphHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
     capturedAt: stored.capturedAt, capturedLabel: formatInstant(stored.capturedAt),
   } } : {}) });
   return `<section class="section cw-graph" data-test="focused-case-graph-section">
+    <div class="v5-graph-topline"><h2>How the trip is affected</h2></div>
     ${m.phase === 'recovered' ? `<p class="graph-caption" data-test="graph-resolved-note">${e(CASE_COPY.graphResolvedNote)}</p>` : ''}${toggle}</section>`;
 }
 
 function affectsHtml(m: CaseWorkspaceModel): string {
   if (!m.affects.items.length && !m.affects.healthyNote) return '';
-  return `<details class="cw-details v5-affects" data-test="case-affects" data-region-key="case-affects"><summary>${e(CASE_COPY.whatThisAffects)}</summary>
+  // Preview the already-supplied labels in the summary so the operator can read
+  // what is affected without opening the disclosure.
+  const preview = m.affects.items.map((item) => item.label).join(' · ');
+  return `<details class="cw-details v5-affects" data-test="case-affects" data-region-key="case-affects"><summary><span class="v5-affects-label">${e(CASE_COPY.whatThisAffects)}</span>${preview ? `<span class="v5-affects-preview">${e(preview)}</span>` : ''}</summary>
     <ul class="cw-compact-list">${m.affects.items.map((item) => `<li data-tone="${item.tone}"><strong>${e(item.label)}</strong> — ${e(item.note)}</li>`).join('')}</ul>
     ${m.affects.healthyNote ? `<p class="cw-muted">${e(m.affects.healthyNote)}</p>` : ''}</details>`;
 }
@@ -77,7 +81,11 @@ function changesHtml(strategy: RecoveryStrategyView): string {
 function moneySummaryHtml(candidate: PlanningCandidateView | undefined): string {
   const cost = decisionCosts(candidate?.costComparison);
   if (cost.unavailable) {
-    return `<p class="cw-muted" data-test="cost-unavailable">${e(cost.unavailable)}</p>`;
+    return `<div class="cw-metrics cw-metrics-unknown">
+      <div class="cw-metric" data-test="cost-new-spend"><small>NEW SPEND</small><strong>Not compared</strong></div>
+      <div class="cw-metric" data-test="cost-potential-loss"><small>POTENTIAL DISPLACED-BOOKING LOSS</small><strong>Not compared</strong></div>
+    </div>
+    <p class="cw-muted" data-test="cost-unavailable">${e(cost.unavailable)}</p>`;
   }
   const exposureNote = cost.exposure.some((line) => /up to/i.test(line.kind.label))
     ? ' · up to (source maximum)'
@@ -210,17 +218,34 @@ function rejectedHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
   const considered = (view.planningEvidence?.candidates ?? []).filter((c) =>
     c.disposition.code === 'REJECTED_VALIDATION' || c.disposition.code === 'REJECTED_DETERMINISTIC');
   if (!considered.length) return '';
-  const preview = considered.slice(0, 3).map((candidate) => {
-    const c = rejectionSummary(candidate);
-    return `<div class="cw-rejection" data-candidate-key="${e(candidate.candidateKey)}">
-      <div><strong>${e(c.label)}</strong><p class="cw-muted">${e(c.status)}</p></div>
+  // Candidates that present identically (same option name, status and recorded
+  // reason) are one row with a count. Presentation-only: nothing is dropped, and
+  // every candidate keeps its own evaluation disclosure.
+  const buckets: { summary: ReturnType<typeof rejectionSummary>; members: typeof considered }[] = [];
+  for (const candidate of considered) {
+    const summary = rejectionSummary(candidate);
+    const hit = buckets.find((bucket) => bucket.summary.label === summary.label
+      && bucket.summary.status === summary.status && bucket.summary.reason === summary.reason);
+    if (hit) hit.members.push(candidate);
+    else buckets.push({ summary, members: [candidate] });
+  }
+  const shown = buckets.slice(0, 3);
+  const preview = shown.map(({ summary: c, members }) => {
+    const first = members[0]!;
+    const evaluations = members.length === 1
+      ? details(`rejection-eval-${first.candidateKey}`, 'Inspect evaluation', proposalHtml(first))
+      : details(`rejection-eval-${first.candidateKey}`, `Inspect ${members.length} evaluations`,
+        members.map((member) => `<div data-candidate-key="${e(member.candidateKey)}">${proposalHtml(member)}</div>`).join(''));
+    return `<div class="cw-rejection" data-candidate-key="${e(first.candidateKey)}" data-grouped="${members.length}">
+      <div><strong>${e(c.label)}</strong><p class="cw-muted">${e(c.status)}${members.length > 1 ? ` · ${members.length} options` : ''}</p></div>
       <div><p>${e(c.reason)}</p>
-        ${details(`rejection-eval-${candidate.candidateKey}`, 'Inspect evaluation', proposalHtml(candidate))}
+        ${evaluations}
       </div></div>`;
   }).join('');
+  const shownCount = shown.reduce((sum, bucket) => sum + bucket.members.length, 0);
   return `<div class="cw-card cw-block" data-test="rejected-summary"><h3>${m.noPlan ? 'Why the automatic options stopped' : 'Why other options were not chosen'}</h3>
     ${preview}
-    ${considered.length > 3 ? `<p class="cw-muted">Showing 3 of ${considered.length} rejected options. Every recorded evaluation remains below.</p>` : ''}
+    ${shownCount < considered.length ? `<p class="cw-muted">Showing ${shownCount} of ${considered.length} rejected options. Every recorded evaluation remains below.</p>` : ''}
   </div>`;
 }
 
@@ -287,7 +312,7 @@ function researchHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
   const sources = m.researchSources;
   const sourceList = sources.map((source) => `<li><a href="${e(source.url)}" target="_blank" rel="noopener noreferrer">${e(source.publisher)}</a><br><span class="cw-muted">Checked ${e(source.checkedAt)}</span></li>`).join('');
   const total = evidence.tools.length + (evidence.modelActivities?.length ?? 0);
-  return `<section class="cw-card" data-test="case-activity"><h3>NORTHSTAR activity</h3>
+  return `<section class="cw-card" data-test="case-activity"><h3>What Northstar checked</h3>
     ${groups.length ? `<table class="cw-research-table"><thead><tr><th scope="col">Category</th><th scope="col">Observed outcome</th><th scope="col">Provider / source</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
     ${!groups.length && evidence.domains.length ? list(evidence.domains.map((d) => `${decisionText(d.domain.label, 'Research domain')}: ${decisionText(d.disposition.label, 'Status not supplied')}`)) : ''}
     ${evidence.candidates.length ? `<p class="cw-muted">${evidence.candidates.length} material options evaluated. Rejection and alternative evidence are preserved above.</p>` : ''}

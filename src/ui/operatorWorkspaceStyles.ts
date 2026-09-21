@@ -201,7 +201,8 @@ export const OPERATOR_WORKSPACE_STYLES = `<style data-operator-workspace-styles>
 
 /* Readiness sits under the graph and must stay subordinate to it. */
 .v5-readiness { margin-top: 20px; }
-.product-operator-overview .readout-buckets { gap: 8px 22px; margin-top: 10px; }
+/* Buckets span the bar they describe, as in the reference, rather than bunching. */
+.product-operator-overview .readout-buckets { justify-content: space-between; gap: 8px 22px; margin-top: 10px; }
 .product-operator-overview .readout-bucket .tile-count { font-size: 17px; font-weight: 500; }
 
 /* Attention rail: an editorial lead story, then demoted siblings. No boxes -
@@ -299,6 +300,35 @@ export const OPERATOR_WORKSPACE_STYLES = `<style data-operator-workspace-styles>
 .v5-case-tabs { margin-top: 14px; }
 .case-workspace .v5-panel > [data-poll-region] > .cw-card:first-child { margin-top: 18px; }
 
+/* Named section above the graph, matching the reference's quiet topline. The
+   Current/Original control is lifted onto that same row so the graph is not
+   pushed down by three separate rows of chrome. */
+.case-workspace .cw-graph { position: relative; }
+.case-workspace .v5-graph-topline { display: flex; align-items: center; gap: 12px; min-height: 34px; margin: 0 0 8px; }
+.case-workspace .v5-graph-topline h2 { margin: 0; font-size: 13px; font-weight: 600; }
+.case-workspace .cw-graph .oc-toggle { margin: 0; }
+.case-workspace .cw-graph .oc-tabs { position: absolute; top: -1px; right: 0; margin: 0; z-index: 1; }
+.case-workspace .cw-graph .oc-caption { margin: 0 0 8px; }
+@media (max-width: 680px) {
+  .case-workspace .cw-graph .oc-tabs { position: static; margin: 0 0 8px; }
+}
+
+/* "What this affects" previews its content in the summary. */
+.case-workspace details.v5-affects > summary { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.case-workspace .v5-affects-label { font-weight: 600; }
+.case-workspace .v5-affects-preview { font-weight: 400; font-size: 11px; color: var(--text-soft); min-width: 0; }
+
+/* Inside the recommended card, itinerary and commitment blocks are separated by
+   hairlines rather than nested panels - one container level, not three. */
+.case-workspace .cw-rec .cw-itinerary > article,
+.case-workspace .cw-alt .cw-itinerary > article {
+  background: none; border-radius: 0; padding: 12px 0; border-top: 1px solid var(--line-soft);
+}
+.case-workspace .cw-rec .cw-itinerary > article:first-child,
+.case-workspace .cw-alt .cw-itinerary > article:first-child { border-top: 0; padding-top: 4px; }
+.case-workspace .cw-rec .cw-itinerary { gap: 0; }
+.case-workspace .cw-rec .cw-block > h4 { font-size: 12px; letter-spacing: 0.01em; color: var(--text-soft); text-transform: none; }
+
 /* Decision rail: one question, its answer, then the money and the control. */
 .v5-case-rail .v5-decision-intro { margin: 0 0 10px; font-size: 11px; line-height: 1.45; }
 .v5-case-rail .cw-approval-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; align-items: baseline; }
@@ -307,6 +337,8 @@ export const OPERATOR_WORKSPACE_STYLES = `<style data-operator-workspace-styles>
 .v5-case-rail [data-test="cost-unavailable"], .v5-case-rail [data-test="decision-execution-blocker"] { font-size: 11px; line-height: 1.45; margin: 10px 0 0; }
 .v5-case-rail .cw-metrics { grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .v5-case-rail .cw-metric { padding: 9px 10px; }
+.v5-case-rail .cw-metrics-unknown .cw-metric { border-style: dashed; background: none; }
+.v5-case-rail .cw-metrics-unknown .cw-metric strong { color: var(--text-soft); font-weight: 600; }
 .v5-case-rail .cw-metric strong { font-size: 15px; }
 .v5-case-rail .btn { margin-top: 12px; }
 .v5-case-rail .v5-recommend-sheet .btn { display: flex; justify-content: center; }

@@ -182,9 +182,11 @@ export function rejectionSummary(candidate: PlanningCandidateView): { label: str
   const blocker = proposal?.blockers.find((check) => check.verdict === 'FAIL') ?? proposal?.blockers[0];
   const recordedReason = failedCommitment?.reasonCode ?? blocker?.reasonCode;
   const reason = recordedReason ? CASE_REASON_SENTENCE[recordedReason] : undefined;
+  const availableText = (minutes: number | undefined): string =>
+    minutes === undefined ? '' : minutes < 0 ? `${-minutes} min short` : `Time available: ${minutes} min`;
   const timings = failedCommitment
-    ? [failedCommitment.availableMinutes === undefined ? '' : `Time available: ${failedCommitment.availableMinutes} min`, failedCommitment.requiredMinutes === undefined ? '' : `Time required: ${failedCommitment.requiredMinutes} min`]
-    : [blocker?.timing?.gapMinutes === undefined ? '' : `Time available: ${blocker.timing.gapMinutes} min`, blocker?.timing?.requiredMinutes === undefined ? '' : `Time required: ${blocker.timing.requiredMinutes} min`];
+    ? [availableText(failedCommitment.availableMinutes), failedCommitment.requiredMinutes === undefined ? '' : `Time required: ${failedCommitment.requiredMinutes} min`]
+    : [availableText(blocker?.timing?.gapMinutes), blocker?.timing?.requiredMinutes === undefined ? '' : `Time required: ${blocker.timing.requiredMinutes} min`];
   const conciseSource = candidate.reasons.map(plain).find((r): r is string => r !== undefined && r.length <= 240);
   const delta = candidate.outcomeDelta[0];
   const outcomeWord = (value: string | undefined): string | undefined =>
@@ -200,9 +202,9 @@ export function rejectionSummary(candidate: PlanningCandidateView): { label: str
     label: decisionText(label, 'Another recovery option'),
     status: DISPOSITION[candidate.disposition.code ?? ''] ?? 'Not selected',
     reason: reason
-      ? `${failedCommitment ? `${decisionText(failedCommitment.label, 'Commitment')}: ` : ''}${reason}${timings.some(Boolean) ? ` (${timings.filter(Boolean).join('; ')})` : ''}.`
+      ? `${failedCommitment ? `${decisionText(failedCommitment.label, 'Commitment')}: ` : ''}${failedCommitment ? reason : sentenceCase(reason)}${timings.some(Boolean) ? ` (${timings.filter(Boolean).join('; ')})` : ''}.`
       : unknownReason
-        ? `${unknownReason}${timings.some(Boolean) ? ` (${timings.filter(Boolean).join('; ')})` : ''}.`
+        ? `${sentenceCase(unknownReason)}${timings.some(Boolean) ? ` (${timings.filter(Boolean).join('; ')})` : ''}.`
       : movement ?? conciseSource ?? fallback,
   };
 }
