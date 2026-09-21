@@ -137,6 +137,9 @@ export async function runDemoReadinessPreflight(options: DemoPreflightOptions): 
   }
 
   // --- Travellers / journeys coexistence ---
+  // AiT materialize creates trips/journeys as DRAFT by command default; Overview
+  // population includes every non-cancelled journey. Preflight must match that
+  // operable baseline — requiring ACTIVE alone rejects a correctly provisioned world.
   const travellerCount = await count(
     options.pool,
     'SELECT COUNT(*)::int AS n FROM travellers WHERE workspace_id = $1 AND lifecycle_status = $2',
@@ -144,8 +147,10 @@ export async function runDemoReadinessPreflight(options: DemoPreflightOptions): 
   );
   const journeyCount = await count(
     options.pool,
-    'SELECT COUNT(*)::int AS n FROM journeys WHERE workspace_id = $1 AND lifecycle_status = $2',
-    [options.workspaceId, 'ACTIVE'],
+    `SELECT COUNT(*)::int AS n FROM journeys
+      WHERE workspace_id = $1
+        AND lifecycle_status NOT IN ('COMPLETED', 'CANCELLED')`,
+    [options.workspaceId],
   );
   checks.push(check(
     'travellers_present',
@@ -157,7 +162,7 @@ export async function runDemoReadinessPreflight(options: DemoPreflightOptions): 
     'journeys_present',
     'required',
     journeyCount >= minJourneys,
-    `active journeys=${journeyCount} (min ${minJourneys})`,
+    `operable journeys=${journeyCount} (min ${minJourneys}; DRAFT+ACTIVE)`,
   ));
   checks.push(check(
     'multi_traveller_coexistence',
