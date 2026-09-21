@@ -367,10 +367,8 @@ export const OPERATOR_WORKSPACE_STYLES = `<style data-operator-workspace-styles>
 .v5-page-head-aside { display: flex; flex-direction: column; align-items: stretch; gap: 12px; min-width: 0; }
 .v5-page-head-aside .v5-event-meta { text-align: right; }
 .v5-page-head-aside .v5-event-meta { margin: 0; }
-/* Capped and pushed right: stretched across a full half the label, the link and
-   the three counts drift so far apart they stop reading as one meter, and the
-   counts land under bar positions they do not correspond to. */
-.v5-readiness-top { width: 100%; max-width: 480px; margin: 0 0 0 auto; padding: 0; border-bottom: 0; }
+/* Equal width with the title block: the meter fills its half of the band. */
+.v5-readiness-top { width: 100%; margin: 0; padding: 0; border-bottom: 0; }
 .v5-readiness-top .v5-readiness-title { margin-bottom: 8px; gap: 14px; }
 .v5-readiness-top .v5-readiness-title h2 {
   font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-soft);
@@ -380,10 +378,11 @@ export const OPERATOR_WORKSPACE_STYLES = `<style data-operator-workspace-styles>
 .v5-readiness-top .v5-readiness-bar { height: 14px; gap: 3px; border-radius: 999px; background: transparent; }
 .v5-readiness-top .v5-readiness-bar > span { border-radius: 999px; min-width: 0; }
 .v5-readiness-top .v5-readiness-bar .seg-unk { background: #dfe4e9; }
-/* A legend, grouped left. Spread across the meter the counts sit under bar
-   positions they do not correspond to, which implies a mapping that is false. */
-.v5-readiness-top .readout-buckets { justify-content: flex-start; gap: 6px 22px; margin-top: 11px; }
-.v5-readiness-top .readout-bucket { font-size: 12px; gap: 6px; align-items: baseline; }
+/* Equal columns under the bar. Spacing them by bar proportion would put each
+   count under a segment it does not measure; equal columns read as a legend. */
+.v5-readiness-top .readout-buckets { display: flex; gap: 6px 18px; margin-top: 12px; }
+.v5-readiness-top .readout-bucket { flex: 1 1 0; min-width: 0; font-size: 12px; gap: 6px; align-items: baseline; }
+.v5-readiness-top .readout-bucket .tile-label { white-space: nowrap; }
 .v5-readiness-top .readout-bucket .tile-count { font-size: 17px; font-weight: 600; }
 .v5-readiness-top .v5-readiness-dot { align-self: center; }
 /* State is never carried by colour alone - the dot repeats the label's tone. */

@@ -39,59 +39,78 @@ function obstaclesInCorridor(sx: number, sy: number, tx: number, ty: number, obs
 }
 
 /**
- * Whether a flat detour at `viaY` (spanning `viaFromX`..`viaToX`) is itself
- * free of every obstacle, not just the ones that blocked the original
- * corridor. Guards against trading one overlap for another.
+ * Whether the band the connector sweeps through (`exitX`..`entryX`, out to
+ * `viaY`) is free of every obstacle, not just the ones that blocked the
+ * original corridor. Guards against trading one overlap for another.
  */
-function bowIsClear(viaFromX: number, viaToX: number, viaY: number, obstacles: readonly Box[]): boolean {
-  const lo = Math.min(viaFromX, viaToX);
-  const hi = Math.max(viaFromX, viaToX);
+function bypassIsClear(exitX: number, entryX: number, viaY: number, obstacles: readonly Box[]): boolean {
+  const lo = Math.min(exitX, entryX);
+  const hi = Math.max(exitX, entryX);
   return obstacles.every((o) => !(o.x < hi && o.x + o.w > lo && o.y < viaY + 1 && o.y + o.h > viaY - 1));
 }
 
+/** A symmetric cubic reaches only this fraction of the way to its control row. */
+const CUBIC_MID_REACH = 0.75;
+
+/** Where a bypass leaves and re-enters its two cards, as a fraction of card width. */
+const BYPASS_EXIT_FRACTION = 0.68;
+const BYPASS_ENTRY_FRACTION = 0.32;
+
+export interface BypassGeometry {
+  readonly d: string;
+  readonly sourceX: number;
+  readonly sourceY: number;
+  readonly targetX: number;
+  readonly targetY: number;
+}
+
 /**
- * Sweep a horizontal (side/diagonal) curve above or below any obstacle cards
- * sitting in its straight-line corridor, so the edge no longer disappears
- * behind an intervening node. The detour stays a smooth curve -- one cubic
- * that arcs around the obstacle -- because an orthogonal lane reads as a
- * schematic, not as this graph's language.
+ * Route an edge that would otherwise pass behind an intervening card.
  *
- * Control points are placed beyond the clearance line, not on it: a symmetric
- * cubic only reaches 3/4 of the way to its controls at the midpoint
- * (y(0.5) = 0.25*y0 + 0.75*cy), so a control placed exactly on the clearance
- * line would leave the curve cutting the card's corner. Dividing by that
- * factor makes the arc's extreme land on the clearance line itself.
+ * Rather than leaving the source's side face and squeezing an arc through the
+ * same horizontal band as the obstacle, the edge leaves and re-enters on the
+ * SAME face of both cards -- both bottoms, or both tops -- and flows between
+ * them in the clear space outside the row. That is what makes it read as a
+ * deliberate route instead of a line sagging past something in its way.
  *
- * Returns null when nothing blocks the corridor, or when neither detour has
+ * The connector is one cubic whose controls are pushed beyond the clearance
+ * line: a symmetric cubic only reaches 3/4 of the way to its controls at the
+ * midpoint (y(0.5) = 0.25*y0 + 0.75*cy), so controls placed on the line would
+ * leave the curve cutting back into the card row. Dividing by that factor puts
+ * the curve's own extreme on the clearance line.
+ *
+ * Returns null when nothing blocks the corridor, or when neither face has
  * clearance -- callers then keep their original, unbowed curve rather than
  * risk a new overlap (conservative by design).
  */
-/** A symmetric cubic reaches only this fraction of the way to its control row. */
-const CUBIC_MID_REACH = 0.75;
-function bowedHorizontalPath(
-  sx: number, sy: number, tx: number, ty: number, obstacles: readonly Box[],
-): string | null {
+function bypassPath(
+  source: Box, target: Box, sx: number, sy: number, tx: number, ty: number, obstacles: readonly Box[],
+): BypassGeometry | null {
   const hits = obstaclesInCorridor(sx, sy, tx, ty, obstacles);
   if (hits.length === 0) return null;
 
-  const top = Math.min(...hits.map((o) => o.y));
-  const bottom = Math.max(...hits.map((o) => o.y + o.h));
-  const naturalMid = (sy + ty) / 2;
+  const obstacleTop = Math.min(...hits.map((o) => o.y));
+  const obstacleBottom = Math.max(...hits.map((o) => o.y + o.h));
+  // Leave/enter from the face nearest the clear side, and clear the deepest
+  // card involved so the connector never re-crosses a card edge.
+  const belowY = Math.max(obstacleBottom, source.y + source.h, target.y + target.h) + OBSTACLE_MARGIN;
+  const aboveY = Math.min(obstacleTop, source.y, target.y) - OBSTACLE_MARGIN;
+  const rowMid = (source.y + source.h / 2 + target.y + target.h / 2) / 2;
+
+  const exitX = source.x + source.w * BYPASS_EXIT_FRACTION;
+  const entryX = target.x + target.w * BYPASS_ENTRY_FRACTION;
   const candidates = [
-    { viaY: top - OBSTACLE_MARGIN, deviation: Math.abs(naturalMid - (top - OBSTACLE_MARGIN)) },
-    { viaY: bottom + OBSTACLE_MARGIN, deviation: Math.abs(naturalMid - (bottom + OBSTACLE_MARGIN)) },
+    { viaY: belowY, sourceY: source.y + source.h, targetY: target.y + target.h, deviation: Math.abs(belowY - rowMid) },
+    { viaY: aboveY, sourceY: source.y, targetY: target.y, deviation: Math.abs(aboveY - rowMid) },
   ].sort((a, b) => a.deviation - b.deviation);
 
-  const viaFromX = Math.max(sx, Math.min(...hits.map((o) => o.x)));
-  const viaToX = Math.min(tx, Math.max(...hits.map((o) => o.x + o.w)));
-
   for (const c of candidates) {
-    if (!bowIsClear(viaFromX, viaToX, c.viaY, obstacles)) continue;
-    // Push the control row past the clearance line so the arc's own extreme
-    // lands on it, then hold the controls over the obstacle span so the curve
-    // is flat-ish where it passes the card and steep where it leaves the nodes.
+    if (!bypassIsClear(exitX, entryX, c.viaY, obstacles)) continue;
     const controlY = (yEnd: number): number => yEnd + (c.viaY - yEnd) / CUBIC_MID_REACH;
-    return `M${r1(sx)} ${r1(sy)} C${r1(viaFromX)} ${r1(controlY(sy))},${r1(viaToX)} ${r1(controlY(ty))},${r1(tx)} ${r1(ty)}`;
+    return {
+      d: `M${r1(exitX)} ${r1(c.sourceY)} C${r1(exitX)} ${r1(controlY(c.sourceY))},${r1(entryX)} ${r1(controlY(c.targetY))},${r1(entryX)} ${r1(c.targetY)}`,
+      sourceX: exitX, sourceY: c.sourceY, targetX: entryX, targetY: c.targetY,
+    };
   }
   return null;
 }
@@ -110,10 +129,11 @@ export function sideCurve(
   const ty = target.y + target.h * targetFraction;
   const dx = Math.max(1, tx - sx);
   const handle = Math.max(4, Math.min(72, dx * 0.36));
-  const bowed = bowedHorizontalPath(sx, sy, tx, ty, obstacles);
+  const bypass = bypassPath(source, target, sx, sy, tx, ty, obstacles);
+  if (bypass) return { route: 'side', ...bypass };
   return {
     route: 'side',
-    d: bowed ?? `M${r1(sx)} ${r1(sy)} C${r1(sx + handle)} ${r1(sy)},${r1(tx - handle)} ${r1(ty)},${r1(tx)} ${r1(ty)}`,
+    d: `M${r1(sx)} ${r1(sy)} C${r1(sx + handle)} ${r1(sy)},${r1(tx - handle)} ${r1(ty)},${r1(tx)} ${r1(ty)}`,
     sourceX: sx, sourceY: sy, targetX: tx, targetY: ty,
   };
 }
@@ -132,10 +152,11 @@ export function diagonalCurve(
   const ty = target.y + target.h * targetFraction;
   const dx = Math.max(1, tx - sx);
   const handle = Math.max(30, Math.min(110, dx * 0.3));
-  const bowed = bowedHorizontalPath(sx, sy, tx, ty, obstacles);
+  const bypass = bypassPath(source, target, sx, sy, tx, ty, obstacles);
+  if (bypass) return { route: 'diagonal', ...bypass };
   return {
     route: 'diagonal',
-    d: bowed ?? `M${r1(sx)} ${r1(sy)} C${r1(sx + handle)} ${r1(sy)},${r1(tx - handle)} ${r1(ty)},${r1(tx)} ${r1(ty)}`,
+    d: `M${r1(sx)} ${r1(sy)} C${r1(sx + handle)} ${r1(sy)},${r1(tx - handle)} ${r1(ty)},${r1(tx)} ${r1(ty)}`,
     sourceX: sx, sourceY: sy, targetX: tx, targetY: ty,
   };
 }
