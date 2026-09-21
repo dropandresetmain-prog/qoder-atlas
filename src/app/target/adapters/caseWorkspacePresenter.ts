@@ -663,7 +663,8 @@ const EXECUTION_BLOCKER_COPY: Record<string, string> = {
   EXECUTION_INPUTS_UNAVAILABLE: 'This would work, but we do not yet hold the traveller’s booking details (legal name and contact), so it cannot be booked automatically.',
   FRESH_PROVIDER_QUOTE_REQUIRED: 'This fare was checked from saved records, not with the airline. A fresh live price check is needed before it can be booked.',
 };
-function executionBlockerLine(blocker: { code: string; message: string }): string {
+/** Shared so every surface states one blocker in one operator voice. */
+export function executionBlockerLine(blocker: { code: string; message: string }): string {
   return EXECUTION_BLOCKER_COPY[blocker.code] ?? plain(blocker.message) ?? 'This option cannot be carried out yet.';
 }
 

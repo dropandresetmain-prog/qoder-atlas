@@ -92,7 +92,9 @@ test('Overview case navigation dominates and the full searchable population rema
   assert.match(html, /data-test="overview-activity-empty"/);
   assert.match(html, /data-test="overview-activity-log"[^>]*>View log →/);
   assert.match(html, /\.v5-context-rail[^{]*\{[^}]*overflow:\s*visible/);
-  assert.match(html, /\.v5-context-rail \.qrow[^{]*\{[^}]*grid-template-areas:\s*"glyph main" "\. right"/);
+  // Rail stories stack: story text, then the case CTA beneath it on its own row.
+  assert.match(html, /\.v5-context-rail \.qrow[^{]*\{[^}]*grid-template-areas:\s*"main" "right"/);
+  assert.match(html, /\.v5-context-rail \.q-glyph \{ display: none; \}/);
 });
 
 test('Overview activity rail projects the latest real ActivityFeed without inventing entries', () => {

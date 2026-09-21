@@ -125,9 +125,9 @@ export const OPERATOR_WORKSPACE_STYLES = `<style data-operator-workspace-styles>
 .v5-context-rail .queue { display: flex; flex-direction: column; gap: 0; }
 .v5-context-rail .qrow {
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
-  grid-template-areas: "glyph main" ". right";
-  column-gap: 10px; row-gap: 8px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "main" "right";
+  column-gap: 0; row-gap: 8px;
   padding: 0 0 14px; margin: 0 0 14px;
   border: 0; border-bottom: 1px solid var(--border); border-radius: 0;
   background: none; box-shadow: none; transform: none; text-decoration: none; color: inherit;
@@ -206,6 +206,10 @@ export const OPERATOR_WORKSPACE_STYLES = `<style data-operator-workspace-styles>
 
 /* Attention rail: an editorial lead story, then demoted siblings. No boxes -
    the rail is a column of hairline-separated stories, not a stack of cards. */
+.v5-context-rail .queue { background: none; border: 0; border-radius: 0; box-shadow: none; overflow: visible; }
+/* The coloured dot on the state line already carries the tone, so the queue
+   glyph would be a second status mark on the same row. */
+.v5-context-rail .q-glyph { display: none; }
 .v5-context-rail .qrow { padding: 0 0 18px; margin: 0 0 18px; row-gap: 10px; }
 .v5-context-rail .qrow:last-child { border-bottom: 0; }
 .v5-context-rail .q-state { display: flex; align-items: center; gap: 6px; font-size: 11px; line-height: 1.3; color: var(--text-soft); }
@@ -233,10 +237,87 @@ export const OPERATOR_WORKSPACE_STYLES = `<style data-operator-workspace-styles>
 .v5-activity-item:last-of-type { border-bottom: 0; }
 .v5-activity-footer { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 4px; }
 
+/* Participant directory: a scannable table, not a stack of tall cards. The
+   filters must not look like a second row of page tabs. */
+.product-operator-overview .roster-tools { gap: 10px; margin-bottom: 0; padding: 16px 0 14px; }
+.product-operator-overview [data-test="roster-filters"] { gap: 4px; padding-bottom: 0; }
+.product-operator-overview [data-test="roster-filters"] .v5-tab {
+  padding: 6px 10px; border-radius: 5px; font-size: 12px; color: var(--text-soft);
+}
+.product-operator-overview [data-test="roster-filters"] .v5-tab:after { display: none; }
+.product-operator-overview [data-test="roster-filters"] .v5-tab[aria-pressed="true"] {
+  color: var(--text); font-weight: 600; background: #edf3f8;
+}
+.product-operator-overview [data-overview-panel="participants"] .queue {
+  border: 0; border-radius: 0; box-shadow: none; background: none; overflow: visible;
+}
+.product-operator-overview [data-overview-panel="participants"] .qrow {
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center; gap: 14px; padding: 10px 0; border-top: 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+/* Name and context read as one line so the directory scans like a table. */
+.product-operator-overview [data-overview-panel="participants"] .qrow > div:not(.b-right) {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; min-width: 0;
+}
+.product-operator-overview [data-overview-panel="participants"] .q-name { font-size: 13px; font-weight: 600; }
+.product-operator-overview [data-overview-panel="participants"] .q-issue { font-size: 12px; color: var(--text-soft); margin: 0; }
+.product-operator-overview [data-overview-panel="participants"] .b-extra { flex-basis: 100%; margin: 2px 0 0; font-size: 11px; }
+/* Status and actions sit in fixed columns so the directory scans vertically. */
+.product-operator-overview [data-overview-panel="participants"] .b-right {
+  display: grid; grid-template-columns: 150px minmax(0, auto); align-items: center;
+  justify-items: start; gap: 12px; flex-wrap: nowrap;
+}
+.product-operator-overview [data-overview-panel="participants"] .roster-actions { justify-self: end; }
+.product-operator-overview [data-overview-panel="participants"] .case-open { padding: 6px 11px; font-size: 12px; }
+.product-operator-overview [data-overview-panel="participants"] .roster-actions { gap: 8px; }
+.product-operator-overview [data-overview-panel="participants"] .badge { font-size: 10px; }
+
 /* Demo control must not compete with the workspace. */
 .product-operator-overview [data-test="simulated-airline-update"] { margin-top: 26px; border: 0; border-top: 1px solid var(--border); border-radius: 0; background: none; padding: 14px 0 0; }
 .product-operator-overview [data-test="simulated-airline-update"] > summary { font-size: 12px; color: var(--text-soft); }
 .product-operator-overview [data-test="simulated-airline-update"] > summary strong { font-weight: 500; }
+
+/* ---- Case ----------------------------------------------------------------- */
+/* Breadcrumb above the title; the timestamp is meta, not part of the problem. */
+.v5-case-head .v5-breadcrumb { margin: 0 0 10px; font-size: 11px; color: var(--text-soft); }
+.v5-case-head h1 { margin: 0; }
+.v5-case-head .sub { margin-top: 8px; font-size: 15px; max-width: 70ch; }
+.v5-case-head .v5-case-updated { margin-top: 8px; font-size: 11px; }
+
+/* Graph is the first thing an operator reads, so the chrome above it stays thin. */
+.case-workspace .oc-toggle { margin-top: 4px; }
+.case-workspace .oc-caption { margin: 8px 0 10px; font-size: 11px; color: var(--text-soft); }
+.case-workspace .cw-graph { margin-bottom: 16px; }
+
+/* "What this affects" is a one-line disclosure, not a boxed card. */
+.case-workspace details.v5-affects { border: 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); border-radius: 0; background: none; padding: 0; margin: 0; }
+.case-workspace details.v5-affects > summary { padding: 13px 0; font-size: 12px; font-weight: 600; }
+.case-workspace details.v5-affects[open] > summary { margin-bottom: 0; }
+.case-workspace .v5-affects .cw-compact-list { padding-bottom: 12px; }
+
+.v5-case-tabs { margin-top: 14px; }
+.case-workspace .v5-panel > [data-poll-region] > .cw-card:first-child { margin-top: 18px; }
+
+/* Decision rail: one question, its answer, then the money and the control. */
+.v5-case-rail .v5-decision-intro { margin: 0 0 10px; font-size: 11px; line-height: 1.45; }
+.v5-case-rail .cw-approval-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; align-items: baseline; }
+.v5-case-rail .cw-approval-facts dt { margin: 0; font-size: 11px; }
+.v5-case-rail .cw-approval-facts dd { margin: 0; font-size: 12px; font-weight: 600; }
+.v5-case-rail [data-test="cost-unavailable"], .v5-case-rail [data-test="decision-execution-blocker"] { font-size: 11px; line-height: 1.45; margin: 10px 0 0; }
+.v5-case-rail .cw-metrics { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.v5-case-rail .cw-metric { padding: 9px 10px; }
+.v5-case-rail .cw-metric strong { font-size: 15px; }
+.v5-case-rail .btn { margin-top: 12px; }
+.v5-case-rail .v5-recommend-sheet .btn { display: flex; justify-content: center; }
+
+/* Activity rows in the case rail follow the same one-headline shape. */
+.v5-case-rail .check-row { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); align-items: start; }
+.v5-case-rail .check-row .c-ic { font-size: 11px; color: var(--text-soft); line-height: 1.5; }
+.v5-case-rail .check-row .c-t { font-size: 12px; font-weight: 600; line-height: 1.4; }
+.v5-case-rail .check-row .c-sub { grid-column: 2; font-size: 11px; color: var(--text-soft); line-height: 1.4; margin-top: 2px; }
+.v5-trip-foot strong.tone-alert { color: #bb4c42; }
+.v5-trip-foot strong.tone-ok { color: #287c5d; }
 
 @media (max-width: 1100px) {
   .v5-overview-layout, .v5-case-layout { grid-template-columns: 1fr; }

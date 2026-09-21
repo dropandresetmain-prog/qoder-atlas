@@ -104,7 +104,7 @@ function overviewItemRow(item: OperatorOverviewItem): string {
     : `<div class="qrow" ${attrs}>${body}</div>`;
 }
 function populationRow(entry: OperatorOverview['population'][number], issueOverride?: string): string {
-  const issue = issueOverride ?? `${operationalStatusLabel(entry.status)} · ${entry.obligation === 'REQUIRED' ? 'Required commitment' : 'Optional commitment'}`;
+  const issue = issueOverride ?? (entry.obligation === 'REQUIRED' ? 'Required commitment' : 'Optional commitment');
   const evaluation = entry.evaluation === 'CURRENT' ? '' : `<p class="b-extra">Assessment ${e(entry.evaluation.toLowerCase().split('_').join(' '))}</p>`;
   return `<div class="qrow" data-test="population-row" data-journey-ref="${e(entry.journeyRef)}" data-status="${entry.status}">
     <span class="q-glyph" aria-hidden="true"><i class="${semanticToneDotClass(operationalStatusTone(entry.status))}"></i></span>

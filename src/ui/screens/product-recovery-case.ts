@@ -4,7 +4,7 @@
  * survive refresh. Stops before consequential A4 work.
  */
 import type { PlanningCandidateView, RecoveryCaseView, RecoveryStrategyView } from '../../contracts/v2/product/readModels.ts';
-import { presentCaseWorkspace, type CaseRow, type CaseWorkspaceModel } from '../../app/target/adapters/caseWorkspacePresenter.ts';
+import { executionBlockerLine, presentCaseWorkspace, type CaseRow, type CaseWorkspaceModel } from '../../app/target/adapters/caseWorkspacePresenter.ts';
 import { SHELL_LINKS } from '../../app/target/productShell.ts';
 import { CASE_COPY, CASE_CHANGE_TYPE_SENTENCE, CASE_REASON_SENTENCE } from '../copy.ts';
 import { escapeHtml, formatInstant } from '../html.ts';
@@ -37,10 +37,11 @@ function headerHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
   const problem = m.whereItBreaks
     ? `<span data-test="focused-graph-first-breakpoint">Where it breaks: <strong>${e(m.whereItBreaks.label)}</strong> — ${e(m.whereItBreaks.phrase)}.</span>`
     : e(fallback);
-  return `<div class="page-head"><h1>${e(m.heading)} ${badge(m.statusLabel, m.statusTone)}</h1>
+  return `<div class="page-head v5-case-head">
+    <p class="v5-breadcrumb"><a href="${SHELL_LINKS.dashboard}" data-test="back-to-overview">${e(CASE_COPY.backToOverview)}</a></p>
+    <h1>${e(m.heading)} ${badge(m.statusLabel, m.statusTone)}</h1>
     <p class="sub" data-test="case-problem">${problem}</p>
-    <p class="cw-muted"><a href="${SHELL_LINKS.dashboard}" data-test="back-to-overview">${e(CASE_COPY.backToOverview)}</a>
-    · Updated <time datetime="${e(m.generatedAt)}">${e(formatInstant(m.generatedAt))}</time></p></div>`;
+    <p class="cw-muted v5-case-updated">Updated <time datetime="${e(m.generatedAt)}">${e(formatInstant(m.generatedAt))}</time></p></div>`;
 }
 
 function graphHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
@@ -76,7 +77,7 @@ function changesHtml(strategy: RecoveryStrategyView): string {
 function moneySummaryHtml(candidate: PlanningCandidateView | undefined): string {
   const cost = decisionCosts(candidate?.costComparison);
   if (cost.unavailable) {
-    return `<p class="cw-muted" data-test="cost-unavailable">${e(cost.unavailable.includes('could not be compared') ? cost.unavailable : `Cost could not be compared: ${cost.unavailable}`)}</p>`;
+    return `<p class="cw-muted" data-test="cost-unavailable">${e(cost.unavailable)}</p>`;
   }
   const exposureNote = cost.exposure.some((line) => /up to/i.test(line.kind.label))
     ? ' · up to (source maximum)'
@@ -106,7 +107,7 @@ function costBreakdownHtml(candidate: PlanningCandidateView | undefined, key: st
 function proposalHtml(candidate: PlanningCandidateView | undefined): string {
   const p = candidate?.proposal;
   if (!p) return '<p class="cw-muted">Detailed itinerary evidence was not supplied for this option.</p>';
-  const flights = p.flights.map((flight) => `<article><p class="cw-kicker">Flight · proposed — not yet applied</p><h4>${e(decisionText(flight.label, 'Replacement flight'))}</h4>
+  const flights = p.flights.map((flight) => `<article><p class="cw-kicker">Flight</p><h4>${e(decisionText(flight.label, 'Replacement flight'))}</h4>
     ${flight.originLabel || flight.destinationLabel ? `<p>${e(decisionText(flight.originLabel, 'Origin not supplied'))} → ${e(decisionText(flight.destinationLabel, 'Destination not supplied'))}</p>` : ''}
     <dl class="cw-times"><div><dt>Depart</dt><dd>${e(decisionTime(flight.departure, flight.departureTimeZone))}</dd></div><div><dt>Arrive</dt><dd>${e(decisionTime(flight.arrival, flight.arrivalTimeZone))}</dd></div></dl></article>`).join('');
   const stays = p.stays.map((stay) => {
@@ -114,7 +115,7 @@ function proposalHtml(candidate: PlanningCandidateView | undefined): string {
     const placeContext = stay.propertyLabel && stay.propertyLabel !== stay.placeLabel
       ? `<p class="cw-muted">Place context: ${e(stay.placeLabel)}</p>`
       : '';
-    return `<article><p class="cw-kicker">Accommodation · proposed — not yet applied</p><h4>${e(decisionText(property, 'Property not supplied'))}</h4>
+    return `<article><p class="cw-kicker">Accommodation</p><h4>${e(decisionText(property, 'Property not supplied'))}</h4>
     ${placeContext}<p>${e(decisionTime(stay.start, stay.timeZone))} → ${e(decisionTime(stay.end, stay.timeZone))}</p></article>`;
   }).join('');
   const checks = p.programmeChecks ?? [];
@@ -162,16 +163,16 @@ function recommendationHtml(view: RecoveryCaseView): string {
   const reasons = [...outcomes, ...basis].slice(0, 3);
   const unresolved = view.uncertainty.map((text) => decisionText(text, '')).filter((text) => text.length > 0).slice(0, 3);
   return `<article class="cw-card cw-rec option-card is-recommended" id="cw-recommendation" data-test="recovery-strategy" data-strategy-ref="${e(strategy.strategyRef)}" data-option-number="${strategy.optionNumber}">
-    <p class="cw-kicker">Recommended recovery · proposed — not yet applied</p>
+    <p class="cw-kicker">Proposed — not yet applied</p>
     <h3>${e(decisionTitle(strategy))}</h3>
     ${proposalHtml(candidate)}
     <div class="cw-block"><h4>Why this proposal</h4>${list(reasons)}
-      <p class="cw-muted">${strategy.projectedSummary.pass} passed · ${strategy.projectedSummary.fail} failed · ${strategy.projectedSummary.unknown} unconfirmed across ${strategy.projectedSummary.total} assessed items.</p>
+      <p class="cw-muted">${strategy.projectedSummary.pass} passed · ${strategy.projectedSummary.fail} failed · ${strategy.projectedSummary.unknown} unconfirmed across ${strategy.projectedSummary.total} assessed item${strategy.projectedSummary.total === 1 ? '' : 's'}.</p>
       ${unresolved.length ? `<h4>Still unresolved</h4>${list(unresolved)}` : ''}
       ${details(`outcome-checks-${strategy.strategyRef}`, 'All projected outcome checks', list(strategy.resolves.map((c) => `${c.projectedVerdict === 'PASS' ? 'Passed' : c.projectedVerdict === 'FAIL' ? 'Failed' : 'Unconfirmed'} — ${decisionText(c.personLabel, 'Traveller')}`)))}</div>
     ${strategy.changes.some((c) => c.effectKind === 'CANCEL_STAY') ? '<p class="cw-muted">Cancellation of the displaced stay is proposed, not completed.</p>' : ''}
     ${costBreakdownHtml(candidate, strategy.strategyRef)}
-    ${strategy.executionBlocker ? `<p class="cw-muted" data-test="option-execution-blocker"><strong>Execution unavailable:</strong> ${e(decisionText(strategy.executionBlocker.message, 'This runtime cannot execute this option yet.'))}</p>` : ''}
+    ${strategy.executionBlocker ? `<p class="cw-muted" data-test="option-execution-blocker"><strong>Cannot be carried out yet:</strong> ${e(executionBlockerLine(strategy.executionBlocker))}</p>` : ''}
   </article>`;
 }
 
@@ -256,8 +257,9 @@ function approvalHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
   return `<section class="cw-card cw-approve cw-approve-sticky" data-test="approval-panel" data-strategy-ref="${strategy ? e(strategy.strategyRef) : ''}">
     <p class="cw-kicker">Decision</p>
     <h2>Approval required before action.</h2>
+    <p class="cw-muted v5-decision-intro">Authority is checked separately from whether the trip works.</p>
     <dl class="cw-approval-facts">
-      <dt>Current decision status</dt><dd>${e(authorityLabel(view.authorityState))}</dd>
+      <dt>Approval</dt><dd>${e(authorityLabel(view.authorityState))}</dd>
     </dl>
     ${moneySummaryHtml(candidate)}
     ${conditions.length ? `<p class="cw-muted">${conditions.length} material condition${conditions.length === 1 ? '' : 's'} recorded on the recommendation.</p>` : ''}
@@ -331,9 +333,19 @@ function compactActivity(m: CaseWorkspaceModel): string {
   return `<section aria-label="Northstar activity"><h2 class="v5-rail-title">Northstar activity</h2>${body}
     <button type="button" class="v5-text-button" data-drawer-from="[data-poll-region='activity']" data-drawer-title="Northstar activity">View log →</button></section>`;
 }
+/**
+ * Whole-trip state in the rail foot. The supplied verdict is unchanged; only the
+ * word an operator reads is. A trip is never implied recovered here unless the
+ * supplied verdict says so.
+ */
+const TRIP_FOOT_LABEL: Record<string, string> = {
+  PASS: 'Recovered', FAIL: 'Not yet recovered', UNKNOWN: 'Not confirmed',
+};
 function wholeTripFoot(view: RecoveryCaseView): string {
-  const presented = presentAssessment(view.tripViability.verdict);
-  return `<div class="v5-trip-foot" data-test="whole-trip-state"><span>Whole trip</span><strong>${e(presented.label)}</strong></div>`;
+  const verdict = view.tripViability.verdict;
+  const presented = presentAssessment(verdict);
+  const label = TRIP_FOOT_LABEL[verdict] ?? presented.label;
+  return `<div class="v5-trip-foot" data-test="whole-trip-state" data-trip-verdict="${e(verdict)}"><span>Whole trip</span><strong class="tone-${presented.tone}">${e(label)}</strong></div>`;
 }
 
 export function renderProductRecoveryCase(view: RecoveryCaseView): string {

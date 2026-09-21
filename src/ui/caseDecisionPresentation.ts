@@ -3,6 +3,8 @@
  * preserve the recorded recommendation, distinguish quoted spend from possible
  * loss, and keep incomplete research incomplete. No provider calls or writes.
  */
+import { sentenceCase } from '../app/target/adapters/surfaceLabels.ts';
+import { executionBlockerLine } from '../app/target/adapters/caseWorkspacePresenter.ts';
 import type {
   PlanningCandidateView, PlanningCostComparisonView, RecoveryCaseView,
   RecoveryStrategyView,
@@ -43,7 +45,9 @@ export function decisionActionState(view: RecoveryCaseView): DecisionActionState
     return {
       kind: 'blocked',
       code: blocker.code,
-      reason: decisionText(blocker.message, 'This option cannot be executed by this runtime yet.'),
+      // The supplied message is written for an engineer; present the operator
+      // wording already mapped for this blocker code. Meaning is unchanged.
+      reason: executionBlockerLine(blocker),
     };
   }
   return { kind: 'ready', strategyRef: options.recommended.strategyRef };
@@ -150,9 +154,11 @@ export function sumDisplayedMoney(amounts: readonly Money[]): string[] | undefin
 export function decisionCosts(comparison: PlanningCostComparisonView | undefined) {
   if (!comparison || comparison.status === 'UNAVAILABLE') return {
     spend: [], exposure: [], other: [],
+    // Supplied reasons arrive mid-sentence; they now stand alone, so they are
+    // sentence-cased here rather than carried behind a restating prefix.
     unavailable: comparison?.status === 'UNAVAILABLE'
-      ? decisionText(comparison.reason, 'The required price or currency evidence is unavailable.')
-      : 'No cost comparison was supplied. This does not mean the recovery is free.',
+      ? `Cost could not be compared: ${decisionText(comparison.reason, 'the required price or currency evidence is unavailable')}.`
+      : 'No cost was compared for this option — which is not the same as free.',
   };
   const spend = comparison.lines.filter((line) => line.kind.code === 'SELECT_OFFER' || line.kind.code === 'ADD_JOURNEY_STAY');
   const exposure = comparison.lines.filter((line) => line.kind.code === 'POLICY_PENALTY_ESTIMATE');
@@ -246,6 +252,7 @@ export function authorityLabel(value: string): string {
     NOT_REQUESTED: 'Approval not requested', NOT_REQUIRED: 'No additional approval required in the recorded state',
     AUTHORIZED: 'Authority granted', GRANTED: 'Authority granted', APPROVED: 'Approval recorded',
     REJECTED: 'Approval declined', DENIED: 'Authority denied', UNKNOWN: 'Authority not confirmed',
-  } as Record<string, string>)[value] ?? (value.toLowerCase() === 'none'
-    ? 'No authority decision recorded' : plain(value) ?? 'Authority details not confirmed');
+    AWAITING: 'Awaiting approval', PENDING_APPROVAL: 'Awaiting approval',
+  } as Record<string, string>)[value.toUpperCase()] ?? (value.toLowerCase() === 'none'
+    ? 'No authority decision recorded' : sentenceCase(plain(value) ?? '') || 'Authority details not confirmed');
 }
