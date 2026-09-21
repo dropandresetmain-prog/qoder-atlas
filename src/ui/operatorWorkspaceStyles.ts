@@ -181,8 +181,16 @@ export const OPERATOR_WORKSPACE_STYLES = `<style data-operator-workspace-styles>
 .v5-panel[hidden] { display: none !important; }
 /* ---- V5 visual convergence pass ------------------------------------------ */
 /* Heading reads as one composition: title block left, event context right. */
-.v5-page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 32px; flex-wrap: wrap; }
+/* One heading band across the full width, above BOTH columns. The two halves
+   carry comparable weight so the readiness meter is a counterweight to the
+   title rather than a widget squeezed into the right margin. */
+.v5-page-head {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: end; gap: 12px 48px;
+  padding-bottom: 22px; margin-bottom: 4px; border-bottom: 1px solid var(--border);
+}
 .v5-page-head-main { min-width: 0; }
+.v5-page-head-main .sub { margin-top: 10px; }
 .v5-event-meta { margin: 10px 0 0; padding-top: 8px; font-size: 12px; color: var(--text-soft); text-align: right; white-space: nowrap; }
 
 /* The graph frame already sits under an "Event health" tab, so its own title
@@ -356,21 +364,28 @@ export const OPERATOR_WORKSPACE_STYLES = `<style data-operator-workspace-styles>
    below the graph reading as a hairline. It moves up as the heading's right-hand
    counterweight, and stays deliberately quiet: small-caps label, muted numbers, no
    large type, so it reads as a status strip and not a hero. */
-.v5-page-head-aside { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; min-width: 0; flex: 0 1 420px; }
+.v5-page-head-aside { display: flex; flex-direction: column; align-items: stretch; gap: 12px; min-width: 0; }
+.v5-page-head-aside .v5-event-meta { text-align: right; }
 .v5-page-head-aside .v5-event-meta { margin: 0; }
-.v5-readiness-top { width: 100%; max-width: 420px; margin: 0; padding: 0; border-bottom: 0; }
+/* Capped and pushed right: stretched across a full half the label, the link and
+   the three counts drift so far apart they stop reading as one meter, and the
+   counts land under bar positions they do not correspond to. */
+.v5-readiness-top { width: 100%; max-width: 480px; margin: 0 0 0 auto; padding: 0; border-bottom: 0; }
 .v5-readiness-top .v5-readiness-title { margin-bottom: 8px; gap: 14px; }
 .v5-readiness-top .v5-readiness-title h2 {
   font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-soft);
 }
 .v5-readiness-top .v5-text-button { font-size: 11px; white-space: nowrap; }
 /* 10px, rounded, with real gaps so the segments read as quantities not a rule. */
-.v5-readiness-top .v5-readiness-bar { height: 10px; gap: 2px; border-radius: 999px; background: transparent; }
+.v5-readiness-top .v5-readiness-bar { height: 14px; gap: 3px; border-radius: 999px; background: transparent; }
 .v5-readiness-top .v5-readiness-bar > span { border-radius: 999px; min-width: 0; }
 .v5-readiness-top .v5-readiness-bar .seg-unk { background: #dfe4e9; }
-.v5-readiness-top .readout-buckets { justify-content: flex-start; gap: 6px 16px; margin-top: 9px; }
-.v5-readiness-top .readout-bucket { font-size: 11px; gap: 5px; align-items: center; }
-.v5-readiness-top .readout-bucket .tile-count { font-size: 13px; font-weight: 600; }
+/* A legend, grouped left. Spread across the meter the counts sit under bar
+   positions they do not correspond to, which implies a mapping that is false. */
+.v5-readiness-top .readout-buckets { justify-content: flex-start; gap: 6px 22px; margin-top: 11px; }
+.v5-readiness-top .readout-bucket { font-size: 12px; gap: 6px; align-items: baseline; }
+.v5-readiness-top .readout-bucket .tile-count { font-size: 17px; font-weight: 600; }
+.v5-readiness-top .v5-readiness-dot { align-self: center; }
 /* State is never carried by colour alone - the dot repeats the label's tone. */
 .v5-readiness-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; display: inline-block; }
 .v5-readiness-top .readout-bucket.tone-ok .v5-readiness-dot { background: #669981; }

@@ -45,7 +45,7 @@ export function renderProductOperatorOverview(
 <main class="shell product-operator-overview v5-workspace" data-test="product-operator-overview" data-assessment-lifecycle="${lifecycle.state}" data-assessment-pending-count="${lifecycle.pendingCount}" data-stable-revision="${view.change.projectionRevision}">
   <div class="page-head v5-page-head" data-poll-region="overview-heading">
     <div class="v5-page-head-main">${eyebrow}<h1>${escapeHtml(surface.title)}</h1>
-      <p class="sub">See the event as a connected system, then go straight to the cases that need attention.</p>
+      <p class="sub">What has changed, and where your attention belongs.</p>
       <p class="sub" data-test="overview-reconciling"${lifecycle.state === 'RECONCILING' ? '' : ' hidden'}>Reconciling changes…</p></div>
     <div class="v5-page-head-aside">${eventLine}<div data-poll-region="overview-summary">${surface.summaryHtml}</div></div></div>
   <div class="v5-overview-layout">

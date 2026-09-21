@@ -25,50 +25,7 @@ const r1 = (n: number): number => Math.round(n * 10) / 10;
 /** Clearance kept between a bypass lane and the obstacle card it steps around. */
 const OBSTACLE_MARGIN = 26;
 
-/** Target corner radius for an orthogonal bypass lane; clamped down per-corner when a segment is too short. */
-const BYPASS_CORNER_RADIUS = 9;
 
-interface Point {
-  readonly x: number;
-  readonly y: number;
-}
-
-/**
- * Render an orthogonal polyline through `points` (each consecutive pair
- * axis-aligned) as an SVG path, rounding every interior corner with a
- * quarter-turn `Q`. Each corner's radius is clamped to half of both its
- * adjoining segment lengths (and to `baseRadius`), so adjacent corners can
- * never eat more than a segment's full length between them -- the path can't
- * self-intersect or overshoot even when a lane leg is very short.
- */
-function roundedOrthogonalPath(points: readonly Point[], baseRadius: number): string {
-  const segLen = (i: number): number => Math.hypot(points[i + 1]!.x - points[i]!.x, points[i + 1]!.y - points[i]!.y);
-  let d = `M${r1(points[0]!.x)} ${r1(points[0]!.y)} `;
-  for (let i = 1; i < points.length - 1; i += 1) {
-    const prev = points[i - 1]!;
-    const cur = points[i]!;
-    const next = points[i + 1]!;
-    const before = segLen(i - 1);
-    const after = segLen(i);
-    const radius = Math.min(baseRadius, before / 2, after / 2);
-    if (radius <= 0.01) {
-      d += `L${r1(cur.x)} ${r1(cur.y)} `;
-      continue;
-    }
-    const inX = (cur.x - prev.x) / before;
-    const inY = (cur.y - prev.y) / before;
-    const outX = (next.x - cur.x) / after;
-    const outY = (next.y - cur.y) / after;
-    const preX = cur.x - inX * radius;
-    const preY = cur.y - inY * radius;
-    const postX = cur.x + outX * radius;
-    const postY = cur.y + outY * radius;
-    d += `L${r1(preX)} ${r1(preY)} Q${r1(cur.x)} ${r1(cur.y)},${r1(postX)} ${r1(postY)} `;
-  }
-  const last = points[points.length - 1]!;
-  d += `L${r1(last.x)} ${r1(last.y)}`;
-  return d;
-}
 
 /**
  * Obstacle boxes whose footprint the straight sx->tx corridor would cross:
@@ -93,16 +50,24 @@ function bowIsClear(viaFromX: number, viaToX: number, viaY: number, obstacles: r
 }
 
 /**
- * Step a horizontal (side/diagonal) curve above or below any obstacle cards
+ * Sweep a horizontal (side/diagonal) curve above or below any obstacle cards
  * sitting in its straight-line corridor, so the edge no longer disappears
- * behind an intervening node. The detour is an orthogonal bypass lane (the
- * circuit/metro-diagram idiom): out horizontally from the source, a rounded
- * turn up/down to a clear lane, flat across the obstacle span, a rounded
- * turn back, and in horizontally to the target. Returns null when nothing
- * blocks the corridor, or when neither detour has clearance -- callers then
- * keep their original, unbowed curve rather than risk a new overlap
- * (conservative by design).
+ * behind an intervening node. The detour stays a smooth curve -- one cubic
+ * that arcs around the obstacle -- because an orthogonal lane reads as a
+ * schematic, not as this graph's language.
+ *
+ * Control points are placed beyond the clearance line, not on it: a symmetric
+ * cubic only reaches 3/4 of the way to its controls at the midpoint
+ * (y(0.5) = 0.25*y0 + 0.75*cy), so a control placed exactly on the clearance
+ * line would leave the curve cutting the card's corner. Dividing by that
+ * factor makes the arc's extreme land on the clearance line itself.
+ *
+ * Returns null when nothing blocks the corridor, or when neither detour has
+ * clearance -- callers then keep their original, unbowed curve rather than
+ * risk a new overlap (conservative by design).
  */
+/** A symmetric cubic reaches only this fraction of the way to its control row. */
+const CUBIC_MID_REACH = 0.75;
 function bowedHorizontalPath(
   sx: number, sy: number, tx: number, ty: number, obstacles: readonly Box[],
 ): string | null {
@@ -122,17 +87,11 @@ function bowedHorizontalPath(
 
   for (const c of candidates) {
     if (!bowIsClear(viaFromX, viaToX, c.viaY, obstacles)) continue;
-    return roundedOrthogonalPath(
-      [
-        { x: sx, y: sy },
-        { x: viaFromX, y: sy },
-        { x: viaFromX, y: c.viaY },
-        { x: viaToX, y: c.viaY },
-        { x: viaToX, y: ty },
-        { x: tx, y: ty },
-      ],
-      BYPASS_CORNER_RADIUS,
-    );
+    // Push the control row past the clearance line so the arc's own extreme
+    // lands on it, then hold the controls over the obstacle span so the curve
+    // is flat-ish where it passes the card and steep where it leaves the nodes.
+    const controlY = (yEnd: number): number => yEnd + (c.viaY - yEnd) / CUBIC_MID_REACH;
+    return `M${r1(sx)} ${r1(sy)} C${r1(viaFromX)} ${r1(controlY(sy))},${r1(viaToX)} ${r1(controlY(ty))},${r1(tx)} ${r1(ty)}`;
   }
   return null;
 }
