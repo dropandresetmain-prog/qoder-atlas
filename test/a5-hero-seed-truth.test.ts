@@ -11,6 +11,7 @@ import { ReviewedEntryPolicySchema } from '../src/resolution/planning/reviewedEn
 import { evaluateRuleExpression, type PredicateContext } from '../src/resolution/evaluation/entryPredicates.ts';
 import type { Encounter } from '../src/resolution/evaluation/encounters.ts';
 import type { WCredential, WCredentialSelection, WCredentialVersion } from '../src/resolution/world/world.ts';
+import { normalizeStayContext } from '../src/providers/hotel/nuiteeAdapter.ts';
 import { emptyWorld, id } from './support/m6World.ts';
 
 function readJson(relativePath: string): unknown {
@@ -110,4 +111,32 @@ test('reviewed SG passport Japan short-visit policy passes the seeded conditions
   });
   assert.equal(evaluateRuleExpression(policy.expression, context('SG')).status, 'PASS');
   assert.equal(evaluateRuleExpression(policy.expression, context('US')).status, 'FAIL');
+});
+
+test('Jordan four-night stay is the confirmed lyf Bugis booking, with its real cancel tier', () => {
+  const programme = readJson('../fixtures/programmes/ait-summit-2026/programme.json') as {
+    context: { places: Array<{ id: string; externalRefs?: Array<{ system: string; value: string }> }> };
+    importDraft: { travellers: Array<{ draftId: string; declaredTravel: Array<{ itemKind: string; stayPlaceRef?: { value: string }; checkIn?: string; checkOut?: string; bookingRef?: { reference: string } }> }> };
+  };
+  const stay = programme.importDraft.travellers.find((traveller) => traveller.draftId === 'ait-draft-09')
+    ?.declaredTravel.find((item) => item.itemKind === 'STAY');
+  assert.ok(stay);
+  assert.equal(stay.stayPlaceRef?.value, 'place-hotel-lyf-bugis');
+  assert.equal(stay.checkIn, '2026-09-29T15:00:00+08:00');
+  assert.equal(stay.checkOut, '2026-10-03T11:00:00+08:00');
+  assert.equal(stay.bookingRef?.reference, 'z-xdzAxcv');
+  const place = programme.context.places.find((entry) => entry.id === 'place-hotel-lyf-bugis');
+  assert.equal(place?.externalRefs?.find((ref) => ref.system === 'nuitee-hotel-id')?.value, 'lp6d67d');
+  assert.equal(
+    programme.importDraft.travellers.filter((traveller) => traveller.declaredTravel.some((item) => item.stayPlaceRef?.value === 'place-hotel-bayview')).length > 0,
+    true,
+  );
+
+  const recording = readJson('../fixtures/recordings/nuitee/retrieve/rec_09c4c22e006e5e2df8408247c4716fe8.json') as {
+    raw: Parameters<typeof normalizeStayContext>[0];
+  };
+  const context = normalizeStayContext(recording.raw);
+  assert.equal(context.cancellation?.refundable, true);
+  assert.equal(context.cancellation?.deadline, undefined);
+  assert.deepEqual(context.cancellation?.fee, { amount: 670.77, currency: 'USD' });
 });

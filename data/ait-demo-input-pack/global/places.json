@@ -50,6 +50,19 @@
       ]
     },
     {
+      "id": "place-hotel-lyf-bugis",
+      "name": "lyf Bugis Singapore",
+      "kind": "HOTEL",
+      "timezone": "Asia/Singapore",
+      "coordinates": { "latitude": 1.300714, "longitude": 103.851512 },
+      "externalRefs": [
+        { "system": "nuitee-hotel-id", "value": "lp6d67d" }
+      ],
+      "servedByPlaceIds": [
+        "place-sin-changi"
+      ]
+    },
+    {
       "id": "place-hotel-harbourline",
       "name": "Harbourline Suites (synthetic alternative hotel, Downtown Core)",
       "kind": "HOTEL",

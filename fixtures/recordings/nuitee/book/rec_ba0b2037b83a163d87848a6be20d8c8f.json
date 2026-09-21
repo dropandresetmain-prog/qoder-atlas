@@ -1,0 +1,196 @@
+{
+  "id": "rec_ba0b2037b83a163d87848a6be20d8c8f",
+  "providerId": "nuitee",
+  "operation": "book",
+  "recordedAt": "2026-09-21T21:01:19.364Z",
+  "sanitized": true,
+  "raw": {
+    "data": {
+      "bookingId": "z-xdzAxcv",
+      "clientReference": "qoder-atlas-jordan-lyf-bugis-baseline",
+      "supplierBookingId": "z-xdzAxcv",
+      "supplierBookingName": "nuitee",
+      "supplier": "nuitee",
+      "supplierId": 2,
+      "status": "CONFIRMED",
+      "hotelConfirmationCode": "test",
+      "checkin": "2026-09-29",
+      "checkout": "2026-10-03",
+      "hotel": {
+        "hotelId": "lp6d67d",
+        "name": "lyf Bugis Singapore managed by The Ascott Ltd",
+        "parentHotelId": "lp6d67d"
+      },
+      "bookedRooms": [
+        {
+          "roomType": {
+            "roomTypeId": "",
+            "name": "Test rate 1"
+          },
+          "boardType": "RO",
+          "boardName": "Room Only",
+          "adults": 1,
+          "children": 0,
+          "rate": {
+            "rateId": "I5NFGVCNJVFFOTKVGNDU2TKSKFDTIWKUJ5HEUV2HKUZUIS2OKRDFAUKZKNDU2USRI5ETGRCBJ5FFGSCGGZCEKTKCKNDVSWKUIFGUEVCQKJJVONCYGJLEWTRWIZDVEMZUJNLEUVKJG5BFESKFLFCUON2CKVDVKWSEKM3UISSLIJKFMS2TIQ2EORJTKRJU2QSRI5ETERCJJZNFISCFGNKE2U2MKZHEUVKTI5HEEVKIIFMVIRKOJJCEOWJTIRJUYSSVI5ITIRCDJVJFMUCSJJCU2VCUGRDUSWKEIVHFEUKIIVNEIT2NJJIUOQKZJBMU2TBUJNEVSVCDJZJFUUCRGNCE6TKCLBDTIUSWIVKFURCLJJCEKNCJLJJUOQK2IRGUYSSRJBCVOVCFJZNECR2FLFCFKTKCKFCU27BWG4YC4NZXPQZDAMRWFUYDSLJSHAQDCMB2GAYDUMBQPRJE67D4PR6E4YLON4QFC5LFMVXHYMBOGAYHYMBOGAYHY7BQFYYDA7BQFYYDA",
+            "retailRate": {
+              "total": {
+                "amount": 670.77,
+                "currency": "USD"
+              },
+              "suggestedSellingPrice": {
+                "source": "providerDirect"
+              },
+              "taxesAndFees": [
+                {
+                  "included": true,
+                  "description": "Sales tax",
+                  "amount": 57.19,
+                  "currency": "USD"
+                },
+                {
+                  "included": true,
+                  "description": "Service charge (taxable)",
+                  "amount": 54.11,
+                  "currency": "USD"
+                }
+              ]
+            },
+            "cancellationPolicies": {
+              "cancelPolicyInfos": [
+                {
+                  "cancelTime": "2026-09-29 23:59:59",
+                  "amount": 670.77,
+                  "type": "amount",
+                  "timezone": "GMT",
+                  "currency": "USD"
+                }
+              ],
+              "hotelRemarks": [],
+              "refundableTag": "RFN"
+            },
+            "maxOccupancy": 1,
+            "boardType": "Room Only",
+            "boardName": "RO",
+            "remarks": "",
+            "perks": []
+          },
+          "firstName": "Jordan",
+          "lastName": "Hale",
+          "childrenAges": null,
+          "board": "Room Only",
+          "boardCode": "RO",
+          "cancellationPolicies": {
+            "cancelPolicyInfos": [
+              {
+                "cancelTime": "2026-09-29 23:59:59",
+                "amount": 670.77,
+                "type": "amount",
+                "timezone": "GMT",
+                "currency": "USD"
+              }
+            ],
+            "hotelRemarks": [],
+            "refundableTag": "RFN"
+          },
+          "room_id": "I5NFGVCNJVFFOTKVGNDU2TKSKFDTIWKUJ5HEUV2HKUZUIS2OKRDFAUKZKNDU2USRI5ETGRCBJ5FFGSCGGZCEKTKCKNDVSWKUIFGUEVCQKJJVONCYGJLEWTRWIZDVEMZUJNLEUVKJG5BFESKFLFCUON2CKVDVKWSEKM3UISSLIJKFMS2TIQ2EORJTKRJU2QSRI5ETERCJJZNFISCFGNKE2U2MKZHEUVKTI5HEEVKIIFMVIRKOJJCEOWJTIRJUYSSVI5ITIRCDJVJFMUCSJJCU2VCUGRDUSWKEIVHFEUKIIVNEIT2NJJIUOQKZJBMU2TBUJNEVSVCDJZJFUUCRGNCE6TKCLBDTIUSWIVKFURCLJJCEKNCJLJJUOQK2IRGUYSSRJBCVOVCFJZNECR2FLFCFKTKCKFCU27BWG4YC4NZXPQZDAMRWFUYDSLJSHAQDCMB2GAYDUMBQPRJE67D4PR6E4YLON4QFC5LFMVXHYMBOGAYHYMBOGAYHY7BQFYYDA7BQFYYDA",
+          "occupancy_number": 1,
+          "amount": 670.77,
+          "currency": "USD",
+          "children_count": 0,
+          "remarks": "",
+          "guests": [
+            {
+              "firstName": "Jordan",
+              "lastName": "Hale",
+              "email": "[REDACTED]",
+              "phone": "",
+              "remarks": "",
+              "occupancyNumber": 1
+            }
+          ]
+        }
+      ],
+      "holder": {
+        "firstName": "Jordan",
+        "lastName": "Hale",
+        "email": "[REDACTED]",
+        "phone": "[REDACTED]"
+      },
+      "createdAt": "2026-09-21T21:01:20",
+      "updatedAt": "",
+      "cancellationPolicies": {
+        "cancelPolicyInfos": [
+          {
+            "cancelTime": "2026-09-29 23:59:59",
+            "amount": 670.77,
+            "type": "amount",
+            "timezone": "GMT",
+            "currency": "USD"
+          }
+        ],
+        "hotelRemarks": [],
+        "refundableTag": "RFN"
+      },
+      "specialRemarks": "Example special remarks",
+      "optionalFees": "Optional fees",
+      "mandatoryFees": "Mandatory fees",
+      "knowBeforeYouGo": "Know before you go",
+      "price": 670.77,
+      "sellingPriceToUser": 670.77,
+      "commission": 0,
+      "addonsTotalAmount": 0,
+      "currency": "USD",
+      "remarks": "",
+      "voucherCode": "",
+      "voucherTotalAmount": 0,
+      "addons": null,
+      "guestId": 270753,
+      "distributorCommission": 0,
+      "distributorPrice": 0,
+      "trackingId": "",
+      "firstName": "Jordan",
+      "lastName": "Hale",
+      "adults": 1,
+      "children": "",
+      "childrenCount": 0,
+      "prebookId": "IzopMz6Dz",
+      "paymentStatus": "succeeded",
+      "paymentTransactionId": "tr_cts_p2sAJoawxIr06VBDgm8o0",
+      "sellingPrice": "670.77",
+      "exchangeRate": 0.8706494034030156,
+      "exchangeRateUsd": 1,
+      "email": "[REDACTED]",
+      "tag": "RFN",
+      "lastFreeCancellationDate": "2026-09-29T23:59:59Z",
+      "userId": 383174,
+      "nationality": "SG",
+      "holderTitle": "",
+      "hotelId": "lp6d67d",
+      "hotelName": "lyf Bugis Singapore managed by The Ascott Ltd",
+      "cancelledAt": null,
+      "refundedAt": null,
+      "loyaltyGuestId": 270753,
+      "sandbox": 1,
+      "clientCommission": 0,
+      "voucherId": null,
+      "voucherTransationId": null,
+      "processingFee": 26.83,
+      "amountRefunded": 0,
+      "refundType": "",
+      "paymentScheduledAt": null,
+      "addonsRedemptions": null,
+      "rebookFrom": "",
+      "agentId": null,
+      "cancelledBy": null,
+      "feed": "liteapionboarding",
+      "goodwillPayment": null,
+      "newCharges": 0,
+      "compensationAmount": 0,
+      "hotelRemarks": "<br/><br/>Payment will be charged upon arrival for same-day bookings and are non-refundable. <br/> Physical IDs or passports are required for hotel check-ins in accordance with the National Registration Regulations (NRR). <br/> The minimum age of guests to check in is 18 years if unaccompanied by an adult. <br/> All guests who have booked for a stay for 7 days or more, whether in a single booking or multiple bookings, will have to contact the hotel directly in order to ensure that the current guidelines from the local authorities are adhered to strictly. <br/> Extra beds are not available at this property. <br/> Light housekeeping is provided every 3 nights stay; full housekeeping service is provided every 7 nights stay<br/>",
+      "payLaterDeadline": null
+    },
+    "guestLevel": 0,
+    "sandbox": true
+  }
+}

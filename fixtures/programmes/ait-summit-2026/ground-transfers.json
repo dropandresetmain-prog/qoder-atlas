@@ -74,6 +74,32 @@
       "mode": "SHUTTLE"
     },
     {
+      "from": "place-sin-changi",
+      "to": "place-hotel-lyf-bugis",
+      "estimate": {
+        "expectedMinutes": 30,
+        "minimumMinutes": 25,
+        "conservativeMinutes": 45,
+        "sourceId": "src-syn-ait-policy",
+        "observedAt": "2026-08-25T09:00:00+00:00",
+        "quality": "MEDIUM"
+      },
+      "mode": "PRIVATE_CAR"
+    },
+    {
+      "from": "place-hotel-lyf-bugis",
+      "to": "place-mbs",
+      "estimate": {
+        "expectedMinutes": 15,
+        "minimumMinutes": 10,
+        "conservativeMinutes": 25,
+        "sourceId": "src-syn-ait-policy",
+        "observedAt": "2026-08-25T09:00:00+00:00",
+        "quality": "MEDIUM"
+      },
+      "mode": "SHUTTLE"
+    },
+    {
       "from": "place-hotel-harbourline",
       "to": "place-mbs",
       "estimate": {

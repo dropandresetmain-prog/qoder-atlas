@@ -10,7 +10,7 @@
 ## Checkpoint ledger
 
 - [x] CP1 — programme horizon, validation limit, cost-before-blast comparator. Focused tests 23 PASS / 0 FAIL. Do not redesign unless a later focused test shows a defect.
-- [ ] CP2 — seed/world truth. Partial. Hotel zero-penalty reseed is blocked.
+- [x] CP2 — seed/world truth. Jordan stay is confirmed lyf Bugis `z-xdzAxcv` (`lp6d67d`), four nights 29 Sep–3 Oct. Checked-in cancel tier is USD 670.77 with no zero-amount window, so the represented penalty is that full price, not zero and not the search-preview USD 167.69.
 - [ ] CP3 — backend/read-model/graph truth
 - [ ] CP4 — Sarah full vertical
 - [ ] CP5 — Jordan full vertical
@@ -26,10 +26,10 @@
 - `test/a5-hero-seed-truth.test.ts` + `test/a5-founder-qc-progression.test.ts`: 5 PASS / 0 FAIL.
 - `npm run gate:anti-hardcoding`: CLEAN (511 files).
 
-## CP2 blocker — Act Now before CP3
+## CP2 hotel
 
-Concorde is not required. A live Nuitée sandbox search for any Singapore stay, 2026-09-29 → 2026-10-03, one adult, nationality SG, Marina Bay 8 km, returned 134 properties / 393 rates / 115 refundable. Every refundable rate carries a positive cancellation fee. Raw policies have no zero-amount cancel row. The latest first penalty tier is `2026-09-28 10:00:00` GMT. Jordan recovery is later: D3 `2026-09-29T12:00:00+09:00` and overnight `2026-09-29T21:30:00+09:00`. Zero rates are still free at either time. A 15 km retry did not add a later window. Do not invent a zero penalty or book a rate that is already inside a penalty tier.
+Approved property: lyf Bugis Singapore, `lp6d67d`, booking `z-xdzAxcv`, USD 670.77, check-in 2026-09-29, check-out 2026-10-03. Retrieve `fixtures/recordings/nuitee/retrieve/rec_09c4c22e006e5e2df8408247c4716fe8.json`. Only `ait-draft-09` moved off shared Concorde. Jordan progression PostgreSQL test still 1 PASS / 0 FAIL. Seed tests 6 PASS / 0 FAIL. Anti-hardcoding CLEAN.
 
 ## Exact next step
 
-Unblock with sandbox inventory whose free-cancel deadline is still open at D3, then finish CP2. Do not start CP3.
+Checkpoint 3: Overview and Case reflect this PostgreSQL truth. Do not reopen the hotel penalty or the 95/82/impossible progression.

@@ -29,16 +29,17 @@
     ]
   },
   "hotelStay": {
-    "placeId": "place-hotel-bayview",
+    "placeId": "place-hotel-lyf-bugis",
+    "providerPropertyId": "lp6d67d",
+    "bookingId": "z-xdzAxcv",
     "checkIn": "2026-09-29T15:00:00+08:00",
     "checkOut": "2026-10-03T11:00:00+08:00",
-    "noShowCutoff": "2026-10-01T00:00:00+08:00",
-    "note": "Healthy baseline reserves four nights, 29 Sep through 3 Oct, with arrival in Singapore on 29 Sep. A disruption may move arrival to 30 Sep and require a Narita overnight. Compare retaining this reservation under its current no-show policy with an explicitly quoted cancellation and new three-night booking; never treat a proposed shorter stay as an already modified booking. The stated cutoff is synthetic scenario input and must not replace fresh provider policy."
+    "note": "One confirmed four-night sandbox booking z-xdzAxcv, retrieve rec_09c4c22e006e5e2df8408247c4716fe8. The checked-in policy is a single USD 670.77 cancel tier at 2026-09-29T23:59:59Z. There is no zero-amount window, so the represented cancellation penalty is that full stay price. A later arrival still needs a separate replacement stay, then cancellation of this booking. Do not treat a shorter stay as a modification of this reservation."
   },
   "arrivalTransfer": {
     "mode": "PRIVATE_TRANSFER",
     "pickup": "place-sin-changi",
-    "dropoff": "place-hotel-bayview",
+    "dropoff": "place-hotel-lyf-bugis",
     "scheduledFor": "2026-09-29T23:30:00+08:00",
     "note": "Dispatch keyed to baseline ZG053 arrival; must be re-dispatched on any arrival change (TRANSFER_REDISPATCH is pre-approved under delegatedAuthority)."
   }
