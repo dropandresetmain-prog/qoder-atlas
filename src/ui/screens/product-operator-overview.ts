@@ -1,5 +1,5 @@
 /** Current PostgreSQL Overview: V7.2 graph, compact readiness, sticky attention rail. */
-import type { OperatorOverview } from '../../contracts/v2/product/readModels.ts';
+import type { ActivityFeed, OperatorOverview } from '../../contracts/v2/product/readModels.ts';
 import { adaptOperatorOverviewToDashboard, overviewCountedTotal } from '../../app/target/adapters/operatorOverviewAdapter.ts';
 import { SHELL_LINKS } from '../../app/target/productShell.ts';
 import { escapeHtml } from '../html.ts';
@@ -7,6 +7,12 @@ import { renderEventOverviewGraph, renderOverviewGraphAssets } from '../overview
 import { renderOverviewRosterControllerScript } from '../overviewRosterController.ts';
 import { renderOverviewWorkspaceScript } from '../operatorWorkspaceClient.ts';
 import { OPERATOR_WORKSPACE_STYLES } from '../operatorWorkspaceStyles.ts';
+import { renderCompactActivityRail } from './product-activity-feed.ts';
+
+export interface ProductOperatorOverviewOptions {
+  /** Latest real ActivityFeed for the compact right rail. Not owned by OperatorOverview. */
+  readonly activity?: ActivityFeed;
+}
 
 function focusControl(options: readonly { tripRef: string; label: string; caseRef?: string }[]): string {
   if (options.length === 0) return '';
@@ -18,7 +24,10 @@ function focusControl(options: readonly { tripRef: string; label: string; caseRe
     <select data-overview-focus-select aria-label="Incident focus">${choices}</select></label>`;
 }
 
-export function renderProductOperatorOverview(view: OperatorOverview): string {
+export function renderProductOperatorOverview(
+  view: OperatorOverview,
+  options: ProductOperatorOverviewOptions = {},
+): string {
   const surface = adaptOperatorOverviewToDashboard(view);
   const airlineConfigured = view.demoIngress?.airlineRebookingConfigured === true;
   const lifecycle = view.populationAssessmentLifecycle;
@@ -69,11 +78,7 @@ export function renderProductOperatorOverview(view: OperatorOverview): string {
     <aside class="v5-context-rail" aria-label="Needs attention">
       <h2 class="v5-rail-title">Needs attention <span>${surface.attentionCount} open ${surface.attentionCount === 1 ? 'story' : 'stories'}</span></h2>
       <div data-poll-region="overview-attention">${surface.attentionHtml}</div>
-      <section class="v5-activity" aria-label="Northstar activity">
-        <h2 class="v5-rail-title">Northstar activity</h2>
-        <p class="sub">Observable activity stays on the activity log. This rail does not invent a second feed.</p>
-        <p><a href="${SHELL_LINKS.activity}">View log →</a></p>
-      </section>
+      <div data-poll-region="overview-activity">${renderCompactActivityRail(options.activity, { limit: 4, logHref: SHELL_LINKS.activity })}</div>
     </aside>
   </div>
 </main>${renderOverviewRosterControllerScript()}${renderOverviewWorkspaceScript()}`;

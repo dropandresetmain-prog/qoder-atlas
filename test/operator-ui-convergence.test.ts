@@ -68,7 +68,8 @@ test('Overview case navigation dominates and the full searchable population rema
   assert.doesNotMatch(html, /Open case →Show interaction/);
   assert.equal((html.match(/data-test="population-row"[^>]*data-journey-ref=/g) ?? []).length, 12);
   assert.equal((html.match(/data-test="population-row" hidden[^>]*data-journey-ref=/g) ?? []).length, 2);
-  assert.ok(html.indexOf('data-poll-region="overview-attention"') < html.indexOf('data-test="simulated-airline-update"'));
+  assert.ok(html.indexOf('data-test="simulated-airline-update"') < html.indexOf('data-poll-region="overview-attention"'),
+    'demo control stays in the main column; Needs attention lives in the sticky rail after it');
   const graphAt = html.indexOf('data-test="event-overview-graph"');
   const attentionAt = html.indexOf('data-poll-region="overview-attention"');
   const summaryAt = html.indexOf('data-poll-region="overview-summary"');
@@ -82,6 +83,69 @@ test('Overview case navigation dominates and the full searchable population rema
   assert.doesNotMatch(html, /Open an affected case to review the proposed recovery/);
   assert.ok(html.includes('readout-buckets'));
   assert.doesNotMatch(html, /class="tiles" data-test="product-summary-tiles"/);
+  assert.match(html, /data-poll-region="overview-activity"/);
+  assert.match(html, /data-test="overview-activity-empty"/);
+  assert.match(html, /data-test="overview-activity-log"[^>]*>View log →/);
+});
+
+test('Overview activity rail projects the latest real ActivityFeed without inventing entries', () => {
+  const html = renderProductOperatorOverview(overview(), {
+    activity: {
+      generatedAt: at,
+      truncated: false,
+      entries: [
+        {
+          entryRef: 'entry-1',
+          atLabel: 'Today · 09:00',
+          actorLabel: 'Operator',
+          subjectLabel: 'Participant 0',
+          what: 'Opened a recovery case',
+          actorKind: 'HUMAN',
+          caseRef: 'case-alpha',
+        },
+        {
+          entryRef: 'entry-2',
+          atLabel: 'Today · 08:40',
+          actorLabel: 'System',
+          subjectLabel: 'Participant 0',
+          what: 'Recorded a schedule change',
+          actorKind: 'SYSTEM',
+        },
+        {
+          entryRef: 'entry-3',
+          atLabel: 'Today · 08:20',
+          actorLabel: 'Service',
+          subjectLabel: 'Participant 1',
+          what: 'Observed a provider update',
+          actorKind: 'SERVICE',
+        },
+        {
+          entryRef: 'entry-4',
+          atLabel: 'Today · 08:00',
+          actorLabel: 'Operator',
+          subjectLabel: 'Participant 2',
+          what: 'Reviewed evidence',
+          actorKind: 'HUMAN',
+        },
+        {
+          entryRef: 'entry-5',
+          atLabel: 'Yesterday · 17:00',
+          actorLabel: 'System',
+          subjectLabel: 'Participant 3',
+          what: 'Should not appear beyond the rail limit',
+          actorKind: 'SYSTEM',
+        },
+      ],
+    },
+  });
+  assert.match(html, /data-test="overview-activity-rail"/);
+  assert.match(html, /v5-activity-title-icon/);
+  assert.equal((html.match(/data-test="overview-activity-row"/g) ?? []).length, 4);
+  assert.doesNotMatch(html, /Should not appear beyond the rail limit/);
+  assert.match(html, /data-case-ref="case-alpha"/);
+  assert.match(html, /data-test="activity-case-link"[^>]*>Open case →/);
+  assert.match(html, /data-ui-feed-tone=/);
+  assert.doesNotMatch(html, /This rail does not invent a second feed/);
 });
 
 test('the recorded recommendation is not replaced by an executable alternative', () => {

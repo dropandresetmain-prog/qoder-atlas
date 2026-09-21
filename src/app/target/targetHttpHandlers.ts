@@ -248,13 +248,20 @@ export async function handleTargetProductHttp(
       const facts = await loadOperatorOverviewFacts(ctx.app.pool, ctx.app.workspaceId, undefined, sinceCursor);
       const view = projectOperatorOverview(facts);
       if (url.searchParams.get('format') === 'html') {
-        // The shell's own chrome, not a second one: brand, event context and
-        // the nav the operator navigates with. The decision count is the
-        // read model's own `decisionRequired` total.
+        // Activity stays a separate feed. The Overview HTML page composes the
+        // latest page for the compact rail; OperatorOverview does not own it.
+        // Overview polling already re-fetches this HTML, so the rail refreshes
+        // with the same seam — no second poller.
+        const activity = await loadActivityFeed(ctx.app.pool, ctx.app.workspaceId);
         sendHtml(
           res,
           200,
-          renderInShell('dashboard', 'Operations overview', shellContext(view), renderProductOperatorOverview(view)),
+          renderInShell(
+            'dashboard',
+            'Operations overview',
+            shellContext(view),
+            renderProductOperatorOverview(view, { activity }),
+          ),
         );
       } else {
         sendJson(res, 200, view);

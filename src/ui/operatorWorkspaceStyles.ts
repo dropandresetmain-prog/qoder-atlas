@@ -134,9 +134,12 @@ export const OPERATOR_WORKSPACE_STYLES = `<style data-operator-workspace-styles>
 .v5-recommend-sheet h2 { font-size: 21px; line-height: 1.25; letter-spacing: -0.02em; margin: 0 0 8px; }
 .v5-trip-foot { display: flex; justify-content: space-between; gap: 12px; font-size: 10px; color: var(--text-soft); border-top: 1px solid var(--border); padding-top: 13px; margin-top: 16px; }
 .v5-trip-foot strong { color: var(--text); font-size: 12px; }
+.v5-activity-title-icon { width: 16px; height: 16px; color: var(--ink); flex: none; display: inline-block; vertical-align: -2px; margin-right: 8px; }
 .v5-activity-item { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 9px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+.v5-activity-bullet { width: 24px; height: 24px; border-radius: 50%; background: #f1f4f6; display: grid; place-items: center; font-size: 10px; color: var(--ink); }
 .v5-activity-item strong { display: block; font-size: 12px; }
 .v5-activity-item p { margin: 2px 0 0; font-size: 10px; color: var(--text-soft); }
+.v5-activity-footer { display: flex; justify-content: space-between; gap: 10px; margin-top: 12px; color: var(--text-soft); font-size: 10px; align-items: center; }
 .v5-drawer { position: fixed; inset: 66px 0 0 auto; margin: 0; width: min(440px, 92vw); height: calc(100vh - 66px); max-height: none; border: 0; border-left: 1px solid var(--border); padding: 0; background: var(--surface); }
 .v5-drawer-head { display: flex; justify-content: space-between; gap: 12px; padding: 22px 24px; border-bottom: 1px solid var(--border); }
 .v5-drawer-body { padding: 22px 24px; overflow: auto; height: calc(100% - 78px); }

@@ -13,14 +13,14 @@ Founder-approved Overview + Case V5 composition on the real frontend, using prod
 
 ## Current checkpoint
 
-**CP1–CP5 implemented and focused-tested. CP6 physical hero walkthrough not run** (needs the live demo database). Verdict for this commit: **PARTIAL**.
+**Activity-rail correction + CP1–CP5. CP6 physical hero walkthrough next.**
 
 ## Acceptance checklist
 
 - [x] CP1 V5 layout primitives in `operatorWorkspaceStyles.ts` + tab/focus/drawer client
 - [x] CP2 Overview: Event health / All participants tabs, real `renderEventOverviewGraph()`, compact readiness, sticky attention rail, focus selector that does not drop other stories
 - [x] CP3 Case: real `renderFocusedCaseGraph()`, Recommended recovery default tab, sticky decision rail, trip viability separate from approval
-- [x] CP4 Compact case activity from the existing case activity rows; Overview rail links to the real activity log (no second feed)
+- [x] CP4 Compact case activity from the existing case activity rows; Overview rail composes latest real `ActivityFeed` (same adapter vocabulary) + View log link
 - [x] CP5 Tight connection (`connection_below_minimum` only) presents AT_RISK / CHECKING, not DISRUPTED / UNRESOLVED. Broken or other blocking failures stay DISRUPTED
 - [ ] CP6 Physical Sarah + Jordan demo walkthrough on the running product
 - [x] Anti-hardcoding CLEAN
@@ -28,23 +28,19 @@ Founder-approved Overview + Case V5 composition on the real frontend, using prod
 
 ## Checks
 
-- `test/operator-ui-convergence.test.ts`, `test/m9-product-surfaces.test.ts`, `test/eventOverview.test.ts`, `test/r2-case-workspace-integration.test.ts`: pass
-- `test/r4-f1-overview-hit-targets.test.ts`: 65/66 then Apply/Reset click re-run pass after moving the demo control into the main column
-- `tsc -p tsconfig.json --noEmit`: pass
-- `node scripts/anti-hardcoding-gate.mjs`: CLEAN
-- Not run: full `npm test`, `test:postgres`, live Sarah/Jordan browser rehearsal
+- `test/operator-ui-convergence.test.ts`: pass (incl. Overview activity rail composition)
+- Overview HTML composes `loadActivityFeed` + `renderCompactActivityRail`; refreshes via existing Overview HTML poll regions (`overview-activity`)
+- Limitation recorded: mini-feed refresh depends on Overview page poll, not a dedicated activity cursor poll
+- Not run yet: live Sarah/Jordan browser rehearsal
 
 ## Issue disposition
 
 | Issue | Class | Notes |
 |---|---|---|
-| V5 composition vs old vertical stack | Act Now | Done in product overview/case screens |
-| Fleet hero | Act Now | Removed from overview readiness |
-| Tight connection painted red | Act Now | Read-model status + overview membership |
-| Overview activity rail without a feed on `OperatorOverview` | Ignore / Accept Risk | Link to Activity; do not invent entries |
+| Overview activity rail without a feed on `OperatorOverview` | Act Now | Fixed by page composition; OperatorOverview contract unchanged |
 | Live Sarah/Jordan D1–D3 click-through | Act Now (next) | Needs demo runtime; not faked here |
 | Legacy `/operator` screens | Ignore / Accept Risk | Product path is product-* |
 
 ## Next action
 
-Boot the accepted demo runtime and walk Overview + Case for two simultaneous open cases, including connection at-risk then broken, against the V5 reference PNGs.
+Boot the accepted demo runtime and walk Overview + Case for Sarah + Jordan in the same workspace.
