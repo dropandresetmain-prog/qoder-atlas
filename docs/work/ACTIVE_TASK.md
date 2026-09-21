@@ -13,14 +13,14 @@
 
 - [x] CP1 investigation + contract decisions (complete)
 - [x] CP2 FIX1 D2 monitoring + FIX2 connection classification — focused tests green — push
-- [ ] CP3 FIX3 controlled runtime clock — background-worker/progression proof — push
+- [x] CP3 FIX3 controlled runtime clock — background-worker/progression proof — push
 - [ ] CP4 FIX4 causal Qwen planning seam — safety + causal acceptance proof — push
 - [ ] CP5 FIX6 demo preflight + integration + anti-hardcoding + docs — push
 - [x] INV5 multi-subject progression — **Park for Later** (production cases single-subject; settledBasis untouched)
 
 ## Current checkpoint
 
-CP2 COMPLETE (pushed @ a7d9cb2). CP3 (FIX3 controlled clock) PAUSED at design-frozen, implementation NOT started — per user stop request. The two read-only clock-map investigations are captured below; no CP3 code written yet. Resume by implementing migration 0136 + boot/periodic/drain/coordinator clock injection + harness clock-only-stage advance.
+CP3 COMPLETE — controlled evaluation clock implemented and verified. Next: CP4 (FIX4 causal Qwen planning seam).
 
 ## CP1 investigation results (subagents, verified against code)
 
@@ -96,12 +96,23 @@ CP2 COMPLETE (pushed @ a7d9cb2). CP3 (FIX3 controlled clock) PAUSED at design-fr
 
 **Gates**: `npm run typecheck` clean; `npm run gate:anti-hardcoding` CLEAN (503 files). Focused pure 91/91; focused PG 15/15 across r1RecoveryProgression, a3JordanConnectionFoundation, m9ConnectionProgression, r1ConnectionRecovery.
 
+### CP3 — FIX3 controlled evaluation clock (IMPLEMENTED)
+
+**Design implemented as frozen:**
+- Migration `0136_workspace_evaluation_clocks.sql`: workspace-scoped `mode` WALL|CONTROLLED + `controlled_now`, default WALL, constraint requires controlled_now when CONTROLLED.
+- Module `src/app/target/evaluationClock.ts`: resolve/read/write + `createWorkspaceEvaluationClock` (durable + cached sync `now()`); `resolveCoordinatorNow` accepts Instant or live getter.
+- Boot (`composeTargetBoot.ts`): creates one clock; injects `evaluationNow` into reassessment pipeline, reassessment drain service, caseLifecycle/execution/externalExecution periodic services, and planning coordinator `deps.now`.
+- Coordinator: `deps.now` may be Instant | (() => Instant); `completionClock` remains wall-owned.
+- Harness (`scripts/a5-founder-qc-progression.ts`): clock-only stages advance CONTROLLED clock + `enqueueDue` + drain + escalation (no refuse); provider-event stages also align the workspace clock to stage.at. Data-driven (`planningNow` / no `eventId`); no traveller/route branches.
+
+**MUST-STAY-WALL preserved:** provider observedAt, modelActivities.observedAt, completionClock, read-model generatedAt, command receipts — untouched. PG test asserts completionClock-style stamp ≠ evaluation now under CONTROLLED.
+
+**Evidence:**
+- Pure: `test/a5-evaluation-clock.test.ts` 4/4 + `test/a5-founder-qc-progression.test.ts` 2/2 (overnight harness-driven).
+- PG: `postgres-integration/a5EvaluationClock.pgtest.ts` 4/4 — WALL default, CONTROLLED durable across reloads, periodic wakes see D1→D2→D3→overnight controlled times, wall operational stamp independent.
+- `npm run typecheck` clean.
+- Suites classified in `test/suites.json` (CURRENT_TARGET + POSTGRES).
+
 ## Next action
 
-PAUSED per user stop request after CP2 push. To resume CP3 (FIX3 controlled runtime clock):
-1. Add migration 0136: workspace-scoped controlled clock (`mode` WALL|CONTROLLED, `controlled_now` timestamptz), runtime-owned, default WALL.
-2. Add a small clock module read by boot; inject as `now` into: `buildReassessmentPipeline` (composeTargetBoot.ts:83), each `createPeriodicService` (runtimeServices.ts:147 default), the drain loop (`options.now`), and the planning coordinator's `deps.now` (composeTargetBoot.ts:235-250 → recoveryPlanningCoordinator.ts:285). Optionally `AppEndpoints.now()` (server/http.ts:194).
-3. Make the harness advance the controlled clock for clock-only overnight stages (scripts/a5-founder-qc-progression.ts:214-216/237-241) and re-run reassessment+lifecycle so overnight emerges from timing/boardability — no scenario/route branch.
-4. Keep ALL MUST-STAY-WALL sites untouched (inventory above).
-5. PG + background-worker proof; typecheck; `npm run gate:anti-hardcoding`; commit+push CP3.
-Then CP4 (FIX4 causal Qwen), CP5 (FIX6 preflight + integration + anti-hardcoding + docs), and the 17-item final report.
+CP4 (FIX4 causal Qwen planning seam): bounded StrategyProposer / offer-selection influence so model output can change a legitimate candidate that reaches deterministic evaluation; fail-closed; RC-6/authority untouched. Then CP5 preflight + integration.

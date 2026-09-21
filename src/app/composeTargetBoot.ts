@@ -39,6 +39,8 @@ import {
   EXTERNAL_STAY_CAPABILITY_STATEMENTS,
 } from './target/externalStayExecution.ts';
 import { provisionWorkspaceAuthority, workspacePrincipalId } from './target/workspaceAuthority.ts';
+import { createWorkspaceEvaluationClock, type WorkspaceEvaluationClock } from './target/evaluationClock.ts';
+import type { Instant } from '../domain/v2/shared/time.ts';
 
 /** Idle cadence of the case lifecycle pass (escalation + resolution); a reassessment drain also triggers it immediately. */
 const CASE_LIFECYCLE_POLL_MS = 5_000;
@@ -78,9 +80,9 @@ export function loadTargetBootConfig(env: NodeJS.ProcessEnv = process.env): Targ
 const registry = createM6Registry();
 
 /** Real M6-evaluator-backed reassessment pipeline — no fixture/demo branching. */
-function buildReassessmentPipeline(pool: Pool): ReassessmentPipeline {
+function buildReassessmentPipeline(pool: Pool, evaluationNow: () => Instant): ReassessmentPipeline {
   return async (claim, assessmentId) => {
-    const now = new Date().toISOString();
+    const now = evaluationNow();
     const world = await captureWorld(pool, {
       workspaceId: claim.workspaceId,
       focus: [claim.subject],
@@ -101,6 +103,8 @@ function buildReassessmentPipeline(pool: Pool): ReassessmentPipeline {
 export interface ComposedTargetBoot {
   config: TargetBootConfig;
   endpoints: TargetEndpoints;
+  /** Runtime-owned evaluation clock (WALL by default; CONTROLLED for demo). */
+  evaluationClock: WorkspaceEvaluationClock;
   close(): Promise<void>;
 }
 
@@ -177,10 +181,21 @@ export async function composeTargetBoot(
   );
   const executorPrincipalId = workspacePrincipalId(config.workspaceId, 'executor');
 
+  // A5 CP3: one authoritative evaluation clock for scenario/planning time.
+  // Default WALL; harness/demo may advance CONTROLLED mode. Operational
+  // timestamps (receipts, provider observedAt, completionClock) stay wall.
+  const evaluationClock = await createWorkspaceEvaluationClock(endpoints.app.pool, config.workspaceId);
+  const evaluationNow = (): Instant => evaluationClock.now();
+  if (evaluationClock.snapshot().mode === 'CONTROLLED') {
+    console.log(`[atlas] evaluation clock CONTROLLED at ${evaluationClock.now()}`);
+  } else {
+    console.log('[atlas] evaluation clock WALL (default)');
+  }
+
   // Background workers: one composition root, one lifecycle, one health
   // surface (src/app/runtimeServices.ts). The reassessment service enqueues
   // clock-expiry work and drains runnable work on every wake.
-  const pipeline = buildReassessmentPipeline(endpoints.app.pool);
+  const pipeline = buildReassessmentPipeline(endpoints.app.pool, evaluationNow);
   // T3/B1: case lifecycle = assessment -> RecoveryCase (escalation) and
   // reassessed truth -> RESOLVED (resolution gate). One reconcile-from-state
   // pass (idempotent, durable) on its own cadence, and run immediately after
@@ -237,6 +252,7 @@ export async function composeTargetBoot(
     workspaceId: config.workspaceId,
     actorPrincipalId: lifecycleActor,
     uow: () => endpoints.app.unitOfWork(),
+    now: evaluationNow,
     // G01: advertise exactly the composed provider families (never a phantom set).
     availableCapabilities: [...families.availableCapabilities, ...(recoveryResearch ? ['HOTEL' as const, 'RESEARCH' as const] : [])],
     ...(recoveryResearch ? { preparePlanningContext: recoveryResearch.prepare } : {}),
@@ -251,6 +267,7 @@ export async function composeTargetBoot(
   const lifecycle = createPeriodicService({
     name: 'caseLifecycle',
     pollMs: CASE_LIFECYCLE_POLL_MS,
+    now: evaluationNow,
     run: async (now) => {
       const escalation = await runCaseEscalation({ pool: endpoints.app.pool, workspaceId: config.workspaceId, actorPrincipalId: lifecycleActor, uow: () => endpoints.app.unitOfWork(), now });
       const resolution = await runRecoveryProgressionPass({ pool: endpoints.app.pool, workspaceId: config.workspaceId, actorPrincipalId: lifecycleActor, uow: () => endpoints.app.unitOfWork(), planner, now });
@@ -281,6 +298,7 @@ export async function composeTargetBoot(
   const execution = createPeriodicService({
     name: 'execution',
     pollMs: EXECUTION_POLL_MS,
+    now: evaluationNow,
     run: (now) =>
       runInternalExecutionPass({ pool: endpoints.app.pool, workspaceId: config.workspaceId, actorPrincipalId: `northstar-execution:${config.workspaceId}`, uow: () => endpoints.app.unitOfWork(), executorPrincipalId, now }),
     summarize: (report) => ({ candidates: report.candidates, executed: report.executed, deferred: report.deferred, failed: report.failed }),
@@ -314,6 +332,7 @@ export async function composeTargetBoot(
     ? createPeriodicService({
         name: 'externalExecution',
         pollMs: EXECUTION_POLL_MS,
+        now: evaluationNow,
         run: async (now) => {
           const shared = {
             pool: endpoints.app.pool,
@@ -371,6 +390,7 @@ export async function composeTargetBoot(
       worker: endpoints.app.reassessmentWorker,
       pipeline,
       workspaceId: config.workspaceId,
+      now: evaluationNow,
       onWake(wake) {
         if (wake.error) {
           console.error(`[atlas] reassessment wake failed: ${wake.error}`);
@@ -407,6 +427,7 @@ export async function composeTargetBoot(
   return {
     config,
     endpoints,
+    evaluationClock,
     async close() {
       services.stop();
       await endpoints.close();

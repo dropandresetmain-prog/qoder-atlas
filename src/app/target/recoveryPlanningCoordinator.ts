@@ -80,6 +80,8 @@ import { advanceCasePhase } from './recoveryPlanning.ts';
 import { deterministicUuid, RUNTIME_ID_NAMESPACES } from './deterministicId.ts';
 import { applicationError } from './applicationCommands.ts';
 import type { IntelligenceClient } from '../../intelligence/client.ts';
+import type { Instant } from '../../domain/v2/shared/time.ts';
+import { resolveCoordinatorNow } from './evaluationClock.ts';
 import {
   resolveRecoveryDomainDecisions,
 } from '../../contracts/v2/planning/recoveryDomain.ts';
@@ -106,7 +108,12 @@ export interface RecoveryPlanningCoordinatorDeps {
   workspaceId: string;
   actorPrincipalId: string;
   uow: () => PgUnitOfWork;
-  now?: string;
+  /**
+   * Evaluation/planning "now". Accept a frozen Instant (tests) or a live
+   * getter (boot-injected workspace evaluation clock). completionClock stays
+   * wall-clock owned separately.
+   */
+  now?: Instant | (() => Instant);
   /** Domain-bound proposers; defaults to the shipped deterministic PROGRAMME proposer. */
   proposers?: readonly DomainProposerBinding[];
   /** Capability families actually available to this composition (drives fail-closed domain selection). */
@@ -282,7 +289,7 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
     planCaseDetailed(input: RecoveryPlanningInput): Promise<CoordinatorPlanOutcome>;
   } = {
     async planCaseDetailed(input: RecoveryPlanningInput): Promise<CoordinatorPlanOutcome> {
-      const now = input.now ?? deps.now ?? new Date().toISOString();
+      const now = resolveCoordinatorNow(deps.now, input.now);
       const status = await caseStatus(deps.pool, deps.workspaceId, input.recoveryCaseId);
       if (!status) return { ok: false, error: applicationError('CASE_NOT_FOUND', `recovery case ${input.recoveryCaseId} does not exist`) };
       if (TERMINAL.has(status)) return { ok: false, error: applicationError('CASE_NOT_OPEN', `recovery case ${input.recoveryCaseId} is ${status}`) };

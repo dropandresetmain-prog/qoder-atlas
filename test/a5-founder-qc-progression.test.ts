@@ -8,6 +8,9 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
   clockOnlyStages,
+  harnessDrivenStages,
+  isClockOnlyStage,
+  isProviderEventStage,
   loadTimeline,
   providerEventStages,
   type DelayTimeline,
@@ -30,11 +33,21 @@ test('A5.1 harness: provider-event stages are data-driven and ordered', () => {
   assert.ok(stages.every((stage) => stage.eventId && stage.arrTime));
 });
 
-test('A5.1 harness: overnight planningNow stages stay clock-only', () => {
+test('A5.1 harness: overnight planningNow stages are clock-only and harness-driven', () => {
   const timeline = JSON.parse(readFileSync(TIMELINE_PATH, 'utf8')) as DelayTimeline;
   const clock = clockOnlyStages(timeline);
   assert.ok(clock.some((stage) => stage.id === 'overnight_narita_necessary'));
   const overnight = clock.find((stage) => stage.id === 'overnight_narita_necessary');
   assert.equal(overnight?.planningNow, '2026-09-29T21:30:00+09:00');
   assert.equal(providerEventStages(timeline).some((stage) => stage.id === 'overnight_narita_necessary'), false);
+  assert.ok(isClockOnlyStage(overnight!));
+  assert.equal(isProviderEventStage(overnight!), false);
+
+  const driven = harnessDrivenStages(timeline);
+  assert.ok(driven.some((stage) => stage.id === 'overnight_narita_necessary'));
+  assert.ok(
+    driven.findIndex((stage) => stage.id === 'zg053_impossible')
+      < driven.findIndex((stage) => stage.id === 'overnight_narita_necessary'),
+    'clock-only overnight follows provider-event stages in harness order',
+  );
 });

@@ -2,7 +2,8 @@
  * A5.1 founder-QC progression harness for connection-loss rehearsal.
  *
  * Reads the configured progressive-delay timeline and applies each stage
- * through the same generic provider-event command the HTTP demo boundary uses.
+ * through the same generic provider-event command the HTTP demo boundary uses,
+ * or advances the workspace evaluation clock for clock-only stages.
  * Stage semantics live in scenario data; this script has no traveller/route
  * application branches and does not dispatch consequential provider actions.
  *
@@ -10,6 +11,7 @@
  *   node --experimental-strip-types scripts/a5-founder-qc-progression.ts --list
  *   node --experimental-strip-types scripts/a5-founder-qc-progression.ts --next
  *   node --experimental-strip-types scripts/a5-founder-qc-progression.ts --stage delay_increases_connection_at_risk
+ *   node --experimental-strip-types scripts/a5-founder-qc-progression.ts --stage overnight_narita_necessary
  *   node --experimental-strip-types scripts/a5-founder-qc-progression.ts --reset-cursor
  *
  * Requires PG_TARGET_* plus PG_TARGET_WORKSPACE_ID for the demo workspace.
@@ -22,12 +24,14 @@ import { loadPostgresTargetConfig } from '../src/persistence/postgres/config.ts'
 import { PgUnitOfWork } from '../src/persistence/postgres/pgUnitOfWork.ts';
 import { acceptProviderShapedDemoEvent } from '../src/app/target/applicationCommands.ts';
 import { runCaseEscalation } from '../src/app/target/caseEscalation.ts';
+import { createWorkspaceEvaluationClock } from '../src/app/target/evaluationClock.ts';
 import { PgReassessmentWorker, type ReassessmentPipeline } from '../src/persistence/postgres/world/pgAssessments.ts';
 import { captureWorld } from '../src/persistence/postgres/world/pgCurrentState.ts';
 import { assessSubject } from '../src/resolution/evaluation/assess.ts';
 import { createM6Registry } from '../src/resolution/evaluation/registry.ts';
 import { projectEffectiveWorld } from '../src/resolution/world/effectiveItinerary.ts';
 import { attachSeedSession, commitSeed, takeSeedEvidence } from '../postgres-integration/m2Seed.ts';
+import type { Instant } from '../src/domain/v2/shared/time.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TIMELINE_PATH = join(
@@ -65,9 +69,22 @@ export function providerEventStages(timeline: DelayTimeline): DelayStage[] {
   return timeline.stages.filter((stage) => Boolean(stage.eventId && stage.arrTime));
 }
 
-/** Clock-only stages (planningNow) — printed, not auto-mutated by this harness. */
+/** Clock-only stages — advance the workspace evaluation clock, no provider event. */
 export function clockOnlyStages(timeline: DelayTimeline): DelayStage[] {
   return timeline.stages.filter((stage) => Boolean(stage.planningNow) && !stage.eventId);
+}
+
+/** Ordered harness-driven stages: provider events, then clock-only advances. */
+export function harnessDrivenStages(timeline: DelayTimeline): DelayStage[] {
+  return [...providerEventStages(timeline), ...clockOnlyStages(timeline)];
+}
+
+export function isProviderEventStage(stage: DelayStage): boolean {
+  return Boolean(stage.eventId && stage.arrTime);
+}
+
+export function isClockOnlyStage(stage: DelayStage): boolean {
+  return Boolean(stage.planningNow) && !stage.eventId;
 }
 
 function say(message: string): void {
@@ -128,6 +145,51 @@ async function resolveInboundServiceId(
   return found.rows[0]!.service_id;
 }
 
+function buildPipeline(
+  pool: ReturnType<typeof createTargetPool>,
+  evaluationNow: () => Instant,
+): ReassessmentPipeline {
+  const registry = createM6Registry();
+  return async (claim, assessmentId) => {
+    const now = evaluationNow();
+    const world = await captureWorld(pool, {
+      workspaceId: claim.workspaceId,
+      focus: [claim.subject],
+      at: now,
+      informationTopics: registry.informationTopics,
+    });
+    return assessSubject({
+      registry,
+      world,
+      effective: projectEffectiveWorld(world),
+      subject: claim.subject,
+      now,
+      assessmentId,
+    }).result;
+  };
+}
+
+async function drainAndEscalate(
+  pool: ReturnType<typeof createTargetPool>,
+  workspaceId: string,
+  evaluationNow: () => Instant,
+): Promise<{ drained: Awaited<ReturnType<PgReassessmentWorker['drainAvailable']>>; escalation: Awaited<ReturnType<typeof runCaseEscalation>> }> {
+  const at = evaluationNow();
+  const pipeline = buildPipeline(pool, evaluationNow);
+  const drained = await new PgReassessmentWorker(pool, { actorId: ACTOR })
+    .drainAvailable(at, pipeline, { workspaceId, maxItems: 200, maxMs: 120_000 });
+  const commandCtx = {
+    workspaceId,
+    actorPrincipalId: ACTOR,
+    uow: () => new PgUnitOfWork(pool, workspaceId),
+    pool,
+  };
+  // Escalation only — progression needs the composed planner from normal boot.
+  // With background services running, they continue against the controlled clock.
+  const escalation = await runCaseEscalation({ ...commandCtx, now: at });
+  return { drained, escalation };
+}
+
 async function applyProviderStage(stage: DelayStage, timeline: DelayTimeline): Promise<void> {
   const config = loadPostgresTargetConfig(process.env);
   const workspaceId = requireWorkspaceId(process.env);
@@ -144,8 +206,11 @@ async function applyProviderStage(stage: DelayStage, timeline: DelayTimeline): P
     const evidenceId = takeSeedEvidence(evidenceSeed);
     await commitSeed(evidenceSeed);
 
-    const at = stage.at ?? new Date().toISOString();
-    const registry = createM6Registry();
+    const at = (stage.at ?? new Date().toISOString()) as Instant;
+    // Keep background workers aligned with scenario time for this stage.
+    const clock = await createWorkspaceEvaluationClock(pool, workspaceId);
+    await clock.advanceTo(at);
+
     const commandCtx = {
       workspaceId,
       actorPrincipalId: ACTOR,
@@ -170,28 +235,11 @@ async function applyProviderStage(stage: DelayStage, timeline: DelayTimeline): P
     if (!ingress.ok) {
       throw new Error(`provider-event ingress failed: ${JSON.stringify(ingress)}`);
     }
-    const pipeline: ReassessmentPipeline = async (claim, assessmentId) => {
-      const world = await captureWorld(pool, {
-        workspaceId: claim.workspaceId,
-        focus: [claim.subject],
-        at,
-        informationTopics: registry.informationTopics,
-      });
-      return assessSubject({
-        registry,
-        world,
-        effective: projectEffectiveWorld(world),
-        subject: claim.subject,
-        now: at,
-        assessmentId,
-      }).result;
-    };
-    const drained = await new PgReassessmentWorker(pool, { actorId: ACTOR })
-      .drainAvailable(at, pipeline, { workspaceId, maxItems: 200, maxMs: 120_000 });
-    const escalation = await runCaseEscalation({ ...commandCtx, now: at });
+    const { drained, escalation } = await drainAndEscalate(pool, workspaceId, () => clock.now());
     say(`Applied stage: ${stage.id}`);
     say(`  narrative: ${stage.narrative ?? '(none)'}`);
     say(`  connection remaining minutes: ${stage.connectionRemainingMinutes ?? 'n/a'}`);
+    say(`  evaluation clock: CONTROLLED @ ${clock.now()}`);
     say(`  ingress revision: ${ingress.revision}; reassessment stop: ${drained.stoppedReason}`);
     say(`  case escalation: opened=${escalation.opened} attached=${escalation.attached}`);
     say('  Next: open Overview → Case and inspect V5.6 graph. Do not approve consequential actions from this harness.');
@@ -200,20 +248,65 @@ async function applyProviderStage(stage: DelayStage, timeline: DelayTimeline): P
   }
 }
 
+/**
+ * Advance the workspace evaluation clock to the stage's planningNow and
+ * re-run reassessment + escalation so overnight/boardability emerges from
+ * timing — no scenario-specific force path.
+ */
+async function applyClockOnlyStage(stage: DelayStage): Promise<void> {
+  const planningNow = stage.planningNow;
+  if (!planningNow) throw new Error(`clock-only stage ${stage.id} requires planningNow`);
+  const config = loadPostgresTargetConfig(process.env);
+  const workspaceId = requireWorkspaceId(process.env);
+  const pool = createTargetPool(config);
+  try {
+    const clock = await createWorkspaceEvaluationClock(pool, workspaceId);
+    await clock.advanceTo(planningNow as Instant);
+    // CLOCK_EXPIRY enqueue so time-alone can stale+reassess.
+    const worker = new PgReassessmentWorker(pool, { actorId: ACTOR });
+    const due = await worker.enqueueDue(clock.now(), workspaceId);
+    const { drained, escalation } = await drainAndEscalate(pool, workspaceId, () => clock.now());
+    say(`Advanced evaluation clock: ${stage.id}`);
+    say(`  narrative: ${stage.narrative ?? '(none)'}`);
+    say(`  planningNow: ${planningNow}`);
+    say(`  evaluation clock: CONTROLLED @ ${clock.now()}`);
+    say(`  clock-expiry enqueued: ${due}; reassessment stop: ${drained.stoppedReason}; processed=${drained.processed}`);
+    say(`  case escalation: opened=${escalation.opened} attached=${escalation.attached}`);
+    say('  Overnight / boardability must emerge from timing at this controlled now — no forced recovery path.');
+  } finally {
+    await pool.end();
+  }
+}
+
+async function applyStage(stage: DelayStage, timeline: DelayTimeline): Promise<void> {
+  if (isProviderEventStage(stage)) {
+    await applyProviderStage(stage, timeline);
+    return;
+  }
+  if (isClockOnlyStage(stage)) {
+    await applyClockOnlyStage(stage);
+    return;
+  }
+  throw new Error(
+    `stage ${stage.id} is neither a provider-event nor a clock-only stage (needs eventId+arrTime or planningNow)`,
+  );
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const timeline = loadTimeline();
   const eventStages = providerEventStages(timeline);
   const clockStages = clockOnlyStages(timeline);
+  const driven = harnessDrivenStages(timeline);
 
   if (args.list || (!args.next && !args.stage && !args.reset)) {
     say('Provider-event stages (harness-driven):');
     for (const [index, stage] of eventStages.entries()) {
       say(`  ${index + 1}. ${stage.id} — ${stage.narrative ?? stage.eventType ?? ''}`);
     }
-    say('Clock-only stages (print / planningNow; not auto-applied here):');
-    for (const stage of clockStages) {
-      say(`  - ${stage.id} planningNow=${stage.planningNow} — ${stage.narrative ?? ''}`);
+    say('Clock-only stages (harness advances workspace evaluation clock):');
+    for (const [index, stage] of clockStages.entries()) {
+      say(`  ${eventStages.length + index + 1}. ${stage.id} planningNow=${stage.planningNow} — ${stage.narrative ?? ''}`);
     }
     say(`Cursor file: ${CURSOR_PATH}`);
     if (!args.list && !args.next && !args.stage && !args.reset) {
@@ -231,28 +324,19 @@ async function main(): Promise<void> {
   const cursor = loadCursor();
   let stage: DelayStage | undefined;
   if (args.stage) {
-    stage = eventStages.find((entry) => entry.id === args.stage)
+    stage = driven.find((entry) => entry.id === args.stage)
       ?? timeline.stages.find((entry) => entry.id === args.stage);
     if (!stage) throw new Error(`unknown stage id: ${args.stage}`);
-    if (!stage.eventId || !stage.arrTime) {
-      say(`Stage ${stage.id} is clock/context only (planningNow=${stage.planningNow ?? 'n/a'}).`);
-      say(stage.narrative ?? '');
-      say('Set the synthetic planning clock / run planning against this stage manually; this harness does not fake wall-clock.');
-      return;
-    }
   } else if (args.next) {
-    stage = eventStages[cursor.nextIndex];
+    stage = driven[cursor.nextIndex];
     if (!stage) {
-      say('All provider-event stages already applied. Use --reset-cursor to restart, or --list.');
-      for (const clock of clockStages) {
-        say(`Remaining clock stage: ${clock.id} @ ${clock.planningNow} — ${clock.narrative ?? ''}`);
-      }
+      say('All harness-driven stages already applied. Use --reset-cursor to restart, or --list.');
       return;
     }
   }
 
   if (!stage) throw new Error('no stage selected');
-  await applyProviderStage(stage, timeline);
+  await applyStage(stage, timeline);
   if (args.next) {
     cursor.applied.push(stage.id);
     cursor.nextIndex += 1;
