@@ -81,7 +81,13 @@ export function renderCompactActivityRail(
   const limit = options.limit ?? 4;
   const logHref = options.logHref ?? '/activity';
   const surface = feed ? adaptActivityFeedToActivityPage(feed) : undefined;
-  const items = (surface?.days ?? []).flatMap((day) => day.items).slice(0, limit);
+  const seen = new Set<string>();
+  const items = (surface?.days ?? []).flatMap((day) => day.items).filter((item) => {
+    const key = `${item.who}\u0000${item.text}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, limit);
   const body = items.length === 0
     ? '<p class="cw-muted" data-test="overview-activity-empty">No activity recorded yet.</p>'
     : items.map((item) => {

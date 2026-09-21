@@ -4,8 +4,7 @@
 
 - Branch: `ui/operator-workspace-v5`
 - Worktree: `.worktrees/ui-operator-workspace-v5`
-- Starting SHA (this correction session): `5561783d9bfedc47d971b6be330b18aa8a4b1c52`
-- Activity-rail correction: `edf62e97be11df1cc6b0c174d52744ed4ddede47`
+- Starting SHA (physical convergence): `6c6eb3604669c1db7d79e1d97d8a1abb006ae776`
 - Role: PRIMARY IMPLEMENTATION OWNER
 
 ## Goal
@@ -14,29 +13,44 @@ Founder-approved Overview + Case V5 composition on the real frontend, using prod
 
 ## Current checkpoint
 
-**CP6 physical walkthrough completed with PARTIAL evidence** (D2 amber screenshot gap). Activity rail correction shipped.
+**Physical convergence pass.** Prior CP6 PARTIAL evidence is rejected. Case rail
+now begins beside the V5.6 graph; legacy pre-graph stack removed; person-as-failure
+copy fixed; Overview focus selector removed in favour of the graph-owned label;
+D2/D3 visual truth and framing corrected at the semantic seam.
 
 ## Acceptance checklist
 
-- [x] CP1–CP5 (prior commit `5561783`)
-- [x] Overview activity rail composes real `ActivityFeed` (same adapter vocabulary; OperatorOverview unchanged)
-- [x] CP6 Jordan D1 GREEN / D2 AT_RISK / D3 DISRUPTED (API + Case agreement)
-- [x] CP6 Sarah + Jordan coexistence without reset
-- [x] Screenshots under `docs/work/operator-workspace-v5-cp6-evidence/`
-- [ ] Dedicated D2 amber UI screenshot (gap recorded)
-- [x] Anti-hardcoding CLEAN
-- [x] Focused UI tests + `tsc --noEmit`
+- [x] Case rail beside graph (DOM + 1440 screenshots)
+- [x] Legacy lead/pre-graph stack removed; compact affects disclosure
+- [x] Person labels never render as “No longer works”
+- [x] Jordan D2 amber / D3 red at Arrival timing (semantic projection, not CSS)
+- [x] Graph default framing fits primary path (no clipped primary nodes on D3)
+- [x] Case rail activity visible at 1440 without nested-only scroll
+- [x] Overview focus label agrees with graph pill; selector removed
+- [x] Focus hidden on All participants
+- [x] Broken readiness concatenation removed
+- [x] Activity phrasing drops redundant subject nouns; dedupes identical who+text
+- [x] Recommendation card fills main column
+- [x] Sarah travel-led recommendation investigated (ACT NOW planner gap)
+- [x] Physical screenshots under `docs/work/operator-workspace-v5-physical-convergence-evidence/`
+- [x] Focused tests + anti-hardcoding CLEAN + `tsc --noEmit`
 
 ## Issue disposition
 
 | Issue | Class | Notes |
 |---|---|---|
-| Overview activity rail | Act Now | Closed — page composition + Overview HTML poll |
-| D2 amber screenshot not frozen before D3 | Park for Later | API proved AT_RISK; see evidence README |
-| Sarah recommendation title travel-led | Park for Later | Matches recorded recommendation; programme alternatives remain; no FE branch |
+| Case rail / legacy stack | Act Now | Closed — V5 layout recompose |
+| Person-as-failure copy | Act Now | Closed — Trip objective / Requires recovery |
+| Jordan D3 visual amber | Act Now | Closed — FAILED relationship upgrades arrival TIMING node |
+| Graph framing | Act Now | Closed — camera FIT constants |
+| Overview focus disagreement | Act Now | Closed — graph-owned label; no multi-incident select |
+| Focus on All participants | Act Now | Closed — `.v5-focus[hidden]` + client hide |
+| Readiness concatenation | Act Now | Closed — removed duplicate segments line |
+| Activity copy quality | Act Now | Closed for redundant nouns; subjects still depend on feed fields |
+| Recommendation width | Act Now | Closed — full main-column width |
+| Sarah travel-led recovery | **Act Now** | Planner selected TRANSPORT option 5; programme options 7–8 viable but not recommended — backend/planner work outside this visual pass |
 | Approval unavailable in REPLAY | Ignore / Accept Risk | Sandbox execution not composed |
-| Activity phrase “for a recovery option” | Park for Later | Adapter vocabulary; not invented entries |
 
 ## Next action
 
-Optional: one more controlled D1→D2 screenshot pass if founder requires amber PNG; otherwise proceed to integration/review of V5 branch.
+Planner/demo selection work so the Sarah hero can surface programme recovery when that is the intended story. Do not frontend-relabel the recorded recommendation.

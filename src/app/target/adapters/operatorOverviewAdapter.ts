@@ -52,12 +52,6 @@ function summaryTiles(counted: ReturnType<typeof countedSet>): string {
     return `<div class="readout-bucket tone-${tone}${key === 'needs-attention' && n > 0 ? ' is-attention' : ''}" data-test="summary-${tone}" data-summary-key="${key}"><strong class="tile-count">${n}</strong><span class="tile-label">${e(label)}</span></div>`;
   }).join('');
 }
-function readoutSegments(counted: ReturnType<typeof countedSet>): string {
-  const c = counted.counts, watching = c.atRisk + c.recovering;
-  return [c.disrupted ? `<span class="seg-bad">${c.disrupted} need${c.disrupted === 1 ? 's' : ''} attention</span>` : '<span class="seg-ok">Nobody needs attention</span>',
-    watching ? `<span class="seg-watch">${watching} watching</span>` : '',
-    c.unknown ? `<span class="seg-unk">${c.unknown} unconfirmed</span>` : ''].join('');
-}
 function barWidth(count: number, total: number): string {
   if (total <= 0 || count <= 0) return '0';
   return ((count / total) * 100).toFixed(2);
@@ -75,8 +69,7 @@ function compactReadiness(counted: ReturnType<typeof countedSet>): string {
       <span class="seg-watch" style="width:${barWidth(watching, total)}%"></span>
       <span class="seg-unk" style="width:${barWidth(c.unknown, total)}%"></span>
     </div>
-    <div class="readout-buckets" data-test="product-summary-tiles">${summaryTiles(counted)}</div>
-    <p class="sub ri-scale" data-test="managed-presentation-segments">${readoutSegments(counted)}</p></div>`;
+    <div class="readout-buckets" data-test="product-summary-tiles">${summaryTiles(counted)}</div></div>`;
 }
 const QUEUE_GLYPH: Record<VisualTone, { className: string; char: string }> = {
   ok: { className: 'g-ok', char: '✓' }, watch: { className: 'g-warn', char: '▲' },

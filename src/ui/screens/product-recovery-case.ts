@@ -31,25 +31,16 @@ function details(key: string, summary: string, body: string): string {
 }
 function badge(label: string, tone: string): string { return `<span class="badge tone-${tone}">${e(label)}</span>`; }
 
-function headerHtml(m: CaseWorkspaceModel): string {
-  return `<div class="page-head"><h1>${e(m.heading)} ${badge(m.statusLabel, m.statusTone)}</h1>
-    <p class="sub">Trip recovery</p><p class="cw-muted"><a href="${SHELL_LINKS.dashboard}" data-test="back-to-overview">${e(CASE_COPY.backToOverview)}</a>
-    · Updated <time datetime="${e(m.generatedAt)}">${e(formatInstant(m.generatedAt))}</time></p></div>`;
-}
-
-/** Situation: what changed + stake. No instructional “review the page” banner. */
-function leadHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
-  const changed = decisionText(view.changeSummary,
+function headerHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
+  const fallback = decisionText(view.changeSummary,
     (view.cause && CASE_CHANGE_TYPE_SENTENCE[view.cause.changeType]) || 'The current trip needs attention.');
-  const reviewing = m.phase === 'awaiting_approval';
-  const statusHint = reviewing
-    ? `<p class="cw-status-hint" data-test="recommendation-status">Recommendation ready · <a href="#cw-recommendation">Review recommendation</a></p>`
-    : '';
-  return `<div class="cw-lead"><div class="callout tone-${m.lead.tone}" data-test="case-lead">
-    <h2>${e(m.lead.title)}</h2><p>${e(changed)}</p>
-    ${m.lead.stake ? `<p><strong>${e(m.lead.stake)}</strong></p>` : ''}
-    ${statusHint}</div>
-    ${m.attention ? `<div class="callout tone-alert" data-test="case-attention"><h2>${e(m.attention.title)}</h2><p>${e(m.attention.body)}</p></div>` : ''}</div>`;
+  const problem = m.whereItBreaks
+    ? `<span data-test="focused-graph-first-breakpoint">Where it breaks: <strong>${e(m.whereItBreaks.label)}</strong> — ${e(m.whereItBreaks.phrase)}.</span>`
+    : e(fallback);
+  return `<div class="page-head"><h1>${e(m.heading)} ${badge(m.statusLabel, m.statusTone)}</h1>
+    <p class="sub" data-test="case-problem">${problem}</p>
+    <p class="cw-muted"><a href="${SHELL_LINKS.dashboard}" data-test="back-to-overview">${e(CASE_COPY.backToOverview)}</a>
+    · Updated <time datetime="${e(m.generatedAt)}">${e(formatInstant(m.generatedAt))}</time></p></div>`;
 }
 
 function graphHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
@@ -62,16 +53,15 @@ function graphHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
       caseStatus: stored.caseStatusAtCapture, role: 'original', includeAssets: false }),
     capturedAt: stored.capturedAt, capturedLabel: formatInstant(stored.capturedAt),
   } } : {}) });
-  return `<section class="section cw-graph" data-test="focused-case-graph-section"><h2>${e(CASE_COPY.graphHeading)}</h2>
-    ${m.whereItBreaks ? `<p class="graph-caption" data-test="focused-graph-first-breakpoint">Where it breaks: <strong>${e(m.whereItBreaks.label)}</strong> — ${e(m.whereItBreaks.phrase)}.</p>` : ''}
+  return `<section class="section cw-graph" data-test="focused-case-graph-section">
     ${m.phase === 'recovered' ? `<p class="graph-caption" data-test="graph-resolved-note">${e(CASE_COPY.graphResolvedNote)}</p>` : ''}${toggle}</section>`;
 }
 
 function affectsHtml(m: CaseWorkspaceModel): string {
   if (!m.affects.items.length && !m.affects.healthyNote) return '';
-  return `<section class="section cw-affects" data-test="case-affects"><h2>${e(CASE_COPY.whatThisAffects)}</h2><div class="cw-card">
+  return `<details class="cw-details v5-affects" data-test="case-affects" data-region-key="case-affects"><summary>${e(CASE_COPY.whatThisAffects)}</summary>
     <ul class="cw-compact-list">${m.affects.items.map((item) => `<li data-tone="${item.tone}"><strong>${e(item.label)}</strong> — ${e(item.note)}</li>`).join('')}</ul>
-    ${m.affects.healthyNote ? `<p class="cw-muted">${e(m.affects.healthyNote)}</p>` : ''}</div></section>`;
+    ${m.affects.healthyNote ? `<p class="cw-muted">${e(m.affects.healthyNote)}</p>` : ''}</details>`;
 }
 
 function changesHtml(strategy: RecoveryStrategyView): string {
@@ -170,12 +160,14 @@ function recommendationHtml(view: RecoveryCaseView): string {
   const basis = (view.planningEvidence?.recommendation?.basis ?? [])
     .map((b) => decisionText(b.summary, '')).filter((text) => text.length > 0 && text.length <= 240).slice(0, 3);
   const reasons = [...outcomes, ...basis].slice(0, 3);
+  const unresolved = view.uncertainty.map((text) => decisionText(text, '')).filter((text) => text.length > 0).slice(0, 3);
   return `<article class="cw-card cw-rec option-card is-recommended" id="cw-recommendation" data-test="recovery-strategy" data-strategy-ref="${e(strategy.strategyRef)}" data-option-number="${strategy.optionNumber}">
     <p class="cw-kicker">Recommended recovery · proposed — not yet applied</p>
     <h3>${e(decisionTitle(strategy))}</h3>
     ${proposalHtml(candidate)}
     <div class="cw-block"><h4>Why this proposal</h4>${list(reasons)}
       <p class="cw-muted">${strategy.projectedSummary.pass} passed · ${strategy.projectedSummary.fail} failed · ${strategy.projectedSummary.unknown} unconfirmed across ${strategy.projectedSummary.total} assessed items.</p>
+      ${unresolved.length ? `<h4>Still unresolved</h4>${list(unresolved)}` : ''}
       ${details(`outcome-checks-${strategy.strategyRef}`, 'All projected outcome checks', list(strategy.resolves.map((c) => `${c.projectedVerdict === 'PASS' ? 'Passed' : c.projectedVerdict === 'FAIL' ? 'Failed' : 'Unconfirmed'} — ${decisionText(c.personLabel, 'Traveller')}`)))}</div>
     ${strategy.changes.some((c) => c.effectKind === 'CANCEL_STAY') ? '<p class="cw-muted">Cancellation of the displaced stay is proposed, not completed.</p>' : ''}
     ${costBreakdownHtml(candidate, strategy.strategyRef)}
@@ -264,13 +256,11 @@ function approvalHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
   return `<section class="cw-card cw-approve cw-approve-sticky" data-test="approval-panel" data-strategy-ref="${strategy ? e(strategy.strategyRef) : ''}">
     <p class="cw-kicker">Decision</p>
     <h2>Approval required before action.</h2>
-    <p class="cw-muted">Authority is checked separately from trip viability.</p>
     <dl class="cw-approval-facts">
       <dt>Current decision status</dt><dd>${e(authorityLabel(view.authorityState))}</dd>
-      <dt>Approving party</dt><dd>The named approving party is not supplied in this case view. No organiser or traveller authority is assumed.</dd>
     </dl>
     ${moneySummaryHtml(candidate)}
-    ${conditions.length ? `<h4>Material conditions</h4>${list(conditions.slice(0, 4))}${conditions.length > 4 ? `<p class="cw-muted">${conditions.length - 4} more in research details.</p>` : ''}<p class="cw-muted">Eligibility checks do not confirm admission or completed arrival formalities.</p>` : ''}
+    ${conditions.length ? `<p class="cw-muted">${conditions.length} material condition${conditions.length === 1 ? '' : 's'} recorded on the recommendation.</p>` : ''}
     ${actionControls}
     <p data-test="recovery-controls-status" data-action-status role="status"></p>
   </section>`;
@@ -353,32 +343,27 @@ export function renderProductRecoveryCase(view: RecoveryCaseView): string {
     ${recommendationHtml(view)}${findRecoveryHtml(view, m)}
   </div>`;
   return `${OPERATOR_WORKSPACE_STYLES}<main class="shell product-recovery-case case-workspace v5-workspace" data-test="product-recovery-case" ${attrs}>
-    ${region('header', headerHtml(m))}
-    ${region('lead', leadHtml(view, m))}
-    ${region('graph', graphHtml(view, m))}
-    ${region('affects', affectsHtml(m))}
+    ${region('header', headerHtml(view, m))}
     <div class="v5-case-layout">
       <div class="v5-case-main">
+        ${region('graph', graphHtml(view, m))}
+        ${region('affects', affectsHtml(m))}
         <div class="v5-case-tabs" role="tablist" aria-label="Recovery evidence">
           <button type="button" class="v5-tab v5-tab-recommended is-active" data-case-tab="recovery" role="tab" aria-selected="true">Recommended recovery</button>
           <button type="button" class="v5-tab" data-case-tab="options" role="tab" aria-selected="false">Other options</button>
           <button type="button" class="v5-tab" data-case-tab="checks" role="tab" aria-selected="false">Checks &amp; sources</button>
         </div>
-        <div class="case-decision-grid">
-          <div class="case-decision-main">
-            <div class="v5-panel" data-case-panel="recovery">
-              ${region('options', optionsRegion)}
-              ${region('execution', executionHtml(m))}
-              ${region('resolution', resolutionHtml(m))}
-            </div>
-            <div class="v5-panel" data-case-panel="options" hidden>
-              ${region('alternatives', `${alternativesHtml(view)}${rejectedHtml(view, m)}${allCandidatesHtml(view)}`)}
-            </div>
-            <div class="v5-panel" data-case-panel="checks" hidden>
-              ${region('activity', researchHtml(view, m))}
-              ${region('technical', technicalHtml(view, m))}
-            </div>
-          </div>
+        <div class="v5-panel" data-case-panel="recovery">
+          ${region('options', optionsRegion)}
+          ${region('execution', executionHtml(m))}
+          ${region('resolution', resolutionHtml(m))}
+        </div>
+        <div class="v5-panel" data-case-panel="options" hidden>
+          ${region('alternatives', `${alternativesHtml(view)}${rejectedHtml(view, m)}${allCandidatesHtml(view)}`)}
+        </div>
+        <div class="v5-panel" data-case-panel="checks" hidden>
+          ${region('activity', researchHtml(view, m))}
+          ${region('technical', technicalHtml(view, m))}
         </div>
       </div>
       <aside class="v5-case-rail case-decision-rail" aria-label="Decision">

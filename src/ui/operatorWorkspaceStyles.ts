@@ -106,6 +106,14 @@ export const OPERATOR_WORKSPACE_STYLES = `<style data-operator-workspace-styles>
 .v5-tab.is-active:after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--ink); }
 .v5-count { font-size: 11px; margin-left: 7px; border-radius: 4px; background: var(--surface-2); padding: 2px 5px; color: var(--text-soft); font-weight: 500; }
 .v5-focus { display: flex; align-items: center; gap: 7px; color: var(--text-soft); font-size: 11px; }
+.v5-focus[hidden] { display: none !important; }
+.v5-case-rail.case-decision-rail { max-height: none; overflow: visible; }
+.v5-case-rail .cw-approve { padding: 12px; }
+.v5-case-rail .cw-approve h2 { font-size: 16px; line-height: 1.25; margin: 0 0 6px; }
+.v5-case-rail .cw-approval-facts { margin: 4px 0 8px; }
+.v5-case-rail .cw-approval-facts dt { margin-top: 4px; }
+.v5-case-rail .v5-rail-title { margin-bottom: 8px; }
+.v5-case-main .cw-rec, .v5-case-main .cw-card { width: 100%; max-width: none; }
 .v5-focus select { max-width: 220px; padding: 7px 9px; color: var(--text); border: 1px solid var(--border); background: var(--surface); border-radius: 5px; font-size: 12px; }
 .v5-context-rail, .v5-case-rail { position: sticky; top: 86px; align-self: start; max-height: calc(100vh - 102px); overflow: auto; border-left: 1px solid var(--border); padding-left: 24px; }
 .v5-rail-title { font-size: 14px; font-weight: 600; display: flex; justify-content: space-between; margin: 0 0 16px; }

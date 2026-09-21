@@ -8,7 +8,6 @@ export function renderOverviewWorkspaceScript(): string {
 (function() {
   'use strict';
   var tabKey = '__northstarOverviewTab';
-  var focusKey = '__northstarOverviewFocus';
   function panels() { return document.querySelectorAll('[data-overview-panel]'); }
   function tabs() { return document.querySelectorAll('[data-overview-tab]'); }
   function show(name) {
@@ -33,20 +32,6 @@ export function renderOverviewWorkspaceScript(): string {
       button.setAttribute('data-bound', 'true');
       button.addEventListener('click', function() { show(button.getAttribute('data-switch-overview') || 'participants'); });
     });
-    var select = document.querySelector('[data-overview-focus-select]');
-    if (select && select.getAttribute('data-bound') !== 'true') {
-      select.setAttribute('data-bound', 'true');
-      select.addEventListener('change', function() {
-        var value = select.value;
-        try { sessionStorage.setItem(focusKey, value); } catch (e) {}
-        document.querySelectorAll('[data-test="overview-item"]').forEach(function(row) {
-          row.classList.toggle('is-focused', (row.getAttribute('data-case-ref') || row.getAttribute('data-trip-ref')) === value);
-        });
-        var label = select.options[select.selectedIndex] ? select.options[select.selectedIndex].text : '';
-        var context = document.querySelector('[data-test="overview-active-context"]');
-        if (context && label) context.textContent = label;
-      });
-    }
     var saved = 'event';
     try { saved = sessionStorage.getItem(tabKey) || 'event'; } catch (e) {}
     if (!document.querySelector('[data-overview-panel="' + saved + '"]')) saved = 'event';

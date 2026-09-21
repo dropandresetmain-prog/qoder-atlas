@@ -480,7 +480,7 @@ test('A1 enrichment: connection facts mark only the upstream arrival, never its 
   );
 });
 
-test('A1 enrichment: broken connection marks the arrival→onward relationship FAILED while delayed arrival stays CHANGED', () => {
+test('A1 enrichment: broken connection marks arrival timing and the onward relationship FAILED', () => {
   const result = projectFocusedCaseGraphEnrichment({
     caseSubjects: [{ subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' }],
     journeys: [{ id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null }],
@@ -496,7 +496,7 @@ test('A1 enrichment: broken connection marks the arrival→onward relationship F
     causalPath: [{ subjectRef: 'JOURNEY:journey-1', causeSubjectRef: 'JOURNEY_ITEM:inbound', dimension: 'connection_feasibility', reasonCode: 'connection_broken', evaluatorId: 'm6.connection', facts: { upstreamArrival: '2031-04-05T12:00:00.000Z', downstreamDeparture: '2031-04-05T11:00:00.000Z', gapMinutes: -60 }, relatedSubjectRefs: ['JOURNEY_ITEM:inbound', 'JOURNEY_ITEM:onward'] }],
     travellerLabelsByJourney: new Map([['journey-1', 'Alice']]), caseId: 'case-1',
   });
-  assert.equal(result.nodes.find((node) => node.ref === 'TIMING:inbound:ARRIVAL')?.semanticState, 'CHANGED');
+  assert.equal(result.nodes.find((node) => node.ref === 'TIMING:inbound:ARRIVAL')?.semanticState, 'FAILED');
   assert.equal(
     result.edges.find((edge) => edge.id === 'MUST_HAPPEN_BEFORE:SERVICE_BOOKING:inbound-service:SERVICE_BOOKING:onward-service')?.semanticState,
     'FAILED',

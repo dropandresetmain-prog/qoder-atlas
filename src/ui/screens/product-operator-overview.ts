@@ -4,6 +4,7 @@ import { adaptOperatorOverviewToDashboard, overviewCountedTotal } from '../../ap
 import { SHELL_LINKS } from '../../app/target/productShell.ts';
 import { escapeHtml } from '../html.ts';
 import { renderEventOverviewGraph, renderOverviewGraphAssets } from '../overview-graph/index.ts';
+import { buildOverviewGraphModel } from '../overview-graph/model.ts';
 import { renderOverviewRosterControllerScript } from '../overviewRosterController.ts';
 import { renderOverviewWorkspaceScript } from '../operatorWorkspaceClient.ts';
 import { OPERATOR_WORKSPACE_STYLES } from '../operatorWorkspaceStyles.ts';
@@ -14,14 +15,9 @@ export interface ProductOperatorOverviewOptions {
   readonly activity?: ActivityFeed;
 }
 
-function focusControl(options: readonly { tripRef: string; label: string; caseRef?: string }[]): string {
-  if (options.length === 0) return '';
-  const choices = options.map((option) => {
-    const value = option.caseRef ?? option.tripRef;
-    return `<option value="${escapeHtml(value)}">${escapeHtml(option.label)}</option>`;
-  }).join('');
-  return `<label class="v5-focus" data-overview-focus>Focus
-    <select data-overview-focus-select aria-label="Incident focus">${choices}</select></label>`;
+function focusControl(label: string | undefined): string {
+  if (!label) return '';
+  return `<p class="v5-focus" data-overview-focus data-test="overview-focus">Focus <strong>${escapeHtml(label)}</strong></p>`;
 }
 
 export function renderProductOperatorOverview(
@@ -38,7 +34,7 @@ export function renderProductOperatorOverview(
   const eventLine = eventTitle
     ? `<p class="sub" data-test="event-context">${escapeHtml(eventTitle)}</p>`
     : '';
-  const active = surface.focusOptions[0]?.label;
+  const active = buildOverviewGraphModel(view)?.focus?.unresolvedTravellerLabel;
   return `${OPERATOR_WORKSPACE_STYLES}
 <main class="shell product-operator-overview v5-workspace" data-test="product-operator-overview" data-assessment-lifecycle="${lifecycle.state}" data-assessment-pending-count="${lifecycle.pendingCount}" data-stable-revision="${view.change.projectionRevision}">
   <div class="page-head" data-poll-region="overview-heading">${eyebrow}<h1>${escapeHtml(surface.title)}</h1>
@@ -52,7 +48,7 @@ export function renderProductOperatorOverview(
           <button type="button" class="v5-tab is-active" data-overview-tab="event" role="tab" aria-selected="true">Event health</button>
           <button type="button" class="v5-tab" data-overview-tab="participants" role="tab" aria-selected="false">All participants <span class="v5-count">${total}</span></button>
         </div>
-        ${focusControl(surface.focusOptions)}
+        ${focusControl(active)}
       </div>
       <section class="v5-panel" data-overview-panel="event">
         <div class="v5-active-context">${active ? `<strong data-test="overview-active-context">${escapeHtml(active)}</strong>` : '<span data-test="overview-active-context">No incident in focus</span>'}</div>

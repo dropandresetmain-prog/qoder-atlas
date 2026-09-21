@@ -68,7 +68,10 @@ describe('R2 Case workspace composition', () => {
     const html = renderProductRecoveryCase(baseCase());
     assert.match(html, /data-test="focused-case-graph-section"/);
     assert.match(html, /data-test="focused-case-graph"/);
-    assert.match(html, /How the trip is affected/);
+    assert.match(html, /data-test="case-problem"/);
+    assert.doesNotMatch(html, /How the trip is affected/);
+    assert.ok(html.indexOf('data-test="focused-case-graph-section"') < html.indexOf('data-test="recovery-controls"'));
+    assert.ok(html.indexOf('v5-case-rail') > html.indexOf('v5-case-layout'));
     assert.ok(
       html.indexOf('data-test="focused-case-graph-section"')
         < html.indexOf('data-test="case-affects"')

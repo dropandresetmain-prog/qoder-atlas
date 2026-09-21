@@ -601,6 +601,16 @@ export function projectFocusedCaseGraphEnrichment(
         authority: 'AUTHORITATIVE',
         semanticState: relationshipState,
       });
+      // A merely tight connection leaves arrival CHANGED. A broken connection
+      // makes arrival the visible operational breakpoint, so the node itself
+      // must read FAILED rather than staying amber beside a green onward flight.
+      if (relationshipState === 'FAILED') {
+        const index = nodes.findIndex((node) => node.ref === timingRef);
+        const current = index >= 0 ? nodes[index] : undefined;
+        if (current && current.semanticState !== 'RECOVERED') {
+          nodes[index] = { ...current, semanticState: 'FAILED' };
+        }
+      }
     }
   }
 

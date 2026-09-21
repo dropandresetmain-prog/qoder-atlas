@@ -6,6 +6,7 @@ import type { OperatorOverview, PlanningCandidateView, PlanningToolEvidenceView,
 import { renderProductRecoveryCase } from '../src/ui/screens/product-recovery-case.ts';
 import { renderProductOperatorOverview } from '../src/ui/screens/product-operator-overview.ts';
 import { buildOverviewGraphModel } from '../src/ui/overview-graph/model.ts';
+import { activityPhrase } from '../src/app/target/adapters/surfaceLabels.ts';
 import {
   decisionActionState, decisionCosts, decisionOptions, groupedResearch, sameStrategy, sumDisplayedMoney,
 } from '../src/ui/caseDecisionPresentation.ts';
@@ -83,6 +84,10 @@ test('Overview case navigation dominates and the full searchable population rema
   assert.doesNotMatch(html, /Open an affected case to review the proposed recovery/);
   assert.ok(html.includes('readout-buckets'));
   assert.doesNotMatch(html, /class="tiles" data-test="product-summary-tiles"/);
+  assert.doesNotMatch(html, /data-overview-focus-select/);
+  assert.match(html, /\.v5-focus\[hidden\]/);
+  assert.doesNotMatch(html, /managed-presentation-segments/);
+  assert.doesNotMatch(html, /need attention\d+ unconfirmed/);
   assert.match(html, /data-poll-region="overview-activity"/);
   assert.match(html, /data-test="overview-activity-empty"/);
   assert.match(html, /data-test="overview-activity-log"[^>]*>View log →/);
@@ -146,6 +151,24 @@ test('Overview activity rail projects the latest real ActivityFeed without inven
   assert.match(html, /data-test="activity-case-link"[^>]*>Open case →/);
   assert.match(html, /data-ui-feed-tone=/);
   assert.doesNotMatch(html, /This rail does not invent a second feed/);
+});
+
+test('generic activity phrases drop a repeated subject noun but keep a real subject', () => {
+  assert.equal(activityPhrase('RECOVERY_PLANNING_COMPLETED', 'a recovery option').text, 'finished comparing recovery options');
+  assert.equal(activityPhrase('RECOVERY_PLANNING_COMPLETED', 'Traveller Alpha\u2019s trip').text, 'finished comparing recovery options for Traveller Alpha\u2019s trip');
+  assert.equal(activityPhrase('EXTERNAL_RECORD_LINKED', 'a record').text, 'linked external record');
+  assert.match(activityPhrase('EXTERNAL_RECORD_OBSERVED', 'a booking').text, /for a booking/);
+});
+
+test('a person label is never rendered as no longer working', () => {
+  const html = renderProductRecoveryCase(view());
+  const body = html.slice(html.indexOf('<main'));
+  assert.doesNotMatch(body, /Traveller Alpha — No longer works/);
+  assert.doesNotMatch(body, /— No longer works/);
+  assert.match(body, /Trip objective/);
+  assert.match(body, /Requires recovery/);
+  assert.ok(body.indexOf('data-poll-region="graph"') < body.indexOf('class="v5-case-rail'));
+  assert.ok(body.indexOf('class="v5-case-layout"') < body.indexOf('data-poll-region="graph"'));
 });
 
 test('the recorded recommendation is not replaced by an executable alternative', () => {
@@ -283,43 +306,50 @@ test('partial and unavailable research are not labelled completed successes', ()
 });
 
 test('active-change footprint excludes unrelated attention travellers', () => {
-  const model = buildOverviewGraphModel({
+  const view = {
     ...overview(),
     eventOverview: {
       days: [{ index: 1, localDate: '2032-04-01', dateLabel: '1 Apr' }],
-      landmarks: [{ ref: 'PROGRAMME_ITEM:opening', title: 'Opening', dayIndex: 1, health: 'GREEN', participantCount: 12, affectedCount: 0 }],
+      landmarks: [{ ref: 'PROGRAMME_ITEM:opening', title: 'Opening', dayIndex: 1, health: 'GREEN' as const, participantCount: 12, affectedCount: 0 }],
       dependencies: [{
         ref: 'SERVICE:shared', kindLabel: 'Flight', label: 'Shared flight', dayIndex: 1,
-        health: 'RED', changed: true, travellerCount: 2, unresolvedCount: 1, clearedCount: 1, checkingCount: 0,
+        health: 'RED' as const, changed: true, travellerCount: 2, unresolvedCount: 1, clearedCount: 1, checkingCount: 0,
       }],
       cohorts: [],
       promotedTravellers: [
-        { journeyRef: 'journey-on-dep', label: 'On dependency', roleLabel: 'Speaker', status: 'DISRUPTED', membership: 'UNRESOLVED', dependencyRef: 'SERVICE:shared' },
-        { journeyRef: 'journey-other', label: 'Other attention', roleLabel: 'Speaker', status: 'DISRUPTED', membership: 'ATTENTION' },
-        { journeyRef: 'journey-cleared', label: 'Cleared', roleLabel: 'Speaker', status: 'READY', membership: 'CLEARED', dependencyRef: 'SERVICE:shared' },
+        { journeyRef: 'journey-on-dep', label: 'On dependency', roleLabel: 'Speaker', status: 'DISRUPTED' as const, membership: 'UNRESOLVED' as const, dependencyRef: 'SERVICE:shared' },
+        { journeyRef: 'journey-other', label: 'Other attention', roleLabel: 'Speaker', status: 'DISRUPTED' as const, membership: 'ATTENTION' as const },
+        { journeyRef: 'journey-cleared', label: 'Cleared', roleLabel: 'Speaker', status: 'READY' as const, membership: 'CLEARED' as const, dependencyRef: 'SERVICE:shared' },
       ],
       promotedOverflow: 0,
       blastRadius: { dependencyRef: 'SERVICE:shared', affectedCount: 2, clearedCount: 1, checkingCount: 0, unresolvedCount: 1, landmarkRefs: ['PROGRAMME_ITEM:opening'] },
       relations: [],
     },
-  });
+  };
+  const model = buildOverviewGraphModel(view);
   assert.ok(model?.focus);
   assert.ok(model!.focus!.incidentIds.includes('journey-on-dep'));
   assert.ok(!model!.focus!.incidentIds.includes('journey-other'));
   assert.equal(model!.focus!.unresolvedTravellerId, 'journey-on-dep');
   assert.match(model!.focus!.message, /Active change · Shared flight/);
+  const html = renderProductOperatorOverview(view);
+  assert.match(html, /<p class="v5-focus" data-overview-focus data-test="overview-focus">Focus <strong>On dependency<\/strong><\/p>/);
+  assert.equal(html.match(/data-test="overview-active-context">On dependency</g)?.length, 1);
+  assert.match(html, /data-overview-panel="participants" hidden/);
+  assert.match(html, /if \(focus\) focus\.hidden = name !== 'event'/);
+  assert.doesNotMatch(html, /<select[^>]*overview-focus/);
 });
 
 test('polling regions, immutable Original, graph and layout order remain composed', () => {
   const v = view(), html = renderProductRecoveryCase(v);
-  for (const name of ['header', 'lead', 'affects', 'graph', 'options', 'approval', 'alternatives', 'activity', 'execution', 'resolution', 'technical']) {
+  for (const name of ['header', 'affects', 'graph', 'options', 'approval', 'alternatives', 'activity', 'execution', 'resolution', 'technical']) {
     assert.equal((html.match(new RegExp(`data-poll-region="${name}"`, 'g')) ?? []).length, 1, name);
   }
   const body = html.slice(html.indexOf('<main'));
-  assert.ok(body.indexOf('data-poll-region="lead"') < body.indexOf('data-poll-region="graph"'));
   assert.ok(body.indexOf('data-poll-region="graph"') < body.indexOf('data-poll-region="affects"'));
-  assert.ok(body.indexOf('data-poll-region="graph"') < body.indexOf('case-decision-grid'));
-  assert.ok(body.indexOf('case-decision-grid') < body.indexOf('data-poll-region="alternatives"'));
+  assert.ok(body.indexOf('data-poll-region="graph"') < body.indexOf('class="v5-case-rail'));
+  assert.ok(body.indexOf('data-poll-region="graph"') < body.indexOf('data-poll-region="options"'));
+  assert.ok(body.indexOf('v5-case-layout') < body.indexOf('data-poll-region="graph"'));
   assert.match(html, /data-test="original-current-toggle"/);
   assert.match(html, /data-test="focused-case-graph"/);
   assert.match(html, /data-change-cursor="91"/);
