@@ -252,11 +252,38 @@ function finish(graph: PresentationGraph, nodes: readonly LayoutNode[]): LayoutR
   }
   for (const list of groups.values()) list.sort(order);
 
+  // Mirror image: distribute anchors when several edges share one TARGET
+  // surface, so edges converging on the same node don't all land on one
+  // point (e.g. two edges both terminating at a card's left edge). Grouped
+  // by target + which surface of it is hit, ordered by the source position
+  // so the fan-in reads left-to-right/top-to-bottom same as the fan-out does.
+  const targetGroupOf = (p: Pending): string => `${p.edge.targetRef}|${p.vertical ? (p.down ? 't' : 'b') : 'l'}`;
+  const targetOrder = (a: Pending, b: Pending): number =>
+    (a.vertical ? a.s.x - b.s.x : a.s.y - b.s.y) || a.edge.renderKey.localeCompare(b.edge.renderKey);
+  const targetGroups = new Map<string, Pending[]>();
+  for (const p of pending) {
+    const k = targetGroupOf(p);
+    if (!targetGroups.has(k)) targetGroups.set(k, []);
+    targetGroups.get(k)!.push(p);
+  }
+  for (const list of targetGroups.values()) list.sort(targetOrder);
+
   const edges: LayoutEdge[] = pending.map((p) => {
     const list = groups.get(groupOf(p))!;
     const index = list.indexOf(p);
     const fraction = list.length > 1 ? (index + 1) / (list.length + 1) : 0.5;
-    const g = routeEdge(p.s, p.t, index, list.length, fraction);
+
+    const targetList = targetGroups.get(targetGroupOf(p))!;
+    const targetIndex = targetList.indexOf(p);
+    const targetFraction = targetList.length > 1 ? (targetIndex + 1) / (targetList.length + 1) : 0.5;
+
+    // Every other node's box is a potential obstacle for this edge's route.
+    const obstacles: Box[] = [];
+    for (const [ref, b] of box) {
+      if (ref !== p.edge.sourceRef && ref !== p.edge.targetRef) obstacles.push(b);
+    }
+
+    const g = routeEdge(p.s, p.t, index, list.length, fraction, targetFraction, obstacles);
     return {
       renderKey: p.edge.renderKey,
       sourceRef: p.edge.sourceRef,

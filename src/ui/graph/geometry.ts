@@ -22,32 +22,107 @@ export interface EdgeGeometry {
 
 const r1 = (n: number): number => Math.round(n * 10) / 10;
 
+/** Clearance kept between a bowed curve and the obstacle card it steps around. */
+const OBSTACLE_MARGIN = 12;
+
+/**
+ * Obstacle boxes whose footprint the straight sx->tx corridor would cross:
+ * strictly between the two x positions, and overlapping the y band the
+ * (near-straight) horizontal curve travels through.
+ */
+function obstaclesInCorridor(sx: number, sy: number, tx: number, ty: number, obstacles: readonly Box[]): Box[] {
+  const loY = Math.min(sy, ty);
+  const hiY = Math.max(sy, ty);
+  return obstacles.filter((o) => o.x < tx && o.x + o.w > sx && o.y < hiY && o.y + o.h > loY);
+}
+
+/**
+ * Whether a flat detour at `viaY` (spanning `viaFromX`..`viaToX`) is itself
+ * free of every obstacle, not just the ones that blocked the original
+ * corridor. Guards against trading one overlap for another.
+ */
+function bowIsClear(viaFromX: number, viaToX: number, viaY: number, obstacles: readonly Box[]): boolean {
+  const lo = Math.min(viaFromX, viaToX);
+  const hi = Math.max(viaFromX, viaToX);
+  return obstacles.every((o) => !(o.x < hi && o.x + o.w > lo && o.y < viaY + 1 && o.y + o.h > viaY - 1));
+}
+
+/**
+ * Step a horizontal (side/diagonal) curve above or below any obstacle cards
+ * sitting in its straight-line corridor, so the edge no longer disappears
+ * behind an intervening node. Returns null when nothing blocks the corridor,
+ * or when neither detour has clearance -- callers then keep their original,
+ * unbowed curve rather than risk a new overlap (conservative by design).
+ */
+function bowedHorizontalPath(
+  sx: number, sy: number, tx: number, ty: number, handle: number, obstacles: readonly Box[],
+): string | null {
+  const hits = obstaclesInCorridor(sx, sy, tx, ty, obstacles);
+  if (hits.length === 0) return null;
+
+  const top = Math.min(...hits.map((o) => o.y));
+  const bottom = Math.max(...hits.map((o) => o.y + o.h));
+  const naturalMid = (sy + ty) / 2;
+  const candidates = [
+    { viaY: top - OBSTACLE_MARGIN, deviation: Math.abs(naturalMid - (top - OBSTACLE_MARGIN)) },
+    { viaY: bottom + OBSTACLE_MARGIN, deviation: Math.abs(naturalMid - (bottom + OBSTACLE_MARGIN)) },
+  ].sort((a, b) => a.deviation - b.deviation);
+
+  const viaFromX = Math.max(sx, Math.min(...hits.map((o) => o.x)));
+  const viaToX = Math.min(tx, Math.max(...hits.map((o) => o.x + o.w)));
+  const viaX = (viaFromX + viaToX) / 2;
+
+  for (const c of candidates) {
+    if (!bowIsClear(viaFromX, viaToX, c.viaY, obstacles)) continue;
+    const h1 = Math.max(4, Math.min(handle, Math.abs(viaX - sx) * 0.6));
+    const h2 = Math.max(4, Math.min(handle, Math.abs(tx - viaX) * 0.6));
+    return `M${r1(sx)} ${r1(sy)} ` +
+      `C${r1(sx + h1)} ${r1(sy)},${r1(viaX - h1)} ${r1(c.viaY)},${r1(viaX)} ${r1(c.viaY)} ` +
+      `C${r1(viaX + h2)} ${r1(c.viaY)},${r1(tx - h2)} ${r1(ty)},${r1(tx)} ${r1(ty)}`;
+  }
+  return null;
+}
+
 /** Right edge of source -> left edge of target. Handle length is bounded by the real gap. */
-export function sideCurve(source: Box, target: Box, sourceFraction = 0.5, targetFraction = 0.5): EdgeGeometry {
+export function sideCurve(
+  source: Box,
+  target: Box,
+  sourceFraction = 0.5,
+  targetFraction = 0.5,
+  obstacles: readonly Box[] = [],
+): EdgeGeometry {
   const sx = source.x + source.w;
   const sy = source.y + source.h * sourceFraction;
   const tx = target.x;
   const ty = target.y + target.h * targetFraction;
   const dx = Math.max(1, tx - sx);
   const handle = Math.max(4, Math.min(72, dx * 0.36));
+  const bowed = bowedHorizontalPath(sx, sy, tx, ty, handle, obstacles);
   return {
     route: 'side',
-    d: `M${r1(sx)} ${r1(sy)} C${r1(sx + handle)} ${r1(sy)},${r1(tx - handle)} ${r1(ty)},${r1(tx)} ${r1(ty)}`,
+    d: bowed ?? `M${r1(sx)} ${r1(sy)} C${r1(sx + handle)} ${r1(sy)},${r1(tx - handle)} ${r1(ty)},${r1(tx)} ${r1(ty)}`,
     sourceX: sx, sourceY: sy, targetX: tx, targetY: ty,
   };
 }
 
 /** Tight monotonic curve for a downstream item to the right and below. */
-export function diagonalCurve(source: Box, target: Box, sourceFraction = 0.72): EdgeGeometry {
+export function diagonalCurve(
+  source: Box,
+  target: Box,
+  sourceFraction = 0.72,
+  targetFraction = 0.5,
+  obstacles: readonly Box[] = [],
+): EdgeGeometry {
   const sx = source.x + source.w;
   const sy = source.y + source.h * sourceFraction;
   const tx = target.x;
-  const ty = target.y + target.h / 2;
+  const ty = target.y + target.h * targetFraction;
   const dx = Math.max(1, tx - sx);
   const handle = Math.max(30, Math.min(110, dx * 0.3));
+  const bowed = bowedHorizontalPath(sx, sy, tx, ty, handle, obstacles);
   return {
     route: 'diagonal',
-    d: `M${r1(sx)} ${r1(sy)} C${r1(sx + handle)} ${r1(sy)},${r1(tx - handle)} ${r1(ty)},${r1(tx)} ${r1(ty)}`,
+    d: bowed ?? `M${r1(sx)} ${r1(sy)} C${r1(sx + handle)} ${r1(sy)},${r1(tx - handle)} ${r1(ty)},${r1(tx)} ${r1(ty)}`,
     sourceX: sx, sourceY: sy, targetX: tx, targetY: ty,
   };
 }
@@ -88,14 +163,29 @@ export function topCurve(source: Box, target: Box, branchIndex: number, branchCo
  * Choose a route from the two boxes' relative position (geometry only):
  *  - target strictly right of source: side curve (diagonal when it also sits well below);
  *  - otherwise vertical: bottom curve when the target is below, top curve when above.
+ *
+ * `targetFraction` mirrors `sourceFraction`: it distributes edges that
+ * converge on the same target surface so they don't all land on one point.
+ * `obstacles` lets horizontal routes bow clear of an intervening card instead
+ * of passing straight through it.
  */
-export function routeEdge(source: Box, target: Box, branchIndex = 0, branchCount = 1, sourceFraction = 0.5): EdgeGeometry {
+export function routeEdge(
+  source: Box,
+  target: Box,
+  branchIndex = 0,
+  branchCount = 1,
+  sourceFraction = 0.5,
+  targetFraction = 0.5,
+  obstacles: readonly Box[] = [],
+): EdgeGeometry {
   const rightOf = target.x >= source.x + source.w + 8;
   if (rightOf) {
     const sourceMid = source.y + source.h / 2;
     const targetMid = target.y + target.h / 2;
-    if (targetMid - sourceMid > source.h * 0.9) return diagonalCurve(source, target, sourceFraction === 0.5 ? 0.72 : sourceFraction);
-    return sideCurve(source, target, sourceFraction, 0.5);
+    if (targetMid - sourceMid > source.h * 0.9) {
+      return diagonalCurve(source, target, sourceFraction === 0.5 ? 0.72 : sourceFraction, targetFraction, obstacles);
+    }
+    return sideCurve(source, target, sourceFraction, targetFraction, obstacles);
   }
   return target.y >= source.y + source.h - 4
     ? bottomCurve(source, target, branchIndex, branchCount)
