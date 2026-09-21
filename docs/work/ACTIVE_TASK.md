@@ -15,12 +15,12 @@
 - [x] CP2 FIX1 D2 monitoring + FIX2 connection classification — focused tests green — push
 - [x] CP3 FIX3 controlled runtime clock — background-worker/progression proof — push
 - [x] CP4 FIX4 causal Qwen planning seam — safety + causal acceptance proof — push
-- [ ] CP5 FIX6 demo preflight + integration + anti-hardcoding + docs — push
+- [x] CP5 FIX6 demo preflight + integration + anti-hardcoding + docs — push
 - [x] INV5 multi-subject progression — **Park for Later** (production cases single-subject; settledBasis untouched)
 
 ## Current checkpoint
 
-CP4 COMPLETE — bounded Qwen TRANSPORT offer selection is causal within the researched boardable set + corridor cap. Next: CP5 demo preflight + integration.
+CP5 COMPLETE — demo readiness preflight (fail-closed, read-only) + evidence. Backend closure candidate ready for integration review. Do NOT claim A5.1/A5.2/A5 complete.
 
 ## CP1 investigation results (subagents, verified against code)
 
@@ -130,6 +130,20 @@ CP4 COMPLETE — bounded Qwen TRANSPORT offer selection is causal within the res
 - Adjacent: `test/r1-transport-proposer.test.ts` + `test/r1-evidence-seam.test.ts` 9/9.
 - `npm run typecheck` clean.
 
+### CP5 — FIX6 demo readiness preflight (IMPLEMENTED)
+
+**Design:** read-only `runDemoReadinessPreflight` + CLI `scripts/a5-demo-readiness-preflight.ts`. Fail-closed on required checks; advisory gaps never alone flip `ok`. No provisioning, authority bypass, quote refresh, or destructive booking.
+
+**Checks (representative):** postgres workspace; dataset marker; travellers/journeys + multi-traveller coexistence; optional required name tokens (caller-supplied — no hero hardcoding); evaluation clock mode; Qwen configured/mode/model; Atlas planning mode + protected execution compose; Nuitée/stay compose; booking identities + execution bindings; budgets; authority authorize/dispatch; quote freshness posture; displaced stay baseline; overnight research config.
+
+**Evidence:**
+- Pure: `test/a5-demo-readiness-preflight.test.ts` 1/1.
+- PG: `postgres-integration/a5DemoReadinessPreflight.pgtest.ts` 3/3 — missing workspace fail-closed; empty workspace fails coexistence; CONTROLLED clock reported; name tokens fail closed.
+- Adjacent FIX1/FIX2 regressions still green (31/31).
+- `npm run typecheck` clean; `npm run gate:anti-hardcoding` CLEAN (506 files).
+
+**Integration note:** Full Sarah/Jordan founder-QC live rehearsal against a provisioned demo workspace is the next operator step (preflight CLI with `--require-name` tokens + progression harness). Backend proofs for D2 WAIT, connection classification, controlled clock, and causal offer selection are already on this branch.
+
 ## Next action
 
-CP5 (FIX6 demo readiness preflight + Sarah/Jordan coexistence integration verification). Then anti-hardcoding + final report.
+Integration review / UI substrate handoff. Operator: run `scripts/a5-demo-readiness-preflight.ts` against the demo workspace, then progression harness through overnight. Do not claim A5.1/A5.2/A5 complete.
