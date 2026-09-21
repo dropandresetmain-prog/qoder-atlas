@@ -88,3 +88,21 @@ pins the fallback behaviour.
 carries only `title` and `organiserLabel`, so the reference's "30 Sep — 02 Oct 2026 /
 SINGAPORE · GMT+8" heading block cannot be produced without inventing data. The event
 title is shown in that position instead.
+
+## Still weak after this pass (not hidden)
+
+- **Focus is stated three times on Event health**: the tab-row "Focus <name>"
+  label, the topline "<name> / <what changed>", and the graph's own
+  "Focus <name>" pill inside its change banner. The reference has two. The third
+  belongs to the graph renderer and was left alone.
+- **Rail story state repeats the rail title.** Every open story reads
+  "Needs attention" under a section also titled "Needs attention", because
+  `operationalStatusLabel` returns a generic status. The reference shows a
+  case-specific state ("Programme commitment at risk"). Closing this needs a
+  case-specific state on the read model, not a frontend string.
+- **The rail ends well above the main column** on Event health, leaving an empty
+  lower-right area on a tall viewport. The rail is sticky, so this is only
+  visible when the page is scrolled to the top.
+- **The graph's yellow change banner and segmented controls** consume roughly
+  110px above the first node on Event health. They are graph-owned and carry real
+  meaning, so they were not compressed.
