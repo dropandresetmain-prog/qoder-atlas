@@ -15,6 +15,8 @@ export interface OverviewFocusOption {
   tripRef: string;
   label: string;
   caseRef?: string;
+  /** Plain what-changed sentence already presented for the attention queue. */
+  context?: string;
 }
 export interface ProductSurfaceModel {
   title: string; summaryHtml: string; attentionHtml: string; attentionCount: number;
@@ -46,11 +48,22 @@ const BUCKETS: readonly { key: string; label: string; tone: VisualTone; count: (
   { key: 'watching', label: MANAGED_TRAVEL_LABEL.WATCHING, tone: 'watch', count: (c) => c.atRisk + c.recovering },
   { key: 'unconfirmed', label: MANAGED_TRAVEL_LABEL.UNCONFIRMED, tone: 'neutral', count: (c) => c.unknown },
 ];
+/**
+ * Readiness labels read as one sentence beside a number, so the shared
+ * title-cased bucket label is normalised for this row only. The shared
+ * `MANAGED_TRAVEL_LABEL` vocabulary is left untouched.
+ */
+function tileLabel(label: string): string {
+  return label.replace(/(\S)\s+(\S)/g, (_m, a: string, b: string) => `${a} ${b.toLowerCase()}`);
+}
+/** Buckets that only add noise when empty are dropped; the two that an operator reads even at zero always stay. */
+const ALWAYS_SHOWN = new Set(['confirmed', 'needs-attention']);
 function summaryTiles(counted: ReturnType<typeof countedSet>): string {
   return BUCKETS.map(({ key, label, tone, count }) => {
     const n = count(counted.counts);
-    return `<div class="readout-bucket tone-${tone}${key === 'needs-attention' && n > 0 ? ' is-attention' : ''}" data-test="summary-${tone}" data-summary-key="${key}"><strong class="tile-count">${n}</strong><span class="tile-label">${e(label)}</span></div>`;
-  }).join('');
+    if (n === 0 && !ALWAYS_SHOWN.has(key)) return '';
+    return `<div class="readout-bucket tone-${tone}${key === 'needs-attention' && n > 0 ? ' is-attention' : ''}" data-test="summary-${tone}" data-summary-key="${key}"><strong class="tile-count">${n}</strong><span class="tile-label">${e(tileLabel(label))}</span></div>`;
+  }).filter(Boolean).join('');
 }
 function barWidth(count: number, total: number): string {
   if (total <= 0 || count <= 0) return '0';
@@ -80,10 +93,10 @@ function overviewItemRow(item: OperatorOverviewItem): string {
     ?? (item.decisionRequired ? 'Decision required before recovery can continue.' : 'No open issues reported.');
   const glyph = item.decisionRequired ? QUEUE_GLYPH.alert : QUEUE_GLYPH[operationalStatusTone(item.status)];
   const body = `<span class="q-glyph ${glyph.className}" aria-hidden="true">${glyph.char}</span>
-    <div><div class="q-name">${e(item.travellerLabel)}</div><div class="q-issue">${e(issue)}</div>
+    <div><div class="q-state tone-${operationalStatusTone(item.status)}"><i aria-hidden="true"></i>${e(operationalStatusLabel(item.status))}</div>
+    <div class="q-name">${e(item.travellerLabel)}</div><div class="q-issue">${e(issue)}</div>
     ${item.unresolvedUncertainty.length ? `<p class="b-extra">${e(item.unresolvedUncertainty.join(' · '))}</p>` : ''}</div>
-    <div class="b-right"><span class="badge tone-${operationalStatusTone(item.status)}">${e(operationalStatusLabel(item.status))}</span>
-      <span class="sr-only">Trip viability: ${e(remainderViabilityLabel(item.remainderViability))}</span>
+    <div class="b-right"><span class="sr-only">Trip viability: ${e(remainderViabilityLabel(item.remainderViability))}</span>
       ${item.caseRef ? '<span class="case-open" data-test="attention-open-case">Open case →</span>' : ''}</div>`;
   const attrs = `data-trip-ref="${e(item.tripRef)}" data-test="overview-item"${item.caseRef ? ` data-case-ref="${e(item.caseRef)}"` : ''}`;
   // The complete row is the link. Do not nest an anchor/button inside it.
@@ -135,7 +148,7 @@ export function adaptOperatorOverviewToDashboard(view: OperatorOverview): Produc
   const summaryHtml = compactReadiness(counted);
   const queue = dedupeQueue(view.items);
   const decisionNote = decisions > 0
-    ? `<p class="sub" data-test="decisions-needed">${decisions} pending decision${decisions === 1 ? '' : 's'} among the cases below.</p>`
+    ? `<p class="sub" data-test="decisions-needed">${decisions === 1 ? 'One case is' : `${decisions} cases are`} waiting on your decision.</p>`
     : '';
   const attentionHtml = `${decisionNote}${queue.length ? `<div class="queue" data-test="product-overview-queue">${queue.map(overviewItemRow).join('')}</div>`
     : '<p class="empty-note" data-test="no-open-cases">Nothing needs attention right now.</p>'}`;
@@ -149,11 +162,15 @@ export function adaptOperatorOverviewToDashboard(view: OperatorOverview): Produc
     <span class="roster-status" data-roster-status role="status" aria-live="polite"></span>
     <span class="roster-pagination" data-test="roster-pagination"><button type="button" class="btn btn-ghost" data-roster-prev aria-label="Previous participants">Previous</button><button type="button" class="btn btn-ghost" data-roster-next aria-label="Next participants">Next</button></span></div>
     <div class="queue" data-roster data-page-size="${ROSTER_PAGE_SIZE}" data-test="product-population-queue">${rows}</div>` : '<p class="empty-note">No trips in scope.</p>';
-  const focusOptions = queue.map((item) => ({
-    tripRef: item.tripRef,
-    label: item.travellerLabel,
-    ...(item.caseRef ? { caseRef: item.caseRef } : {}),
-  }));
+  const focusOptions = queue.map((item) => {
+    const context = plainChangeText(item.whatChanged) ?? plainChangeText(item.recoveryActivity);
+    return {
+      tripRef: item.tripRef,
+      label: item.travellerLabel,
+      ...(item.caseRef ? { caseRef: item.caseRef } : {}),
+      ...(context ? { context } : {}),
+    };
+  });
   return { title: 'Operations overview', summaryHtml, attentionHtml, attentionCount: queue.length,
     rosterHtml, rosterCount: roster.length, itemsHtml: `${attentionHtml}${rosterHtml}`, focusOptions };
 }

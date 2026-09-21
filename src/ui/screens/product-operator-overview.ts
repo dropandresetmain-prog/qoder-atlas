@@ -32,15 +32,22 @@ export function renderProductOperatorOverview(
   const eventTitle = view.eventContext?.title;
   const eyebrow = organiser ? `<p class="v5-eyebrow">${escapeHtml(organiser)}</p>` : '';
   const eventLine = eventTitle
-    ? `<p class="sub" data-test="event-context">${escapeHtml(eventTitle)}</p>`
+    ? `<p class="v5-event-meta" data-test="event-context">${escapeHtml(eventTitle)}</p>`
     : '';
   const active = buildOverviewGraphModel(view)?.focus?.unresolvedTravellerLabel;
+  // The topline states WHAT is in focus; the tab-row control states THAT focus is
+  // set. Carrying the already-presented change sentence here stops the two reading
+  // as the same sentence twice.
+  const activeContext = active
+    ? surface.focusOptions.find((option) => option.label === active)?.context
+    : undefined;
   return `${OPERATOR_WORKSPACE_STYLES}
 <main class="shell product-operator-overview v5-workspace" data-test="product-operator-overview" data-assessment-lifecycle="${lifecycle.state}" data-assessment-pending-count="${lifecycle.pendingCount}" data-stable-revision="${view.change.projectionRevision}">
-  <div class="page-head" data-poll-region="overview-heading">${eyebrow}<h1>${escapeHtml(surface.title)}</h1>
-    <p class="sub">See the event as a connected system, then go straight to the cases that need attention.</p>
-    ${eventLine}
-    <p class="sub" data-test="overview-reconciling"${lifecycle.state === 'RECONCILING' ? '' : ' hidden'}>Reconciling changes…</p></div>
+  <div class="page-head v5-page-head" data-poll-region="overview-heading">
+    <div class="v5-page-head-main">${eyebrow}<h1>${escapeHtml(surface.title)}</h1>
+      <p class="sub">See the event as a connected system, then go straight to the cases that need attention.</p>
+      <p class="sub" data-test="overview-reconciling"${lifecycle.state === 'RECONCILING' ? '' : ' hidden'}>Reconciling changes…</p></div>
+    ${eventLine}</div>
   <div class="v5-overview-layout">
     <div class="v5-overview-main">
       <div class="v5-workspace-tabs">
@@ -51,7 +58,9 @@ export function renderProductOperatorOverview(
         ${focusControl(active)}
       </div>
       <section class="v5-panel" data-overview-panel="event">
-        <div class="v5-active-context">${active ? `<strong data-test="overview-active-context">${escapeHtml(active)}</strong>` : '<span data-test="overview-active-context">No incident in focus</span>'}</div>
+        <div class="v5-active-context">${active
+          ? `<strong data-test="overview-active-context">${escapeHtml(active)}</strong>${activeContext ? `<span class="v5-context-slash" aria-hidden="true">/</span><span class="v5-context-what">${escapeHtml(activeContext)}</span>` : ''}`
+          : '<span data-test="overview-active-context">No incident in focus</span>'}</div>
         ${renderOverviewGraphAssets()}${renderEventOverviewGraph(view)}
         <div data-poll-region="overview-summary">${surface.summaryHtml}</div>
       </section>

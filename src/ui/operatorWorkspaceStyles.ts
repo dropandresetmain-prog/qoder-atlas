@@ -179,6 +179,65 @@ export const OPERATOR_WORKSPACE_STYLES = `<style data-operator-workspace-styles>
 .v5-drawer-head { display: flex; justify-content: space-between; gap: 12px; padding: 22px 24px; border-bottom: 1px solid var(--border); }
 .v5-drawer-body { padding: 22px 24px; overflow: auto; height: calc(100% - 78px); }
 .v5-panel[hidden] { display: none !important; }
+/* ---- V5 visual convergence pass ------------------------------------------ */
+/* Heading reads as one composition: title block left, event context right. */
+.v5-page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 32px; flex-wrap: wrap; }
+.v5-page-head-main { min-width: 0; }
+.v5-event-meta { margin: 10px 0 0; padding-top: 8px; font-size: 12px; color: var(--text-soft); text-align: right; white-space: nowrap; }
+
+/* The graph frame already sits under an "Event health" tab, so its own title
+   block is a duplicate heading. Hiding it here is presentation only - the graph
+   renderer, its controls and its semantics are untouched. */
+.product-operator-overview .og { margin: 0; }
+.product-operator-overview .og-frame { border-radius: 8px; box-shadow: none; border-color: #e3e9ed; background: #fbfcfe; }
+.product-operator-overview .og-head { padding: 0 0 12px; border-bottom: 0; justify-content: flex-end; background: none; }
+.product-operator-overview .og-head > div:first-child { display: none; }
+
+/* Topline above the graph: who/what is in focus, in the reference's quiet voice. */
+.v5-active-context { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; min-height: 34px; padding-top: 12px; font-size: 12px; color: var(--text-soft); }
+.v5-active-context strong { color: var(--text); font-weight: 600; }
+.v5-context-slash { color: #bcc4cb; }
+.v5-context-what { min-width: 0; }
+
+/* Readiness sits under the graph and must stay subordinate to it. */
+.v5-readiness { margin-top: 20px; }
+.product-operator-overview .readout-buckets { gap: 8px 22px; margin-top: 10px; }
+.product-operator-overview .readout-bucket .tile-count { font-size: 17px; font-weight: 500; }
+
+/* Attention rail: an editorial lead story, then demoted siblings. No boxes -
+   the rail is a column of hairline-separated stories, not a stack of cards. */
+.v5-context-rail .qrow { padding: 0 0 18px; margin: 0 0 18px; row-gap: 10px; }
+.v5-context-rail .qrow:last-child { border-bottom: 0; }
+.v5-context-rail .q-state { display: flex; align-items: center; gap: 6px; font-size: 11px; line-height: 1.3; color: var(--text-soft); }
+.v5-context-rail .q-state i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+.v5-context-rail .q-state.tone-alert { color: #bb4c42; }
+.v5-context-rail .q-state.tone-watch { color: #936313; }
+.v5-context-rail .q-state.tone-ok { color: #287c5d; }
+.v5-context-rail .q-name { margin-top: 6px; font-size: 21px; letter-spacing: -0.03em; }
+.v5-context-rail .q-issue { font-size: 13px; line-height: 1.5; color: var(--text); margin-top: 8px; }
+.v5-context-rail .b-extra { font-size: 11px; color: var(--text-soft); margin: 6px 0 0; }
+/* Second and later stories step down so the rail has one obvious entry point. */
+.v5-context-rail .qrow + .qrow .q-name { margin-top: 4px; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+.v5-context-rail .qrow + .qrow .q-issue { font-size: 12px; color: var(--text-soft); margin-top: 4px; }
+.v5-context-rail .qrow + .qrow .case-open {
+  background: none; color: var(--ink); border: 1px solid var(--border);
+  padding: 8px 12px; font-weight: 500;
+}
+.v5-context-rail .qrow + .qrow:hover .case-open { background: var(--surface-2); }
+.v5-context-rail [data-test="decisions-needed"] { margin: -4px 0 16px; }
+
+/* Activity: one headline plus one muted meta line. */
+.v5-context-rail .v5-activity { margin-top: 2px; }
+.v5-activity-item strong { line-height: 1.4; }
+.v5-activity-item p { font-size: 11px; line-height: 1.4; }
+.v5-activity-item:last-of-type { border-bottom: 0; }
+.v5-activity-footer { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 4px; }
+
+/* Demo control must not compete with the workspace. */
+.product-operator-overview [data-test="simulated-airline-update"] { margin-top: 26px; border: 0; border-top: 1px solid var(--border); border-radius: 0; background: none; padding: 14px 0 0; }
+.product-operator-overview [data-test="simulated-airline-update"] > summary { font-size: 12px; color: var(--text-soft); }
+.product-operator-overview [data-test="simulated-airline-update"] > summary strong { font-weight: 500; }
+
 @media (max-width: 1100px) {
   .v5-overview-layout, .v5-case-layout { grid-template-columns: 1fr; }
   .v5-context-rail, .v5-case-rail { position: static; max-height: none; overflow: visible; border-left: 0; border-top: 1px solid var(--border); padding-left: 0; padding-top: 24px; }

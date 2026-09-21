@@ -12,6 +12,7 @@ import {
   type ActivitySurfaceItem,
   type ActivitySurfaceView,
 } from '../../app/target/adapters/activityAdapter.ts';
+import { sentenceCase } from '../../app/target/adapters/surfaceLabels.ts';
 import { caseHref } from '../../app/target/productShell.ts';
 import { escapeHtml, formatInstant } from '../html.ts';
 
@@ -94,11 +95,17 @@ export function renderCompactActivityRail(
       const link = item.caseId
         ? ` <a class="f-link" href="${escapeHtml(caseHref(item.caseId))}" data-test="activity-case-link">Open case →</a>`
         : '';
-      const sub = item.sub ? `<p>${escapeHtml(item.sub)}</p>` : '';
+      // The section is already titled "Northstar activity", so repeating the actor
+      // on every row is noise. A non-Northstar actor still earns its prefix.
+      const headline = item.who === 'Northstar'
+        ? sentenceCase(item.text)
+        : `${item.who} — ${item.text}`;
+      // One muted meta line instead of a time line plus a reason line.
+      const meta = [item.sub, item.time].filter((part) => part && part.length > 0).join(' · ');
       return `<div class="v5-activity-item" data-test="overview-activity-row" data-ui-feed-tone="${item.tone}"${item.caseId ? ` data-case-ref="${escapeHtml(item.caseId)}"` : ''}>
         <div class="v5-activity-bullet ${TONE_CLASS[item.tone]}" aria-hidden="true">${escapeHtml(item.glyph)}</div>
-        <div><strong>${escapeHtml(item.who)} — ${escapeHtml(item.text)}${link}</strong>
-          <p>${escapeHtml(item.time)}</p>${sub}</div></div>`;
+        <div><strong>${escapeHtml(headline)}${link}</strong>
+          ${meta ? `<p>${escapeHtml(meta)}</p>` : ''}</div></div>`;
     }).join('');
   return `<section class="v5-activity" aria-label="Northstar activity" data-test="overview-activity-rail">
     <h2 class="v5-rail-title">${ACTIVITY_ICON}Northstar activity</h2>
