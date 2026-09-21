@@ -26,6 +26,7 @@ import {
 } from '../src/persistence/postgres/commands/m8AuthorityCommands.ts';
 import { PgExecutionWorker } from '../src/persistence/postgres/execution/pgExecutionWorker.ts';
 import { computeRequestFingerprint } from '../src/resolution/execution/stateMachine.ts';
+import { recordSelectedPlanCanonicalApplication } from '../src/persistence/postgres/execution/selectedPlanContinuation.ts';
 import { evaluateRecoveryCaseResolution } from '../src/app/target/recoveryCaseResolution.ts';
 import { resolveRecoveryCase } from '../src/persistence/postgres/commands/m9CaseResolutionCommands.ts';
 import { loadRecoveryCaseFacts } from '../src/app/target/readmodels/pgFactAssembler.ts';
@@ -260,9 +261,33 @@ describe('M9 3C/3D Jordan coordinated multi-action recovery (real dependency + p
 
     await execute(flightIntent.id, 'SUCCESS');
     await execute(naritaIntent.id, 'SUCCESS');
-    await execute(singaporeReplacementIntent.id, 'SUCCESS');
+    const replacementAttemptId = await execute(singaporeReplacementIntent.id, 'SUCCESS');
+    const observation = await pool.query<{ id: string }>(
+      `SELECT id FROM execution_observations
+        WHERE workspace_id = $1 AND attempt_id = $2 AND action_intent_id = $3 AND origin = 'EXTERNAL_PROVIDER'`,
+      [seed.workspaceId, replacementAttemptId, singaporeReplacementIntent.id],
+    );
+    assert.equal(observation.rowCount, 1, 'replacement observation exists before cancellation may prepare');
+    const commandNamespace = 'JORDAN_REPLACEMENT_CANONICAL';
+    const commandKey = randomUUID();
+    await pool.query(
+      `INSERT INTO command_receipts
+         (workspace_id, command_namespace, idempotency_key, payload_hash, result_ref, committed_revisions)
+       VALUES ($1, $2, $3, $4, $5, '[]'::jsonb)`,
+      [seed.workspaceId, commandNamespace, commandKey, 'a'.repeat(64), JSON.stringify({ applied: true })],
+    );
+    assert.deepEqual(await recordSelectedPlanCanonicalApplication(pool, {
+      workspaceId: seed.workspaceId,
+      actorId: seed.actorId,
+      attemptId: replacementAttemptId,
+      actionPlanId: planId,
+      actionIntentId: singaporeReplacementIntent.id,
+      commandNamespace,
+      idempotencyKey: commandKey,
+      source: { kind: 'EXTERNAL_PROVIDER', observationId: observation.rows[0]!.id },
+    }), { ok: true });
 
-    // 3D: cancellation fails for real after dependency is satisfied.
+    // 3D: cancellation fails for real after the replacement is canonically applied.
     await execute(singaporeDisplacedCancelIntent.id, 'FAILURE');
 
     const factsAfterFailure = await loadRecoveryCaseFacts(pool, seed.workspaceId, opened.caseId, NOW);
