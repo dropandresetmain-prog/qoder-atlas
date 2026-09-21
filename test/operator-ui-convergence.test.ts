@@ -91,6 +91,8 @@ test('Overview case navigation dominates and the full searchable population rema
   assert.match(html, /data-poll-region="overview-activity"/);
   assert.match(html, /data-test="overview-activity-empty"/);
   assert.match(html, /data-test="overview-activity-log"[^>]*>View log →/);
+  assert.match(html, /\.v5-context-rail[^{]*\{[^}]*overflow:\s*visible/);
+  assert.match(html, /\.v5-context-rail \.qrow[^{]*\{[^}]*grid-template-areas:\s*"glyph main" "\. right"/);
 });
 
 test('Overview activity rail projects the latest real ActivityFeed without inventing entries', () => {

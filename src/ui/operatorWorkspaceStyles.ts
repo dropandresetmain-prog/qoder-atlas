@@ -115,13 +115,40 @@ export const OPERATOR_WORKSPACE_STYLES = `<style data-operator-workspace-styles>
 .v5-case-rail .v5-rail-title { margin-bottom: 8px; }
 .v5-case-main .cw-rec, .v5-case-main .cw-card { width: 100%; max-width: none; }
 .v5-focus select { max-width: 220px; padding: 7px 9px; color: var(--text); border: 1px solid var(--border); background: var(--surface); border-radius: 5px; font-size: 12px; }
-.v5-context-rail, .v5-case-rail { position: sticky; top: 86px; align-self: start; max-height: calc(100vh - 102px); overflow: auto; border-left: 1px solid var(--border); padding-left: 24px; }
-.v5-rail-title { font-size: 14px; font-weight: 600; display: flex; justify-content: space-between; margin: 0 0 16px; }
-.v5-rail-title span { font-size: 11px; color: var(--text-soft); font-weight: 400; }
-.v5-context-rail .qrow { display: block; padding: 0 0 18px; margin-bottom: 18px; border-bottom: 1px solid var(--border); background: none; text-decoration: none; color: inherit; }
-.v5-context-rail .q-name { font-size: 22px; letter-spacing: -0.03em; font-weight: 600; }
+.v5-context-rail, .v5-case-rail {
+  position: sticky; top: 86px; align-self: start;
+  border-left: 1px solid var(--border); padding-left: 22px; padding-right: 2px;
+  max-height: none; overflow: visible;
+}
+.v5-rail-title { font-size: 14px; font-weight: 600; display: flex; justify-content: space-between; gap: 10px; align-items: baseline; margin: 0 0 12px; }
+.v5-rail-title span { font-size: 11px; color: var(--text-soft); font-weight: 400; white-space: nowrap; }
+.v5-context-rail .queue { display: flex; flex-direction: column; gap: 0; }
+.v5-context-rail .qrow {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  grid-template-areas: "glyph main" ". right";
+  column-gap: 10px; row-gap: 8px;
+  padding: 0 0 14px; margin: 0 0 14px;
+  border: 0; border-bottom: 1px solid var(--border); border-radius: 0;
+  background: none; box-shadow: none; transform: none; text-decoration: none; color: inherit;
+}
+.v5-context-rail .qrow:hover, .v5-context-rail .qrow:focus-visible { background: none; transform: none; outline: none; }
+.v5-context-rail .q-glyph { grid-area: glyph; margin-top: 4px; }
+.v5-context-rail .qrow > div:not(.b-right) { grid-area: main; min-width: 0; }
+.v5-context-rail .b-right { grid-area: right; display: flex; flex-direction: column; align-items: stretch; gap: 8px; min-width: 0; }
+.v5-context-rail .q-name { font-size: 18px; letter-spacing: -0.03em; font-weight: 600; line-height: 1.2; }
 .v5-context-rail .qrow + .qrow .q-name { font-size: 15px; font-weight: 500; }
-.v5-context-rail .case-open { display: flex; justify-content: space-between; margin-top: 14px; background: var(--ink); color: var(--paper); border-radius: 5px; padding: 11px 13px; font-size: 12px; font-weight: 600; }
+.v5-context-rail .q-issue { font-size: 12px; line-height: 1.4; color: var(--text-soft); margin-top: 4px; }
+.v5-context-rail .badge { align-self: flex-start; }
+.v5-context-rail .case-open {
+  display: flex; justify-content: center; align-items: center; width: 100%; box-sizing: border-box;
+  margin-top: 0; background: var(--ink); color: var(--paper); border-radius: 5px;
+  padding: 10px 12px; font-size: 12px; font-weight: 600;
+}
+.v5-context-rail .v5-activity { margin-top: 4px; padding-top: 2px; }
+.v5-context-rail .v5-activity .v5-rail-title { margin-bottom: 8px; }
+.v5-context-rail .v5-activity-item { padding: 7px 0; }
+.v5-context-rail [data-test="decisions-needed"] { font-size: 12px; margin: 0 0 12px; color: var(--text-soft); }
 .v5-readiness { margin-top: 22px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
 .v5-readiness-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .v5-readiness-title h2 { font-size: 13px; font-weight: 500; margin: 0; }
