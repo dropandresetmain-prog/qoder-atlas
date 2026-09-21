@@ -32,11 +32,13 @@ to use `renderEventOverviewGraph()` and `renderFocusedCaseGraph()`.
 | 3 | `03-jordan-case-recommendation-1440.png` | Case composition on a second, non-programme case: compact header with breadcrumb above the title, named graph topline carrying the Current/Original control, V5.6 graph prominent and not squashed, sticky rail beside the graph carrying recommendation → decision → activity → whole-trip state. |
 | 4 | `04-sarah-case-recommendation-1440.png` | Same composition on the programme case. Approval status is legible; new spend and displaced-booking loss stay separate and read "Not compared"; unknown stays unknown; whole trip reads "Not yet recovered" — recovery is not visually implied. |
 | 5 | `05-sarah-case-full-page-1440.png` | Full scroll: Recommended recovery visually outranks Other options and Checks & sources; itinerary and commitment blocks are hairline-separated rather than nested panels; the rail stays useful while scrolling. |
+| 7 | `07-jordan-graph-edge-routing-detail.png` | 2x zoom on the Jordan case graph: the transitive inbound->onward edge bows clear of the Arrival timing card and enters the onward flight on its own anchor, instead of passing behind the card and converging on a single anchor (which read as a phantom doubled connection). Node detail text clips on a whole line with an ellipsis. |
 | 6 | `06-sarah-case-other-options-1440.png` | Rejected options that present identically collapse into one row with a count ("Rejected · 4 options") and one grouped evaluation disclosure — presentation-only grouping, nothing dropped. Negative time is stated as a shortfall ("65 min short"). |
 
 ## Checks run at this state
 
-- `test/operator-ui-convergence.test.ts` — 16/16 pass.
+- `test/operator-ui-convergence.test.ts`, `r2-graph-renderer`, `r3-causal-spine-layout`,
+  `eventOverview`, `operator-ui-camera` — 61/61 pass.
 - `npm run typecheck` — clean.
 - `npm run lint` — 225 pre-existing errors, **identical to the pristine base**; zero introduced.
 - `node scripts/anti-hardcoding-gate.mjs` — `VERDICT: CLEAN`.
@@ -65,17 +67,38 @@ The approved V5 reference shows "Move the programme commitment" for this case.
 The strategy title was **not** frontend-relabelled and the candidates were **not**
 reordered. This is planner selection, not presentation.
 
-**INVESTIGATE — Overview graph framing.** In the graph's own "Active change" view,
-6 of 30 nodes are cut mid-card at the viewport edges (4 left, 2 right), including a
-required-attendee card sliced in half. Switching the graph to "Whole event" clips
-nothing. This is the graph's own focus-framing rect, not a container-size problem,
-so no page CSS was used to mask it.
+**FIXED (was INVESTIGATE) — Overview graph framing.** Previously 6 of 30 nodes were
+cut mid-card at the viewport edges in "Active change". `fitOverviewCamera` now takes
+an optional world-space margin (default 0, so all existing callers are unchanged) and
+the change/focus framing passes 32. Measured at 1440x900: 6 -> 0 clipped, Active
+change 0.713 vs whole event 0.700, whole-event transform byte-identical.
 
-**INVESTIGATE — Case graph vertical fit.** The V5.6 scene rect reserves roughly
-190px of empty space above its content, so the nodes sit low in the viewport and the
-faded context row meets the "drag to pan" hint at the bottom edge. Reducing the
-container height clips content below ~470px, so the slack is in the scene rect, not
-the container.
+Known limit, stated rather than hidden: a fixed margin does not generalise to every
+viewport. Measured clipped-node counts at margin 32 are 0 at 1920x1080, 0 at
+1440x900, 0 at 1100x900, but **6 at 1280x860** — and at 1280 no constant clears the
+clipping without zooming out past the whole-event scale. The graph is also pannable,
+so a user who drags will see partially cut cards at the frame edge regardless. A
+general fix needs a different mechanism (iteratively expanding the box until no node
+straddles the viewport, or an edge fade), not a larger constant.
+
+**PARK — Case graph vertical fit.** The V5.6 scene rect reserves roughly 190px of
+empty space above its content, so the nodes sit low in the viewport and the faded
+context row meets the "drag to pan" hint at the bottom edge. Reducing the container
+height clips content below ~470px, so the slack is in the scene rect, not the
+container. Not addressed in this pass.
+
+**FIXED — Case graph edge routing and node text.** Edges passing behind a card:
+6 -> 0 (Jordan), 2 -> 0 (Sarah), both panels. Node text now clips on a whole line
+boundary with an ellipsis; previously `.fg-detail` was `flex: 1 1 0`, so the flex
+algorithm set its height and `-webkit-line-clamp` never applied, leaving the card's
+own `overflow: hidden` to cut through the middle of a text row.
+
+Cost, stated plainly: the detail line is now clamped to ONE line on every card, so a
+flight card reads "Los Angeles International ->..." and no longer shows the
+destination inline. The full string is still on the node's native `title` attribute
+and `aria-label`, and in the node inspector. Restoring the second line needs card
+height, which `SIZES` in `graph/layout.ts` owns — a `normal` card has only ~8px of
+slack today against the ~13.4px a second line costs.
 
 **PARK — activity entries carry no source or subject.** Overview rail entries such as
 "Linked external record" / "Observed external record" are machine-derived fallbacks
