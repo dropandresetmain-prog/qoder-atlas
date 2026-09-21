@@ -37,7 +37,7 @@ import { createM6Registry } from '../../resolution/evaluation/registry.ts';
 import { projectEffectiveWorld } from '../../resolution/world/effectiveItinerary.ts';
 import { evaluateRecoveryStrategy } from '../../resolution/scenarios/evaluate.ts';
 import { unmetProgrammeItems, validateProposalCandidates, type FailingSubject, type StrategyProposer } from '../../resolution/planning/proposer.ts';
-import { createProgrammeTimeSwapProposer } from '../../resolution/planning/proposers/programmeTimeSwapProposer.ts';
+import { createProgrammeTimeSwapProposer, proposalValidationLimit } from '../../resolution/planning/proposers/programmeTimeSwapProposer.ts';
 import { deterministicUuid, RUNTIME_ID_NAMESPACES } from './deterministicId.ts';
 import { applicationError } from './applicationCommands.ts';
 
@@ -161,7 +161,9 @@ export async function proposeRecoveryStrategies(ctx: PlanningContext, input: { c
 
   for (const proposer of ctx.proposers ?? defaultProposers()) {
     const raw = await proposer.propose({ workspaceId: ctx.workspaceId, recoveryCaseId: input.caseId, now, failing, world, effective });
-    const { accepted, rejected } = validateProposalCandidates(raw);
+    const { accepted, rejected } = validateProposalCandidates(raw, {
+      limit: proposalValidationLimit(proposer.id, raw.length),
+    });
     for (const r of rejected) {
       report.candidates.push({ key: `${proposer.id}#${r.index}`, proposerId: proposer.id, strategyId: '', viability: 'REJECTED_BY_VALIDATION', persisted: false, rejectionReason: r.reason });
     }

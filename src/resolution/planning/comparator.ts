@@ -14,8 +14,8 @@
  *     preference + soft deterministic facts + convenience.
  *   - there is NO scalar LLM "viability score" anywhere. Ranking is a
  *     deterministic tuple: precedence-ordered explicit-preference alignment,
- *     then deterministic facts (regressions, improvements, blast radius,
- *     declared cost), then a stable strategyRef tiebreak.
+ *     then deterministic facts (regressions, declared total exposure,
+ *     improvements, blast radius), then a stable strategyRef tiebreak.
  *   - explicit preferences outrank inferred ones: an inferred preference is
  *     demoted by `orderComparatorPreferences`, so it can never outrank an
  *     explicit traveller/organisation preference even if mislabelled.
@@ -165,16 +165,16 @@ function compareCandidates(
   const na = { ...NO_FACTS, ...fa };
   const nb = { ...NO_FACTS, ...fb };
 
-  // 2. Fewer regressions wins.
+  // 2. Fewer regressions wins. Unacceptable regressions beat saving money.
   if (na.worseCount !== nb.worseCount) return na.worseCount - nb.worseCount;
-  // 3. More improvements wins.
-  if (na.betterCount !== nb.betterCount) return nb.betterCount - na.betterCount;
-  // 4. Smaller immediate blast radius wins.
-  if (na.blastRadiusSize !== nb.blastRadiusSize) return na.blastRadiusSize - nb.blastRadiusSize;
-  // 5. Lower declared cost wins; an absent cost sorts last (never free).
+  // 3. Lower declared total exposure wins. Absent cost sorts last (never free).
   const ca = na.declaredCostMinorUnits ?? Number.MAX_SAFE_INTEGER;
   const cb = nb.declaredCostMinorUnits ?? Number.MAX_SAFE_INTEGER;
   if (ca !== cb) return ca - cb;
+  // 4. More improvements wins.
+  if (na.betterCount !== nb.betterCount) return nb.betterCount - na.betterCount;
+  // 5. Smaller immediate blast radius wins, only after cost.
+  if (na.blastRadiusSize !== nb.blastRadiusSize) return na.blastRadiusSize - nb.blastRadiusSize;
   // 6. Stable tiebreak.
   return a.localeCompare(b);
 }
@@ -203,7 +203,7 @@ function buildBasis(
   if (facts) {
     basis.push({
       code: 'deterministic_comparison',
-      summary: `selected among viable candidates: ${facts.worseCount} regression(s), ${facts.betterCount} improvement(s), blast radius ${facts.blastRadiusSize}`,
+      summary: `selected among viable candidates: ${facts.worseCount} regression(s), ${facts.betterCount} improvement(s), blast radius ${facts.blastRadiusSize}${facts.declaredCostMinorUnits === undefined ? '' : `, declared total exposure ${facts.declaredCostMinorUnits} minor unit(s)`}`,
       kind: 'DETERMINISTIC_FACT',
     });
   }
@@ -226,7 +226,7 @@ function buildTradeoffs(
       if (facts.betterCount > 0) advantages.push(`${facts.betterCount} subject(s) improve`);
       if (facts.worseCount === 0) advantages.push('no regressions among reassessed subjects');
       if (facts.worseCount > 0) disadvantages.push(`${facts.worseCount} subject(s) regress`);
-      if (facts.declaredCostMinorUnits !== undefined) disadvantages.push(`declared cost ${facts.declaredCostMinorUnits} minor unit(s)`);
+      if (facts.declaredCostMinorUnits !== undefined) disadvantages.push(`declared total exposure ${facts.declaredCostMinorUnits} minor unit(s)`);
       for (const note of facts.semanticNotes ?? []) advantages.push(note);
     }
     return { strategyRef: ref, advantages, disadvantages };

@@ -40,8 +40,8 @@ import type { DomainProposerInput } from '../src/contracts/v2/planning/proposerA
 import type { Evaluator } from '../src/resolution/evaluation/evaluator.ts';
 import { dimension, explain } from '../src/resolution/evaluation/explain.ts';
 import { projectEffectiveWorld } from '../src/resolution/world/effectiveItinerary.ts';
-import { createProgrammeTimeSwapProposer } from '../src/resolution/planning/proposers/programmeTimeSwapProposer.ts';
-import type { ProposalCandidate, StrategyProposer } from '../src/resolution/planning/proposer.ts';
+import { createProgrammeTimeSwapProposer, PROGRAMME_TIME_SWAP_PROPOSER_ID, proposalValidationLimit } from '../src/resolution/planning/proposers/programmeTimeSwapProposer.ts';
+import { validateProposalCandidates, type ProposalCandidate, type StrategyProposer } from '../src/resolution/planning/proposer.ts';
 import { defaultRecoveryDomainRegistry } from '../src/resolution/planning/recoveryDomains.ts';
 import {
   runRecoveryPlanning,
@@ -192,6 +192,35 @@ function programmeBasis(): { basis: PlanningBasis; unmetItemId: string; journeyI
   return { basis, unmetItemId: unmet.id, journeyId: jA.id };
 }
 
+/** Same programme, one unmet slot, and seventeen later counterparts. Only the furthest swap is viable. */
+function programmeHorizonBasis(): { basis: PlanningBasis; unmetItemId: string; furthestItemId: string } {
+  const travellerA = id();
+  const jA = journeyRow(travellerA);
+  const programmeId = id();
+  const unmet = programmeItemRow(programmeId, EARLY, '2030-06-02T11:00:00.000Z');
+  const counterparts = Array.from({ length: 17 }, (_, index) => {
+    const day = String(3 + index).padStart(2, '0');
+    return programmeItemRow(programmeId, `2030-06-${day}T10:00:00.000Z`, `2030-06-${day}T11:00:00.000Z`);
+  });
+  const furthest = counterparts[16]!;
+  const world = emptyWorld({
+    travellers: [{ id: travellerA, revision: 1, lifecycleStatus: 'ACTIVE' }],
+    journeys: [jA],
+    programmes: [{ id: programmeId, revision: 1, eventId: id(), title: 'event', lifecycleStatus: 'ACTIVE' }],
+    programmeItems: [unmet, ...counterparts],
+    participations: [{ id: id(), programmeItemId: unmet.id, travellerId: travellerA, obligation: 'REQUIRED', accepted: true, preparationWindow: null }],
+    focus: [{ kind: 'JOURNEY', id: jA.id }],
+  });
+  const subject: TypedRef = { kind: 'JOURNEY', id: jA.id };
+  const assessment = failingAssessment(subject, 'programme_participation', { kind: 'PROGRAMME_ITEM', id: unmet.id });
+  const registry = registryFlippingWhen(jA.id, (w) => w.programmeItems.find((i) => i.id === unmet.id)!.window!.start === furthest.window!.start);
+  const basis: PlanningBasis = {
+    workspaceId: world.workspaceId, recoveryCaseId: id() as SubjectId, basisAssessmentId: assessment.id as SubjectId,
+    reason: 'CASE_OPENED', now: NOW, world, effective: projectEffective(world), failing: [{ subject, assessment }], registry,
+  };
+  return { basis, unmetItemId: unmet.id, furthestItemId: furthest.id };
+}
+
 /** Situation B — STAY domain via a seam-injected proposer using a DIFFERENT effect kind. */
 function stayBasis(): { basis: PlanningBasis; stayItemId: string; journeyId: string } {
   const travellerB = id();
@@ -264,8 +293,47 @@ test('generality A: PROGRAMME domain via the real time-swap proposer yields a VI
   assert.ok(rec!.immediateChangeBlastRadius!.changedRefs.some((r) => r.kind === 'PROGRAMME_ITEM' && r.id === unmetItemId));
   assert.ok(rec!.reassessmentClosure!.reachedRefs.length > 0);
   assert.ok(rec!.outcomeDelta.some((d) => d.delta === 'BETTER'));
-  assert.equal(rec!.costComparison, undefined, 'without a composed supplier Sarah/current planning retains its existing cost-free behavior');
-  assert.equal(costSupplierCalls, 0, 'a globally composed supplier does not add unavailable-cost warnings to programme-only candidates');
+  assert.equal(rec!.costComparison, undefined, 'a programme-only candidate omits cost instead of storing an unavailable warning');
+  assert.equal(costSupplierCalls, 1, 'the supplier is consulted once; a missing programme price is not stored as unknown cost');
+});
+
+test('programme horizon keeps a viable counterpart past the old sixth and the global sixteenth', async () => {
+  const { basis, unmetItemId, furthestItemId } = programmeHorizonBasis();
+  const out = await runRecoveryPlanning(basis, {
+    domainRegistry: defaultRecoveryDomainRegistry(),
+    availableCapabilities: ['FLIGHT', 'HOTEL', 'TRANSFER', 'RESEARCH'],
+    proposers: [{ domain: 'PROGRAMME', proposer: createProgrammeTimeSwapProposer() }],
+    minters: minters(),
+    coordinatorVersion: COORDINATOR_VERSION,
+    comparatorVersion: COMPARATOR_VERSION,
+  });
+  assert.equal(out.result.outcome, 'AWAITING_AUTHORITY');
+  assert.equal(out.viableStrategies.length, 1);
+  assert.equal(
+    out.attempt.recommendation!.recommendedStrategyRef,
+    `strategy:${PROGRAMME_TIME_SWAP_PROPOSER_ID}:${unmetItemId}:${furthestItemId}`,
+  );
+
+  const raw = Array.from({ length: 17 }, (_, index) => ({
+    key: `${PROGRAMME_TIME_SWAP_PROPOSER_ID}:horizon:${index}`,
+    effects: [
+      { effectKind: 'CHANGE_PROGRAMME_ITEM_TIME' as const, programmeItemId: unmetItemId, proposedWindow: { start: EARLY, end: '2030-06-02T11:00:00.000Z' } },
+      { effectKind: 'CHANGE_PROGRAMME_ITEM_TIME' as const, programmeItemId: furthestItemId, proposedWindow: { start: LATE, end: '2030-06-02T16:00:00.000Z' } },
+    ],
+    affectedSubjectRefs: [{ kind: 'PROGRAMME_ITEM' as const, id: unmetItemId }],
+    rationale: 'Exchange the windows of two items of the same programme.',
+    assumptions: [{
+      code: 'counterpart_accepts_earlier_window',
+      description: 'The counterpart can operate in the earlier window.',
+      subjectRef: { kind: 'PROGRAMME_ITEM' as const, id: furthestItemId },
+    }],
+  }));
+  const capped = validateProposalCandidates(raw);
+  assert.equal(capped.accepted.length, 16);
+  assert.equal(capped.rejected.at(-1)?.reason, 'candidate limit 16 reached');
+  const open = validateProposalCandidates(raw, { limit: proposalValidationLimit(PROGRAMME_TIME_SWAP_PROPOSER_ID, raw.length) });
+  assert.equal(open.accepted.length, 17);
+  assert.equal(open.rejected.length, 0);
 });
 
 test('coordinator compares captured provider prices with dated FX and retains unavailable cost evidence', async () => {

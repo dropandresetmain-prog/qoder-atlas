@@ -83,3 +83,18 @@ test('requires a captured SELECT_OFFER price and rejects unsupported rate precis
   const invalidRate = compareRecoveryCosts({ effects: [{ effectKind: 'SELECT_OFFER', journeyItemId: id(42), offerId: id(43), offerPrice: { amount: '10.00', currency: 'USD' } }], homeCurrency: 'SGD', rates: [rate(1e-7, 'USD')], comparedAt: at });
   assert.equal(failureCode(invalidRate), 'INVALID_RATE_PRECISION');
 });
+
+test('a zero cancellation penalty is zero potential loss, not a missing price', () => {
+  const result = compareRecoveryCosts({
+    effects: [{ effectKind: 'CANCEL_STAY', journeyItemId: id(50), reservationLineId: id(51), cancellationPenalty: { amount: '0.00', currency: 'SGD' } }],
+    homeCurrency: 'SGD',
+    rates: [],
+    comparedAt: at,
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.lines[0]!.kind, 'POLICY_PENALTY_ESTIMATE');
+  assert.deepEqual(result.potentialLossHomeAmount, { amount: '0.00', currency: 'SGD' });
+  assert.deepEqual(result.totalHomeAmount, { amount: '0.00', currency: 'SGD' });
+  assert.deepEqual(result.newSpendHomeAmount, { amount: '0', currency: 'SGD' });
+});

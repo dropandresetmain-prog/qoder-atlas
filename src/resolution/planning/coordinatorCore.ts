@@ -52,6 +52,7 @@ import {
   type FailingSubject,
   type StrategyProposer,
 } from './proposer.ts';
+import { proposalValidationLimit } from './proposers/programmeTimeSwapProposer.ts';
 import {
   bindDomainProposer,
   type DomainStrategyProposer,
@@ -266,7 +267,14 @@ async function costComparisonForCandidate(input: {
   candidate: EvaluatedCandidate;
   basis: PlanningBasis;
   supplier: NonNullable<CoordinatorCoreDeps['costContextForCandidate']>;
-}): Promise<MaterialCandidateCostComparison> {
+  /**
+   * Priced effects must record UNAVAILABLE when home-currency context is
+   * missing. Unpriced effects omit the comparison so an absent price is never
+   * stored as a warning that later ranks as unknown cost.
+   */
+  whenContextMissing?: 'unavailable' | 'omit';
+}): Promise<MaterialCandidateCostComparison | undefined> {
+  const whenContextMissing = input.whenContextMissing ?? 'unavailable';
   let context: { homeCurrency: string; rates: readonly FxRateEvidence[]; comparedAt: Instant } | undefined;
   try {
     context = await input.supplier({
@@ -276,13 +284,16 @@ async function costComparisonForCandidate(input: {
       basis: input.basis,
     });
   } catch {
+    if (whenContextMissing === 'omit') return undefined;
     return unavailableCost('CONTEXT_UNAVAILABLE', 'captured home-currency cost context could not be obtained', input.basis.now);
   }
   if (!context) {
+    if (whenContextMissing === 'omit') return undefined;
     return unavailableCost('CONTEXT_UNAVAILABLE', 'no captured home-currency cost context is available for this candidate', input.basis.now);
   }
   const comparedAt = InstantSchema.safeParse(context.comparedAt);
   if (!comparedAt.success) {
+    if (whenContextMissing === 'omit') return undefined;
     return unavailableCost('CONTEXT_UNAVAILABLE', 'captured home-currency comparison instant is invalid', input.basis.now);
   }
   const compared = compareRecoveryCosts({
@@ -451,7 +462,9 @@ export async function runRecoveryPlanning(
         ? bindDomainProposer(bound, domain.domainId, { evidence: evidenceContext, preferences: deps.preferences ?? [] })
         : bound;
       const raw = await proposer.propose({ workspaceId, recoveryCaseId, now, failing, world: planningWorld, effective: planningEffective });
-      const { accepted, rejected } = validateProposalCandidates(raw);
+      const { accepted, rejected } = validateProposalCandidates(raw, {
+        limit: proposalValidationLimit(proposer.id, raw.length),
+      });
       for (const r of rejected) {
         rejectedEvidence.push(materialCandidateFromValidationRejection({
           candidateKey: `${proposer.id}#${r.index}`,
@@ -501,12 +514,14 @@ export async function runRecoveryPlanning(
   // the RC-6 result already recorded above.
   if (deps.costContextForCandidate) {
     for (const candidate of evaluated) {
-      if (!hasComparableCostEffect(candidate.result.strategy.scenarioChange.effects)) continue;
-      candidate.costComparison = await costComparisonForCandidate({
+      const priced = hasComparableCostEffect(candidate.result.strategy.scenarioChange.effects);
+      const comparison = await costComparisonForCandidate({
         candidate,
         basis,
         supplier: deps.costContextForCandidate,
+        whenContextMissing: priced ? 'unavailable' : 'omit',
       });
+      if (comparison) candidate.costComparison = comparison;
     }
   }
 

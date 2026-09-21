@@ -68,13 +68,15 @@ export const MAX_CANDIDATES_PER_PROPOSER = 16;
  */
 export function validateProposalCandidates(
   raw: readonly unknown[],
+  options: { limit?: number } = {},
 ): { accepted: ProposalCandidate[]; rejected: { index: number; reason: string }[] } {
+  const limit = options.limit ?? MAX_CANDIDATES_PER_PROPOSER;
   const accepted: ProposalCandidate[] = [];
   const rejected: { index: number; reason: string }[] = [];
   const seen = new Set<string>();
   raw.forEach((item, index) => {
-    if (accepted.length >= MAX_CANDIDATES_PER_PROPOSER) {
-      rejected.push({ index, reason: `candidate limit ${MAX_CANDIDATES_PER_PROPOSER} reached` });
+    if (accepted.length >= limit) {
+      rejected.push({ index, reason: `candidate limit ${limit} reached` });
       return;
     }
     const parsed = ProposalCandidateSchema.safeParse(item);

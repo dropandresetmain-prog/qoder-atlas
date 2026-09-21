@@ -6,8 +6,8 @@
  *   - a stale / non-viable / foreign-case candidate can never be recommended;
  *   - explicit preferences outrank inferred ones (even a mislabelled inferred
  *     preference cannot jump the queue);
- *   - deterministic fact ordering: fewer regressions, more improvements,
- *     smaller blast radius, lower declared cost, stable ref tiebreak;
+ *   - deterministic fact ordering: fewer regressions, lower declared total exposure,
+ *     more improvements, smaller blast radius, stable ref tiebreak;
  *   - semantic notes explain but NEVER affect ranking;
  *   - the output always re-validates against the contract boundary.
  */
@@ -88,7 +88,7 @@ test('selectRecommendation: fewer regressions outranks every later fact', () => 
   assert.deepEqual(result!.alternativeStrategyRefs, ['many-improvements']);
 });
 
-test('selectRecommendation: ties fall through improvements, blast radius, then declared cost; absent cost sorts last', () => {
+test('selectRecommendation: declared total exposure outranks blast radius; absent cost sorts last', () => {
   const result = selectRecommendation({
     recoveryCaseId: CASE_ID,
     viableCandidates: [viable('no-cost'), viable('cheap'), viable('same-as-cheap-but-wider')],
@@ -100,11 +100,25 @@ test('selectRecommendation: ties fall through improvements, blast radius, then d
     comparatorVersion: 'r1-comparator/test',
   });
   assert.ok(result);
-  // 'cheap' wins: same facts as 'no-cost' but declared cost present (absent
-  // cost sorts last); 'no-cost' beats 'same-as-cheap-but-wider' because the
-  // smaller blast radius is checked before cost.
-  assert.equal(result!.recommendedStrategyRef, 'cheap');
-  assert.deepEqual(result!.alternativeStrategyRefs, ['no-cost', 'same-as-cheap-but-wider']);
+  // Cost 100 beats cost 500 even with a wider blast. Absent cost sorts last.
+  assert.equal(result!.recommendedStrategyRef, 'same-as-cheap-but-wider');
+  assert.deepEqual(result!.alternativeStrategyRefs, ['cheap', 'no-cost']);
+});
+
+test('selectRecommendation: zero declared cost beats a paid smaller blast', () => {
+  const result = selectRecommendation({
+    recoveryCaseId: CASE_ID,
+    viableCandidates: [viable('paid-narrow'), viable('free-wide'), viable('unknown-cost')],
+    facts: [
+      facts('paid-narrow', { betterCount: 4, blastRadiusSize: 1, declaredCostMinorUnits: 400 }),
+      facts('free-wide', { betterCount: 1, blastRadiusSize: 6, declaredCostMinorUnits: 0 }),
+      facts('unknown-cost', { betterCount: 9, blastRadiusSize: 1 }),
+    ],
+    comparatorVersion: 'r1-comparator/test',
+  });
+  assert.ok(result);
+  assert.equal(result!.recommendedStrategyRef, 'free-wide');
+  assert.deepEqual(result!.alternativeStrategyRefs, ['paid-narrow', 'unknown-cost']);
 });
 
 test('selectRecommendation: ranking never depends on input order (stable ref tiebreak)', () => {
@@ -225,6 +239,6 @@ test('selectRecommendation: tradeoffs are per-candidate in rank order, recommend
   assert.ok(good.advantages.includes('no regressions among reassessed subjects'));
   const mixed = result!.tradeoffs[1]!;
   assert.ok(mixed.disadvantages.includes('1 subject(s) regress'));
-  assert.ok(mixed.disadvantages.includes('declared cost 1200 minor unit(s)'));
+  assert.ok(mixed.disadvantages.includes('declared total exposure 1200 minor unit(s)'));
   assert.ok(result!.recommendationBasis.some((b) => b.code === 'deterministic_comparison' && b.kind === 'DETERMINISTIC_FACT'));
 });

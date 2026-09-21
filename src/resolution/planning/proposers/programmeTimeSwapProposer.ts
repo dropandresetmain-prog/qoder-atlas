@@ -6,7 +6,8 @@
  * as the unmet requirement), it proposes exchanging that item's window with
  * another item of the SAME programme that starts later — a bilateral
  * `CHANGE_PROGRAMME_ITEM_TIME` pair. Candidates are ordered by how little
- * the programme moves (nearest later slot first) and bounded.
+ * the programme moves (nearest later slot first), through the end of that
+ * programme. Viability, not a nearest-N cap, decides which swaps survive.
  *
  * It does not decide viability: every candidate is evaluated by the real M6
  * registry over an overlay (evaluateRecoveryStrategy), which is where the
@@ -16,23 +17,26 @@
 import type { TypedRef } from '../../../domain/v2/shared/identity.ts';
 import { compareInstants } from '../../../domain/v2/shared/time.ts';
 import type { WProgrammeItem } from '../../world/world.ts';
-import { unmetProgrammeItems, type ProposalCandidate, type ProposerInput, type StrategyProposer } from '../proposer.ts';
+import { MAX_CANDIDATES_PER_PROPOSER, unmetProgrammeItems, type ProposalCandidate, type ProposerInput, type StrategyProposer } from '../proposer.ts';
 
 export const PROGRAMME_TIME_SWAP_PROPOSER_ID = 'proposer.programme-time-swap';
 
 const INACTIVE_LIFECYCLES = new Set(['CANCELLED', 'CLOSED', 'WITHDRAWN', 'SUPERSEDED']);
 
-export interface ProgrammeTimeSwapProposerOptions {
-  /** Max counterpart items considered per unmet item (nearest later slots first). */
-  maxCounterpartsPerItem?: number;
-}
-
 function swappable(item: WProgrammeItem): item is WProgrammeItem & { window: { start: string; end: string } } {
   return item.window !== null && !INACTIVE_LIFECYCLES.has(item.lifecycleStatus);
 }
 
-export function createProgrammeTimeSwapProposer(options: ProgrammeTimeSwapProposerOptions = {}): StrategyProposer {
-  const maxCounterparts = Math.max(1, options.maxCounterpartsPerItem ?? 6);
+/**
+ * Programme time-swap must keep every later counterpart in the same programme.
+ * Other proposers stay on the global candidate ceiling.
+ */
+export function proposalValidationLimit(proposerId: string, rawCount: number): number {
+  if (proposerId === PROGRAMME_TIME_SWAP_PROPOSER_ID) return Math.max(1, rawCount);
+  return MAX_CANDIDATES_PER_PROPOSER;
+}
+
+export function createProgrammeTimeSwapProposer(): StrategyProposer {
   return {
     id: PROGRAMME_TIME_SWAP_PROPOSER_ID,
     version: '1',
@@ -49,8 +53,7 @@ export function createProgrammeTimeSwapProposer(options: ProgrammeTimeSwapPropos
             .filter((other): other is WProgrammeItem & { window: { start: string; end: string } } =>
               other.id !== unmet.id && other.programmeId === unmet.programmeId && swappable(other)
               && compareInstants(other.window!.start, unmet.window.start) > 0)
-            .sort((a, b) => compareInstants(a.window.start, b.window.start) || a.id.localeCompare(b.id))
-            .slice(0, maxCounterparts);
+            .sort((a, b) => compareInstants(a.window.start, b.window.start) || a.id.localeCompare(b.id));
 
           for (const counterpart of counterparts) {
             const key = `${PROGRAMME_TIME_SWAP_PROPOSER_ID}:${unmet.id}:${counterpart.id}`;
