@@ -1,6 +1,6 @@
 # Capabilities and limitations
 
-**Current convergence status (2026-09-21):** R4, A1 and A2 are accepted. A3 is a conditional presentation pass. A4 is **PHYSICALLY ACCEPTED** on `546adf210db8ead343ecdac22b410515665c176a`. A5 is active: bounded truth/UI fixes, Sarah + Jordan repeat on one final candidate, then final gates and freeze.
+**Current convergence status (2026-09-21):** R4, A1 and A2 are accepted. A3 remains a historical conditional presentation pass. A4 is **PHYSICALLY ACCEPTED** on `546adf210db8ead343ecdac22b410515665c176a`. Backend Lane B substrate is **IMPLEMENTATION COMPLETE FOR INTEGRATION REVIEW** at `finish/a5-1-integration @ 36f8711` (CP2–CP5). Lane A visual-first Overview/Case redesign remains active. A5.2 physical Sarah + Jordan proof and A5.3 gates/freeze follow only after UI integration + founder E2E.
 
 This is the technical truth sheet for the current PostgreSQL target runtime. `IMPLEMENTED` means an executable path exists; `COMPOSED` means normal boot can reach it; `FOCUSED-PROVEN` means the relevant seam passed; `PHYSICALLY ACCEPTED` is reserved for closed end-to-end evidence.
 
@@ -27,7 +27,7 @@ This is the technical truth sheet for the current PostgreSQL target runtime. `IM
 | RecoveryCase lifecycle / progression | **IMPLEMENTED / ACCEPTED** | Preserve one lifecycle owner. |
 | Recovery-domain planning | **IMPLEMENTED / ACCEPTED CORE** | No new planner architecture in A5. |
 | Internal programme execution | **A2 PHYSICALLY ACCEPTED** | Preserve Sarah path. |
-| Desktop V5.6 / V7.2 surfaces | **IMPLEMENTED; A3 CONDITIONAL PASS** | Fix only bounded truth/readability defects in A5. |
+| Desktop V5.6 / V7.2 surfaces | **IMPLEMENTED; founder-QC requires redesign around accepted graphs** | Preserve V5.6/V7.2 semantics; redesign surrounding Overview/Case composition visual-first before production integration. |
 | Selected-plan continuation | **IMPLEMENTED / PHYSICALLY PROVEN IN A4** | Do not broaden into generic workflow. |
 | Protected Atlas selected execution | **IMPLEMENTED / PHYSICALLY PROVEN IN A4** | Preserve no-blind-retry semantics. |
 | Protected Nuitée book/cancel/reconcile | **IMPLEMENTED / PHYSICALLY PROVEN IN A4** | Preserve exact-binding and canonical-application gates. |
@@ -49,15 +49,15 @@ See [A4 physical acceptance](work/A4_PHYSICAL_SANDBOX_ACCEPTANCE.md) for the exe
 
 ### Act Now
 
-- fix V5.6 definitive FAIL → amber/yellow projection;
-- validate/fix progressive-delay graph edges/state;
-- clarify Overview Active Change/focus;
-- move hero graphs above secondary blocks;
-- compress UUID-heavy/repetitive operator copy;
-- separate new spend from potential displaced-booking loss in final presentation;
-- make the final Jordan progression/disruption path repeatable for recording;
-- repeat Sarah + Jordan on the exact final candidate;
-- run full gates once after repeat acceptance.
+- visual-first redesign of Overview and Case around the accepted V7.2/V5.6 graphs: image mockups → founder QC → HTML prototypes → founder QC → production integration;
+- preserve Sarah + Jordan simultaneously in one product world; a reset is not a product scenario switch;
+- verify in integrated UI that Jordan D1/D2/D3 presents GREEN → AMBER → RED (backend CP2 classifier/WAIT substrate is on `36f8711`; residual projection polish only if founder E2E still shows collapse);
+- verify D3 focused Case causality and any duplicate connection projection in the redesigned surfaces;
+- verify D2 monitoring/risk is not sold as premature actionable replacement recovery;
+- reproduce the exact Jordan approval blocker and fix either product logic or founder-QC provisioning without bypassing authority/budget/execution safety;
+- inspect suspicious Sarah FAILED node/edge states for incorrect Case-wide inheritance;
+- integrate both lanes, then repeat founder E2E before A5.2;
+- run final physical Sarah + Jordan proof on one exact candidate, then full gates once.
 
 ### A5 baseline requirements
 
@@ -75,7 +75,7 @@ See [A4 physical acceptance](work/A4_PHYSICAL_SANDBOX_ACCEPTANCE.md) for the exe
 - generic programme, hotel, itinerary, visit or credential administration;
 - broad immigration/legal crawling;
 - unrelated providers, transfer transactions and insurance claims;
-- extra scenarios/multi-incident breadth;
+- extra scenarios and multi-centre V7.2 graph breadth; simultaneous open Sarah/Jordan Cases are now an A5 product requirement, not deferred;
 - importer atomicity redesign and non-critical legacy parity;
 - unrelated infrastructure/refactors.
 
