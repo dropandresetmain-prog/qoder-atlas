@@ -32,8 +32,10 @@ Approved property: lyf Bugis Singapore, `lp6d67d`, booking `z-xdzAxcv`, USD 670.
 
 ## CP3 in progress
 
-Case and traveller-trip nodes now use the connection-aware colour. A tight-only failure is AFFECTED; a separate blocking failure stays FAILED. Overview already did this. `test/a5-backend-truth-closure.test.ts` 16 PASS / 0 FAIL. Sarah projection and polling traces are still open.
+Case and traveller-trip nodes use the connection-aware colour (`617ed6a`). A tight-only failure is AFFECTED; a separate blocking failure stays FAILED. Sarah’s post-reprotection split already followed PASS/FAIL. Schedule-change travellers stay UNKNOWN while reassessment is pending; the changed service is CHANGED. Do not paint pending assessments amber.
+
+Polling replaces the graph region only when `data-graph-scene-hash` changes, then restores camera, view, and selection from `window.__northstarGraphState`. An unchanged hash correctly leaves the canvas alone. Do not add a second in-place update path.
 
 ## Exact next step
 
-Finish Checkpoint 3 from the remaining projection traces. Do not reopen hotel penalty or the 95/82/impossible progression.
+Checkpoint 3 still needs the Sarah schedule-change and reprotection graph states proven on the read model, then proposed-versus-committed programme detail. Do not reopen hotel penalty or the 95/82/impossible progression.
