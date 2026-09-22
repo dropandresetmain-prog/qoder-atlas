@@ -145,9 +145,13 @@ function shellContext(view: OperatorOverview): ShellContext {
   };
 }
 
-/** Persistent demo tooling chrome renders only where the reset gate is open. */
-function resetChrome(): { resetDemo?: true; demoConsole?: true } {
-  return demoResetGate(process.env).open ? { resetDemo: true, demoConsole: true } : {};
+/**
+ * Persistent demo tooling chrome renders only where the reset gate is open.
+ * Reset Demo now lives inside the Demo Console popover (not a separate
+ * top-bar action) — `demoConsole` alone renders both.
+ */
+function resetChrome(): { demoConsole?: true } {
+  return demoResetGate(process.env).open ? { demoConsole: true } : {};
 }
 
 function refuseDemoGate(res: ServerResponse): boolean {

@@ -138,6 +138,8 @@
       "test/a5-offer-selection.test.ts",
       "test/a5-demo-readiness-preflight.test.ts",
       "test/a5-demo-console.test.ts",
+      "test/a5-demo-console-popover.test.ts",
+      "test/e2e/a5-demo-console-popover.e2e.test.ts",
       "test/a5-backend-truth-closure.test.ts",
       "test/r2-focused-graph-projection.test.ts",
       "test/r2-graph-renderer.test.ts",
