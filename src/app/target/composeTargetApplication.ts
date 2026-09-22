@@ -73,6 +73,8 @@ export interface TargetApplication {
      * composeTargetBoot — HTTP must not poke clock internals directly.
      */
     afterDemoReset?: () => Promise<void>;
+    /** Stop background workers before a demo clone pool swap. */
+    beforeDemoReset?: () => Promise<void>;
     /** Boot-owned evaluation clock for demo control application in-process. */
     evaluationClock?: WorkspaceEvaluationClock;
     /** Wake reassessment + lifecycle after a demo control mutates time or world. */

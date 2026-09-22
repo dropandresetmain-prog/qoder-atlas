@@ -342,10 +342,15 @@ export async function resetOntoPristineClone(params?: {
   previousPool.on('error', () => undefined);
   await previousPool.end().catch(() => undefined);
 
+  // Drop the previous clone asynchronously. FORCE-dropping while any straggler
+  // backend still holds a socket surfaces as "Connection terminated unexpectedly"
+  // on unrelated statements that raced the swap.
   const dropStarted = performance.now();
-  await dropDisposableDatabase(previousDatabaseName, DEMO_CLONE_DB_PREFIX).catch((error) => {
-    console.warn(`[atlas] previous demo clone drop deferred: ${error instanceof Error ? error.message : String(error)}`);
-  });
+  setTimeout(() => {
+    void dropDisposableDatabase(previousDatabaseName, DEMO_CLONE_DB_PREFIX).catch((error) => {
+      console.warn(`[atlas] previous demo clone drop deferred: ${error instanceof Error ? error.message : String(error)}`);
+    });
+  }, 2_000);
   const dropMs = performance.now() - dropStarted;
   mark('dropPrevious');
 

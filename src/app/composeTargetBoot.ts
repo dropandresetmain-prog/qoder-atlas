@@ -499,6 +499,11 @@ export async function composeTargetBoot(
     },
     ...(externalCapabilityStatements.length > 0 ? { externalCapabilities: externalCapabilityStatements } : {}),
     afterExecution: () => lifecycle.runNow(),
+    beforeDemoReset: async () => {
+      // Quiesce workers before the pool swaps off the old clone so in-flight
+      // UoW clients are not FORCE-killed mid-statement.
+      await services.quiesce();
+    },
     // After demo reset deletes workspace rows (including the durable clock),
     // resync the in-process evaluation-clock cache so background workers do
     // not keep evaluating at a stale CONTROLLED instant until process restart.
@@ -509,6 +514,7 @@ export async function composeTargetBoot(
           ? `[atlas] evaluation clock refreshed after demo reset: CONTROLLED at ${evaluationClock.now()}`
           : '[atlas] evaluation clock refreshed after demo reset: WALL (baseline)',
       );
+      services.start();
       await lifecycle.runNow();
     },
     evaluationClock,

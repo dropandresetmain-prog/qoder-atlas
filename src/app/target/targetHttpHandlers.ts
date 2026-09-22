@@ -742,6 +742,7 @@ export async function handleTargetProductHttp(
           sendJson(res, 403, { error: gate.code, message: gate.message });
           return true;
         }
+        await ctx.app.runtimeHooks?.beforeDemoReset?.();
         const outcome = await resetDemoWorkspace({
           pool: ctx.app.pool,
           uow: () => ctx.app.unitOfWork(),

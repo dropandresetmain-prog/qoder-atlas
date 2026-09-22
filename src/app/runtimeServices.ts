@@ -45,6 +45,8 @@ export interface RuntimeServices {
   readonly services: readonly RuntimeService[];
   start(): void;
   stop(): void;
+  /** Stop timers and wait for in-flight periodic passes (safe before pool swap). */
+  quiesce(): Promise<void>;
   health(): RuntimeServiceHealth[];
 }
 
@@ -127,6 +129,8 @@ export interface PeriodicServiceOptions<R> {
 export interface PeriodicService extends RuntimeService {
   /** Run one pass now (e.g. right after upstream work completes) instead of waiting for the idle cadence. Overlapping calls coalesce. */
   runNow(): Promise<void>;
+  /** Stop the idle timer and wait for any in-flight pass to finish (demo Reset quiesce). */
+  quiesce(): Promise<void>;
 }
 
 /**
@@ -183,6 +187,11 @@ export function createPeriodicService<R>(options: PeriodicServiceOptions<R>): Pe
       timer = undefined;
     },
     runNow,
+    async quiesce() {
+      if (timer) clearInterval(timer);
+      timer = undefined;
+      if (inFlight) await inFlight.catch(() => undefined);
+    },
     health() {
       return {
         name: options.name,
@@ -210,6 +219,13 @@ export function composeRuntimeServices(services: readonly RuntimeService[]): Run
     },
     stop() {
       for (const service of [...services].reverse()) service.stop();
+    },
+    async quiesce() {
+      for (const service of [...services].reverse()) {
+        const maybe = service as RuntimeService & { quiesce?: () => Promise<void> };
+        if (maybe.quiesce) await maybe.quiesce();
+        else maybe.stop();
+      }
     },
     health() {
       return services.map((service) => service.health());
