@@ -25,6 +25,8 @@ const manifest = JSON.parse(readFileSync(resolve(ROOT, 'test/suites.json'), 'utf
 
 const HEAVYWEIGHT_POSTGRES_FILES = [
   'postgres-integration/b1SarahWorldRecovery.pgtest.ts',
+  'postgres-integration/a5JordanD3Planning.pgtest.ts',
+  'postgres-integration/a5HeroSameWorldSequential.pgtest.ts',
   'postgres-integration/productBaselineWorld.pgtest.ts',
   'postgres-integration/t2F1FailureInjection.pgtest.ts',
   'postgres-integration/t2F3HttpValidation.pgtest.ts',

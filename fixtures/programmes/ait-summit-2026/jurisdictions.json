@@ -25,7 +25,7 @@
       "regimeKind": "COUNTRY",
       "isoAlpha2": "SG",
       "area": { "id": "area-sg", "name": "Singapore", "areaType": "COUNTRY", "boundingBoxes": [[103.60, 1.13, 104.10, 1.48]] },
-      "placeIds": ["place-sin-changi", "place-mbs", "place-panpacific", "place-hotel-bayview", "place-hotel-harbourline"]
+      "placeIds": ["place-sin-changi", "place-mbs", "place-panpacific", "place-hotel-bayview", "place-hotel-harbourline", "place-hotel-lyf-bugis"]
     },
     {
       "id": "jur-my",

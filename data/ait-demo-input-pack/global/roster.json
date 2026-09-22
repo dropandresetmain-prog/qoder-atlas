@@ -208,6 +208,7 @@
         "displayName": "Jordan Hale",
         "identity": {
           "email": "jordan.hale@pacificrim.test",
+          "givenName": "Jordan",
           "lastName": "Hale"
         },
         "homeLocationText": "Los Angeles (LAX)",

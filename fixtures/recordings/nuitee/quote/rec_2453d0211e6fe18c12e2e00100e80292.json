@@ -1,0 +1,120 @@
+{
+  "id": "rec_2453d0211e6fe18c12e2e00100e80292",
+  "providerId": "nuitee",
+  "operation": "quote",
+  "recordedAt": "2026-09-21T23:01:13.119Z",
+  "sanitized": true,
+  "raw": {
+    "data": {
+      "prebookId": "y72hQJ4Cq",
+      "offerId": "3gAYonJzkd4AEaRzcmlk2gEFR1pTVE1NSldNVTNHTU1SUUc0WlRNT0pXTVUzRE9OVERHWTJYWU1KREdJWURFTlJSR0FZREM3QlNHQVpETU1KUUdBWlhZWkxPTDVLVkc3Q1RJNTZGS1UyRVBRWVVDTUNEUFEyREtNUlpQUlVWQVoyVkpCNkRDTlpaR0FZREdNSldHWTRES01CUk1WWkcyVkpER1EyRFFNSlNHVVJUTU5SWkZVMkRJT0JSR0kyWFlVU0dKWjZERU1CU0dZWURTTVJaR0VZREFNRDRHSjZGRU1KU0dFWkhZTVpRR0lZRENJMlNKNFJWRVJTT0VNWkRBTVJXRlVZRFNMSlNIRVFEQ01CMkdBWUNHo3ByY8tAcuAo9cKPXKVvcl9wcssAAAAAAAAAAKVvcl9jbcsAAAAAAAAAAKJjbcsAAAAAAAAAAKNwY2SzMjAyNi0wOS0zMCAxMDowMDowMKJydKNSRk6jYnJkolJPpG1yaWTAo21ybsCjaGRwwKNmcm6go3NybqtOYW5vIFNpbmdsZaNvY24BpHBya3PAo2RldMsAAAAAAAAAAKJjcIKhcJKFoXSzMjAyNi0wOS0yOSAxMDowMDowMKFhy0Bi4FHrhR64oWOjVVNEonR5pmFtb3VudKJ0eqNHTVSFoXSzMjAyNi0wOS0zMCAxMDowMDowMKFhy0Bi4FHrhR64oWOjVVNEonR5pmFtb3VudKJ0eqNHTVSicnSjUkZOpHNoaWSmNDQ4MTI1o3NpZAKjaGlkp2xwNmQ2N2Sjb2NjkYGhYQGjY3Vyo1VTRKJnbqJTR6JjaaoyMDI2LTEwLTAxomNvqjIwMjYtMTAtMDOjZ2lkoKJjcssAAAAAAAAAAKRzc2lk2TBzZXNzaW9uXzAxYTBjNjMzYTUwOTJmZ3RwdUpGcVdOeDBIN3lDOHJSWUtjOE5yWDmjaXNowqNzc3CucHJvdmlkZXJEaXJlY3SjaWZtwqVpZmNocsKjaWZywqVzZWFpZKdscDZkNjdkom5rsWxpdGVhcGlvbmJvYXJkaW5nonR4koShacOhZKlTYWxlcyB0YXihYctAOYo9cKPXCqFjo1VTRIShacOhZLhTZXJ2aWNlIGNoYXJnZSAodGF4YWJsZSmhYctAOJHrhR64UqFjo1VTRKJscMCjYmt0BKRtc3Bhy0B24KPXCj1xpG1zcGOjVVNE",
+      "hotelId": "lp6d67d",
+      "currency": "USD",
+      "termsAndConditions": "",
+      "roomTypes": [
+        {
+          "rates": [
+            {
+              "rateId": "I5NFGVCNJVFFOTKVGNDU2TKSKFDTIWSUJVHUUV2NKUZUIT2OKRCEOWJSLBMU2SSEI5EVSRCFJZJFER2BLFCEGN2CKNDUCWSEJVGUUUKHIFNFQWK2JRHUYNKLKZDTOQ2UJE2TMRSLKUZEKUCRLFKUGTKDIRIFCMSEJNGVEWSQKJKVMQK2GJLEUQRWIRBU4WS2I5AVSRCHJVFFOR2ZGRCEWTKCKJGVMWSHGJLEURCHKEZEIUKNJJJUOVKSKRGU4US2IZKTERCJJ5BFER2JGJMFSVKTI5FFUNSEIVGUEU2HLFMUIU2NKJNEORKZIRAU2RBUI5FDMRSFJVFFGR2FLJEFSTK2KFDUSWKEINETEU2KGRJFMRKSKNHUKTK2IRAU2USXIZKVSRCTJRFFGSCFKFCEGTKCGJDUCWKDI56DGMBSFYYDC7BSGAZDMLJQHEWTGMBAGEYDUMBQHIYDA7CSJ56HY7D4JZQW43ZAKNUW4Z3MMV6DALRQGB6DALRQGB6HYMBOGAYHYMBOGAYA",
+              "occupancyNumber": 1,
+              "name": "Nano Single",
+              "maxOccupancy": 1,
+              "adultCount": 1,
+              "childCount": 0,
+              "childrenAges": [],
+              "boardType": "RO",
+              "boardName": "Room Only",
+              "remarks": "<br/><br/>Payment will be charged upon arrival for same-day bookings and are non-refundable. <br/> Physical IDs or passports are required for hotel check-ins in accordance with the National Registration Regulations (NRR). <br/> The minimum age of guests to check in is 18 years if unaccompanied by an adult. <br/> All guests who have booked for a stay for 7 days or more, whether in a single booking or multiple bookings, will have to contact the hotel directly in order to ensure that the current guidelines from the local authorities are adhered to strictly. <br/> Extra beds are not available at this property. <br/> Light housekeeping is provided every 3 nights stay; full housekeeping service is provided every 7 nights stay<br/>",
+              "priceType": "commission",
+              "commission": [
+                {
+                  "amount": 0,
+                  "currency": "USD"
+                }
+              ],
+              "retailRate": {
+                "total": [
+                  {
+                    "amount": 302.01,
+                    "currency": "USD"
+                  }
+                ],
+                "suggestedSellingPrice": [
+                  {
+                    "amount": 366.04,
+                    "currency": "USD",
+                    "source": "providerDirect"
+                  }
+                ],
+                "initialPrice": null,
+                "taxesAndFees": [
+                  {
+                    "included": true,
+                    "description": "Sales tax",
+                    "amount": 25.54,
+                    "currency": "USD"
+                  },
+                  {
+                    "included": true,
+                    "description": "Service charge (taxable)",
+                    "amount": 24.57,
+                    "currency": "USD"
+                  }
+                ]
+              },
+              "cancellationPolicies": {
+                "cancelPolicyInfos": [
+                  {
+                    "cancelTime": "2026-09-29 10:00:00",
+                    "amount": 151.01,
+                    "currency": "USD",
+                    "type": "amount",
+                    "timezone": "GMT"
+                  },
+                  {
+                    "cancelTime": "2026-09-30 10:00:00",
+                    "amount": 151.01,
+                    "currency": "USD",
+                    "type": "amount",
+                    "timezone": "GMT"
+                  }
+                ],
+                "hotelRemarks": [],
+                "refundableTag": "RFN"
+              },
+              "paymentTypes": [
+                "NUITEE_PAY"
+              ],
+              "providerCommission": {
+                "amount": 0,
+                "currency": ""
+              },
+              "perks": [],
+              "promotions": null
+            }
+          ]
+        }
+      ],
+      "suggestedSellingPrice": 366.04,
+      "isPackageRate": true,
+      "commission": 0,
+      "price": 302.01,
+      "priceType": "commission",
+      "priceDifferencePercent": 0,
+      "cancellationChanged": false,
+      "boardChanged": false,
+      "supplier": "nuitee",
+      "supplierId": 2,
+      "paymentTypes": [
+        "NUITEE_PAY",
+        "ACC_CREDIT_CARD",
+        "WALLET"
+      ],
+      "checkin": "2026-10-01",
+      "checkout": "2026-10-03",
+      "sellingPriceToUser": 302.01
+    },
+    "guestLevel": 0,
+    "sandbox": true
+  }
+}

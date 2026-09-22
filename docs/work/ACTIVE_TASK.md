@@ -36,6 +36,14 @@ Case and traveller-trip nodes use the connection-aware colour (`617ed6a`). A tig
 
 Polling replaces the graph region only when `data-graph-scene-hash` changes, then restores camera, view, and selection from `window.__northstarGraphState`. An unchanged hash correctly leaves the canvas alone. Do not add a second in-place update path.
 
+## CP5 seam
+
+D1–D3 on the AiT clone still pass. Composed REPLAY flight search succeeds. Twelve transport candidates are rejected: connection still broken or below minimum, arrival after the deadline, the original stay misaligned, or an overnight with no hotel. Stay research stays off until the current assessment itself fails overnight accommodation. Reviewed publisher pages for the Narita hotel policy and the Japan entry sources now replay from `fixtures/recordings/official-documents/`. The AiT materializer does not create a passport from nationality, so planning has to provision the existing synthetic sandbox passport first. Reviewed publication must be signed by a registered principal. The Narita one-night search `rec_3453274e073bba4809e874155b28bd8e` and its three quotes replay successfully (`hotel.search` and two `hotel.quote` results succeed, and entry research succeeds). The sixteen candidates still fail: the original lyf stay is misaligned, several arrivals miss the deadline, and the quoted Narita night does not by itself clear `overnight_unaccommodated`. The next wiring is `stayReplacementBinding` for booking `z-xdzAxcv`, with the USD 670.77 penalty read from that booking, after Jordan’s Singapore intended visit is materialized. Cancellation of the original stay must wait for a canonical application of the replacement (`7c9b4a3`).
+
+Checkpoint 6 has no PostgreSQL harness. The closest sequential run is the SQLite rehearsal in `test/integration.r2-rehearsal.test.ts`, which resets only at the start and end. A later proof should use one `obtainAitSummitWorld` and live in `postgres-integration/a5HeroSameWorldSequential.pgtest.ts`, classified in `postgres` and `aitFixtureCloneConsumers`, not `postgresFast`. Do not write that test until Jordan’s plan is viable.
+
+Lint is already red on untouched files (`a3SandboxExecutionInputs.pgtest.ts`, `a3StayArrivalRequirement.pgtest.ts`, and others). Park for Later until the final gate; do not treat that as a Jordan defect.
+
 ## Exact next step
 
-Checkpoint 5: Jordan healthy → D1 → D2 → D3 → recovery → approval → execution → observation → reassessment on REPLAY, ending CURRENT/PASS and RESOLVED. Do not reopen Sarah’s comparator, hotel penalty amount, or the graph colour rule.
+`a5JordanD3Planning.pgtest.ts` passes: the recommended plan includes a replacement flight, a new stay, and cancellation of the lyf booking at USD 670.77. A fresh RECORD quote is approved, sandbox flight and stay execution run, the trip reassesses PASS, and the case resolves. Checkpoint 6 passed in `a5HeroSameWorldSequential.pgtest.ts`: Sarah’s programme case resolves, then Jordan’s connection case opens in the same workspace, with no reset and no second sandbox booking. Do not reopen Sarah’s comparator, the hotel penalty amount, or the graph colour rule.

@@ -592,6 +592,17 @@ describe('M2 fail-closed typed-subject registration (real PostgreSQL)', () => {
       // A1 (0130): typed desired target for an immutable ChangeRequest revision;
       // relational target refs remain separately queryable and FK-validated.
       'change_request_revisions.desired_target',
+      // Selected-plan continuation (0133) and stay execution bindings (0134):
+      // bounded typed payloads, size-checked in those migrations, not a fact bucket.
+      'selected_plan_continuation_checkpoints.source_effect_manifest',
+      'selected_plan_continuation_checkpoints.residual_effect_fingerprints',
+      'selected_plan_continuation_checkpoints.prerequisite_receipts',
+      'selected_plan_continuation_checkpoints.accounted_revisions',
+      'selected_plan_continuation_checkpoints.fresh_manifest',
+      'selected_plan_continuation_checkpoints.viability_evidence_refs',
+      'stay_execution_bindings.workflow_state',
+      'stay_execution_bindings.stay_window',
+      'stay_execution_bindings.approved_visit',
     ];
     const jsonColumns = await pool.query<{ table_name: string; column_name: string }>(
       `SELECT table_name, column_name FROM information_schema.columns

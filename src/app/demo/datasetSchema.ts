@@ -158,7 +158,11 @@ export type DatasetPreference = z.infer<typeof DatasetPreferenceSchema>;
 export const DatasetTravellerSchema = z.looseObject({
   draftId: NonEmpty,
   displayName: NonEmpty,
-  identity: z.looseObject({ email: NonEmpty.optional(), lastName: NonEmpty.optional() }).default({}),
+  identity: z.looseObject({
+    email: NonEmpty.optional(),
+    givenName: NonEmpty.optional(),
+    lastName: NonEmpty.optional(),
+  }).default({}),
   homeLocationText: z.string().optional(),
   nationalityCodes: z.array(NonEmpty).default([]),
   notes: z.array(z.string()).default([]),

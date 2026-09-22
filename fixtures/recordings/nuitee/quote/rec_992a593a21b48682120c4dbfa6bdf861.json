@@ -1,0 +1,120 @@
+{
+  "id": "rec_992a593a21b48682120c4dbfa6bdf861",
+  "providerId": "nuitee",
+  "operation": "quote",
+  "recordedAt": "2026-09-21T22:39:39.472Z",
+  "sanitized": true,
+  "raw": {
+    "data": {
+      "prebookId": "RgMXRWmTm",
+      "offerId": "3gAYonJzkd4AEaRzcmlk2gE8RzRaVE1OSldNUTNEU01SUUdZMkRNWlJYR1UzREVOVERHWTJURU1CWEdJM0dNTlRHR1pTREVaQldNVTNHTU5URkdKU0RPTVpXTVEzR01OVENHWTRUTVpKV0c1NkRDSVpTR0FaRE1NQlpHSTRYWU1SUUdJM0RBT0pUR0I2R0szUzdLVkpYWVUySFBSS1ZHUkQ0R0ZBVEFRMzRHUTJURU9MNE5GSUdPVktJUFFZVE9PSlFHQVpUQU1SVUhBMlRRTkRKTU4zRVFJWlNHTTRUU01KWkVNWVRLTkJWRlVaREdPSlpHRTRYWVVTR0paNkRFTUJTR1lZRFNNUldHQVpEQU1ENEdGNkZFTUpSR00ySFlNWldHVVlTR1VTUEVOSkVNVFJER0lZREVOUk5HQTRTMk1SV0VBWURFT1JRR0FSUaNwcmPLQEJBR64UeuGlb3JfcHLLAAAAAAAAAAClb3JfY23LAAAAAAAAAACiY23LAAAAAAAAAACjcGNkszIwMjYtMDktMjcgMDI6MDA6MDCicnSjUkZOo2JyZKJST6RtcmlkwKNtcm7Ao2hkcMCjZnJuoKNzcm68U2VtaSBEb3VibGUgUm9vbS1Ob24tU21va2luZ6NvY24BpHBya3PAo2RldMsAAAAAAAAAAKJjcIKhcJKFoXSzMjAyNi0wOS0yNiAwMjowMDowMKFhy0AdMzMzMzMzoWOjVVNEonR5pmFtb3VudKJ0eqNHTVSFoXSzMjAyNi0wOS0yNyAwMjowMDowMKFhy0BCQUeuFHrhoWOjVVNEonR5pmFtb3VudKJ0eqNHTVSicnSjUkZOpHNoaWSmMjM5OTE5o3NpZAKjaGlkp2xwM2E5Mmajb2NjkYGhYQGjY3Vyo1VTRKJnbqJTR6JjaaoyMDI2LTA5LTI5omNvqjIwMjYtMDktMzCjZ2lkoKJjcssAAAAAAAAAAKRzc2lk2TBzZXNzaW9uXzAxYTBjNjFkZmE3OUVHeEJoVGwwb3hxU3RvQVBQRWg5WGwySVEzYmqjaXNowqNzc3CucHJvdmlkZXJEaXJlY3SjaWZtwqVpZmNocsKjaWZywqVzZWFpZKdscDNhOTJmom5rsWxpdGVhcGlvbmJvYXJkaW5nonR4koShacOhZLdQcm9wZXJ0eSBzZXJ2aWNlIGNoYXJnZaFhy0ANMzMzMzMzoWOjVVNEhKFpw6Fko1ZBVKFhy0ANMzMzMzMzoWOjVVNEomxwwKNia3QIpG1zcGHLQES0euFHrhSkbXNwY6NVU0Q=",
+      "hotelId": "lp3a92f",
+      "currency": "USD",
+      "termsAndConditions": "",
+      "roomTypes": [
+        {
+          "rates": [
+            {
+              "rateId": "I42FUVCNJZFFOTKRGNCFGTKSKFDVSMSEJVNFEWCHKUZUIRKOKRCEOWJSKRCU2QSYI5ETGR2NJZKEOR22KNCEKWSCK5GVKM2HJVHFIRSHJJJUIT2NLJLU2UJTI5GU4VCDI5MTIVCNLJFFORZVGZCEGSK2KNDUCWSEJVGUEWSHJE2FQWKNKJIUOSJTIRAU6SSUI5BDMR2LGNJTOS2WJJMFSVJSJBIFES2WI5JEINCHIZAVIQKRGM2EOUJSKRCU6TBUJZDESR2PKZFUSUCRLFKE6T2KKFDUCWSUIFGVEVKIIEZFIUKOIRFE2TRTIVIUSWSTI5GTIVCTJVFFURKNLFKEWTSCKZDFKWSEI5HUUWSHIU2FQWKVKNDUUWRWIRCU2QSTI5MVSRCTJVJFOR2BLJCECTKEGRDUMNSGIVGUUUSHJUZEQWKNLJLUOVKZKNDVKU2QIVHEURKNKRJEIR2JLFCEKTSSJZDUCNCTGJGVEV2FIFMUIRKPKJIUOQKSKF6DGNROGUYXYMRQGI3C2MBZFUZDOIBQGI5DAMB2GAYHYUSPPR6HY7CTMVWWSICEN52WE3DFEBJG633NFVHG63RNKNWW623JNZTXYMBOGAYHYMBOGAYHY7BQFYYDA7BQFYYDA",
+              "occupancyNumber": 1,
+              "name": "Semi Double Room-Non-Smoking",
+              "maxOccupancy": 1,
+              "adultCount": 1,
+              "childCount": 0,
+              "childrenAges": [],
+              "boardType": "RO",
+              "boardName": "Room Only",
+              "remarks": "",
+              "priceType": "commission",
+              "commission": [
+                {
+                  "amount": 0,
+                  "currency": "USD"
+                }
+              ],
+              "retailRate": {
+                "total": [
+                  {
+                    "amount": 36.51,
+                    "currency": "USD"
+                  }
+                ],
+                "suggestedSellingPrice": [
+                  {
+                    "amount": 41.41,
+                    "currency": "USD",
+                    "source": "providerDirect"
+                  }
+                ],
+                "initialPrice": null,
+                "taxesAndFees": [
+                  {
+                    "included": true,
+                    "description": "Property service charge",
+                    "amount": 3.65,
+                    "currency": "USD"
+                  },
+                  {
+                    "included": true,
+                    "description": "VAT",
+                    "amount": 3.65,
+                    "currency": "USD"
+                  }
+                ]
+              },
+              "cancellationPolicies": {
+                "cancelPolicyInfos": [
+                  {
+                    "cancelTime": "2026-09-26 02:00:00",
+                    "amount": 7.3,
+                    "currency": "USD",
+                    "type": "amount",
+                    "timezone": "GMT"
+                  },
+                  {
+                    "cancelTime": "2026-09-27 02:00:00",
+                    "amount": 36.51,
+                    "currency": "USD",
+                    "type": "amount",
+                    "timezone": "GMT"
+                  }
+                ],
+                "hotelRemarks": [],
+                "refundableTag": "RFN"
+              },
+              "paymentTypes": [
+                "NUITEE_PAY"
+              ],
+              "providerCommission": {
+                "amount": 0,
+                "currency": ""
+              },
+              "perks": [],
+              "promotions": null
+            }
+          ]
+        }
+      ],
+      "suggestedSellingPrice": 41.41,
+      "isPackageRate": false,
+      "commission": 0,
+      "price": 36.51,
+      "priceType": "commission",
+      "priceDifferencePercent": 0,
+      "cancellationChanged": false,
+      "boardChanged": false,
+      "supplier": "nuitee",
+      "supplierId": 2,
+      "paymentTypes": [
+        "NUITEE_PAY",
+        "ACC_CREDIT_CARD",
+        "WALLET"
+      ],
+      "checkin": "2026-09-29",
+      "checkout": "2026-09-30",
+      "sellingPriceToUser": 36.51
+    },
+    "guestLevel": 0,
+    "sandbox": true
+  }
+}

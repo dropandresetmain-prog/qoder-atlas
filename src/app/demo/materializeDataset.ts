@@ -733,6 +733,7 @@ export async function materializeDataset(params: MaterializeDatasetParams): Prom
           id: ids.id('traveller-name', traveller.draftId),
           nameKind: 'DISPLAY',
           displayValue: traveller.displayName,
+          ...(traveller.identity.givenName ? { givenName: traveller.identity.givenName } : {}),
           ...(traveller.identity.lastName ? { familyName: traveller.identity.lastName } : {}),
           effectiveRange: { start: dateOnly(rosterObservedAt) },
           evidenceId: rosterEvidence,

@@ -1,0 +1,347 @@
+{
+  "id": "rec_643f03e481a67eee0a887239ce9a8fcb",
+  "providerId": "nuitee",
+  "operation": "search",
+  "recordedAt": "2026-09-21T23:00:59.578Z",
+  "sanitized": true,
+  "raw": {
+    "hotels": [
+      {
+        "id": "lp6d67d",
+        "name": "lyf Bugis Singapore managed by The Ascott Ltd",
+        "main_photo": "https://static.cupid.travel/hotels/580665225.jpg",
+        "thumbnail": "https://static.cupid.travel/hotels/thumbnail/580665225.jpg",
+        "address": "200 Middle Road",
+        "country_code": "sg",
+        "city_name": "Singapore",
+        "latitude": 1.300714,
+        "longitude": 103.851512,
+        "rating": 8.4,
+        "stars": 4,
+        "review_count": 6310
+      }
+    ],
+    "data": [
+      {
+        "hotelId": "lp6d67d",
+        "roomTypes": [
+          {
+            "roomTypeId": "GY3DSLJUGQ4DCMRVPRJEMTT4GIYDENRQHEZDQMJQGAYHYML4KIYTGNRVPQ2DQMZTHA",
+            "offerId": "3gAYonJzkd4AEaRzcmlk2gECR1pTVE1NSldNVTNHTU1SUUc0WVRPTkpXR1UzREtOVEZQUVlTR01SUUdJM0RBT0pUR0I2REVNQlNHWVlUQU1CVFBSU1c0WDJWS042RkdSMzRLVkpVSTdCUklFWUVHN0JVR1VaRFM3REpLQlRWS1NENEdFM1RTTUJRR01ZVE1OSlpIQTNEUTZMTktWWVNHTkJVSEFZVEVOSkRHWTNEU0xKVUdRNERDTVJWUFJKRU1UVDRHSVlERU5SUUhFWkRRTUpRR0FZSFlNTDRLSVlUR05SVlBRMkRRTVpUSEFSVkVUWkRLSkRFNElaU0dBWkRNTEpRSEVXVEVPQkFHRVlEVU1CUUVNo3ByY8tAfjYUeuFHrqVvcl9wcssAAAAAAAAAAKVvcl9jbcsAAAAAAAAAAKJjbcsAAAAAAAAAAKNwY2SzMjAyNi0wOS0yOSAxMDowMDowMKJydKNSRk6jYnJkolJPpG1yaWTAo21ybsCjaGRwwKNmcm6go3NybqpOYW5vIFF1ZWVuo29jbgGkcHJrc8CjZGV0ywAAAAAAAAAAomNwgqFwkoWhdLMyMDI2LTA5LTI4IDEwOjAwOjAwoWHLQGQkKPXCj1yhY6NVU0SidHmmYW1vdW50onR6o0dNVIWhdLMyMDI2LTA5LTI5IDEwOjAwOjAwoWHLQGQkKPXCj1yhY6NVU0SidHmmYW1vdW50onR6o0dNVKJydKNSRk6kc2hpZKY0NDgxMjWjc2lkAqNoaWSnbHA2ZDY3ZKNvY2ORgaFhAaNjdXKjVVNEomduolNHomNpqjIwMjYtMDktMzCiY2-qMjAyNi0xMC0wM6NnaWSgomNyywAAAAAAAAAApHNzaWTZMHNlc3Npb25fMDFhMGM2MzM4MzRjSEJMaDNhTWYxMktNcDRLR0VQQ0VVUHNTRFdGUKNpc2jCo3NzcK5wcm92aWRlckRpcmVjdKNpZm3CpWlmY2hywqNpZnLCpXNlYWlkp2xwNmQ2N2SibmuxbGl0ZWFwaW9uYm9hcmRpbmeidHiShKFpw6FkqVNhbGVzIHRheKFhy0BEwUeuFHrhoWOjVVNEhKFpw6FkuFNlcnZpY2UgY2hhcmdlICh0YXhhYmxlKaFhy0BDXrhR64UfoWOjVVNEomxwwKNia3QDpG1zcGHLQISej1wo9cOkbXNwY6NVU0Q=",
+            "supplier": "nuitee",
+            "supplierId": 2,
+            "rates": [
+              {
+                "rateId": "I5NFGVCNJVFFOTKVGNDU2TKSKFDTIWKUJ5HEUV2HKUZUIS2OKRDFAUKZKNDU2USRI5ETGRCBJ5FFIR2CGZCEKTKCKNDVSWKUIFGUEVCQKJJVONCYGJLEWTRWIZDVEMZUJNLEUVKJG5BFESKFLFCUON2CKVDVKWSEKM3UISSLIJKFMS2TIQ2EORJTKRJU2QSRI5GVSVCNJZFFUSCBGNCFCNSMJZFVMWKTI5HEEVKIIFMVIRKOJJCEOWJTIRJUYSSVI5ITIRCDJVJFMUCSJJCU2VCUGRDUSWKEIVHFEUKIIVNEIUKNJJIUOQKZJBMU2TBUJNEVSVCHJZJFMUCRGJCFCTK2KREECUSWIVKFURCLJJCEKNCJLJJUOQK2IRGUYSSRJBCVOVCFJ5BECR2FLFCFKTKCKFCU27BUHAZS4MZYPQZDAMRWFUYDSLJSHEQDCMB2GAYDUMBQPRJE67D4PR6E4YLON4QFC5LFMVXHYMBOGAYHYMBOGAYHY7BQFYYDA7BQFYYDA",
+                "occupancyNumber": 1,
+                "name": "Nano Queen",
+                "maxOccupancy": 1,
+                "adultCount": 1,
+                "childCount": 0,
+                "childrenAges": [],
+                "boardType": "RO",
+                "boardName": "Room Only",
+                "remarks": "",
+                "priceType": "commission",
+                "commission": [
+                  {
+                    "amount": 0,
+                    "currency": "USD"
+                  }
+                ],
+                "retailRate": {
+                  "total": [
+                    {
+                      "amount": 483.38,
+                      "currency": "USD"
+                    }
+                  ],
+                  "suggestedSellingPrice": [
+                    {
+                      "amount": 659.82,
+                      "currency": "USD",
+                      "source": "providerDirect"
+                    }
+                  ],
+                  "initialPrice": [
+                    {
+                      "amount": 483.38,
+                      "currency": "USD"
+                    }
+                  ],
+                  "taxesAndFees": [
+                    {
+                      "included": true,
+                      "description": "Sales tax",
+                      "amount": 41.51,
+                      "currency": "USD"
+                    },
+                    {
+                      "included": true,
+                      "description": "Service charge (taxable)",
+                      "amount": 38.74,
+                      "currency": "USD"
+                    }
+                  ]
+                },
+                "cancellationPolicies": {
+                  "cancelPolicyInfos": [
+                    {
+                      "cancelTime": "2026-09-28 10:00:00",
+                      "amount": 161.13,
+                      "currency": "USD",
+                      "type": "amount",
+                      "timezone": "GMT"
+                    },
+                    {
+                      "cancelTime": "2026-09-29 10:00:00",
+                      "amount": 161.13,
+                      "currency": "USD",
+                      "type": "amount",
+                      "timezone": "GMT"
+                    }
+                  ],
+                  "hotelRemarks": [],
+                  "refundableTag": "RFN"
+                },
+                "paymentTypes": [
+                  "NUITEE_PAY"
+                ],
+                "providerCommission": {
+                  "amount": 0,
+                  "currency": ""
+                },
+                "perks": [],
+                "promotions": null
+              }
+            ],
+            "offerRetailRate": {
+              "amount": 483.38,
+              "currency": "USD"
+            },
+            "suggestedSellingPrice": {
+              "amount": 659.82,
+              "currency": "USD",
+              "source": "providerDirect"
+            },
+            "offerInitialPrice": {
+              "amount": 483.38,
+              "currency": "USD"
+            },
+            "priceType": "commission",
+            "rateType": "package",
+            "paymentTypes": [
+              "NUITEE_PAY"
+            ]
+          },
+          {
+            "roomTypeId": "GY3DSLJUGQ4DCMRVPRHFERSOPQZDAMRWGA4TEMBRGAYDA7BSPRJDCMZWGV6DIOBTGM4A",
+            "offerId": "3gAYonJzkd4AEaRzcmlk2gEFR1pTVE1NSldNVTNHTU1SUUc0WVRPTkpXR1UzREtOVEZQUVlTR01SUUdJM0RBT0pUR0I2REVNQlNHWVlUQU1CVFBSU1c0WDJWS042RkdSMzRLVkpVSTdCUklFWUVHN0JVR1VaRFM3REpLQlRWS1NENEdFM1RTTUJRR01ZVE1OSlpIQTNEUTZMTktWWVNHTkJVSEFZVEVOSkRHWTNEU0xKVUdRNERDTVJWUFJIRkVSU09QUVpEQU1SV0dBNFRFTUJSR0FZREE3QlNQUkpEQ01aV0dWNkRJT0JUR000Q0dVU1BFTkhGRVJTT0VNWkRBTVJXRlVZRFNMSlNHQVFEQ01CMkdBWUNHo3ByY8tAfjYUeuFHrqVvcl9wcssAAAAAAAAAAKVvcl9jbcsAAAAAAAAAAKJjbcsAAAAAAAAAAKNwY2SgonJ0pE5SRk6jYnJkolJPpG1yaWTAo21ybsCjaGRwwKNmcm6go3NybqpOYW5vIFF1ZWVuo29jbgGkcHJrc8CjZGV0ywAAAAAAAAAAomNwgqFwkKJydKROUkZOpHNoaWSmNDQ4MTI1o3NpZAKjaGlkp2xwNmQ2N2Sjb2NjkYGhYQGjY3Vyo1VTRKJnbqJTR6JjaaoyMDI2LTA5LTMwomNvqjIwMjYtMTAtMDOjZ2lkoKJjcssAAAAAAAAAAKRzc2lk2TBzZXNzaW9uXzAxYTBjNjMzODM0Y0hCTGgzYU1mMTJLTXA0S0dFUENFVVBzU0RXRlCjaXNowqNzc3CucHJvdmlkZXJEaXJlY3SjaWZtwqVpZmNocsKjaWZywqVzZWFpZKdscDZkNjdkom5rsWxpdGVhcGlvbmJvYXJkaW5nonR4koShacOhZKlTYWxlcyB0YXihYctARMFHrhR64aFjo1VTRIShacOhZLhTZXJ2aWNlIGNoYXJnZSAodGF4YWJsZSmhYctAQ164UeuFH6Fjo1VTRKJscMCjYmt0A6Rtc3Bhy0CEno9cKPXDpG1zcGOjVVNE",
+            "supplier": "nuitee",
+            "supplierId": 2,
+            "rates": [
+              {
+                "rateId": "I5NFGVCNJVFFOTKVGNDU2TKSKFDTIWKUJ5HEUV2HKUZUIS2OKRDFAUKZKNDU2USRI5ETGRCBJ5FFIR2CGZCEKTKCKNDVSWKUIFGUEVCQKJJVONCYGJLEWTRWIZDVEMZUJNLEUVKJG5BFESKFLFCUON2CKVDVKWSEKM3UISSLIJKFMS2TIQ2EORJTKRJU2QSRI5GVSVCNJZFFUSCBGNCFCNSMJZFVMWKTI5HEEVKIIFMVIRKOJJCEOWJTIRJUYSSVI5ITIRCDJVJFMUCSJBDEKUSTJ5IFCWSEIFGVEV2HIE2FIRKNIJJEOQKZIRATOQSTKBJEURCDJVNFOR2WGZCEST2CKRDU2NCDI5KVGUCFJZEEMRKSKNHUKTK2IRAU2USXIZKVSRCTJRFFGR2BKFCEGTKCGJDUCWKDI56DIOBTFYZTQ7D4KJHXY7D4PRHGC3TPEBIXKZLFNZ6DALRQGB6DALRQGB6HYMBOGAYHYMBOGAYA",
+                "occupancyNumber": 1,
+                "name": "Nano Queen",
+                "maxOccupancy": 1,
+                "adultCount": 1,
+                "childCount": 0,
+                "childrenAges": [],
+                "boardType": "RO",
+                "boardName": "Room Only",
+                "remarks": "",
+                "priceType": "commission",
+                "commission": [
+                  {
+                    "amount": 0,
+                    "currency": "USD"
+                  }
+                ],
+                "retailRate": {
+                  "total": [
+                    {
+                      "amount": 483.38,
+                      "currency": "USD"
+                    }
+                  ],
+                  "suggestedSellingPrice": [
+                    {
+                      "amount": 659.82,
+                      "currency": "USD",
+                      "source": "providerDirect"
+                    }
+                  ],
+                  "initialPrice": [
+                    {
+                      "amount": 483.38,
+                      "currency": "USD"
+                    }
+                  ],
+                  "taxesAndFees": [
+                    {
+                      "included": true,
+                      "description": "Sales tax",
+                      "amount": 41.51,
+                      "currency": "USD"
+                    },
+                    {
+                      "included": true,
+                      "description": "Service charge (taxable)",
+                      "amount": 38.74,
+                      "currency": "USD"
+                    }
+                  ]
+                },
+                "cancellationPolicies": {
+                  "cancelPolicyInfos": [],
+                  "hotelRemarks": [],
+                  "refundableTag": "NRFN"
+                },
+                "paymentTypes": [
+                  "NUITEE_PAY"
+                ],
+                "providerCommission": {
+                  "amount": 0,
+                  "currency": ""
+                },
+                "perks": [],
+                "promotions": null
+              }
+            ],
+            "offerRetailRate": {
+              "amount": 483.38,
+              "currency": "USD"
+            },
+            "suggestedSellingPrice": {
+              "amount": 659.82,
+              "currency": "USD",
+              "source": "providerDirect"
+            },
+            "offerInitialPrice": {
+              "amount": 483.38,
+              "currency": "USD"
+            },
+            "priceType": "commission",
+            "rateType": "package",
+            "paymentTypes": [
+              "NUITEE_PAY"
+            ]
+          },
+          {
+            "roomTypeId": "GIYTOOBNGQ2DQMJSGV6FERSOPQZDAMRWGA4TEOBRGAYDA7BRPRJDCMZWGV6DIOJQHEZA",
+            "offerId": "3gAYonJzkd4AEaRzcmlk2gEER1pTVE1NSldNVTNHTU1SUUc0WVRPTkpXR1UzREtOVEZQUVlTR01SUUdJM0RBT0pUR0I2REVNQlNHWVlUQU1CVFBSU1c0WDJWS042RkdSMzRLVkpVSTdCUklFWUVHN0JVR1VaRFM3REpLQlRWS1NENEdFM1RTTUJRR01ZVE1OSlpIQTNEUTZMTktWWVNHTkJVSEFZVEVOSkRHSVlUT09CTkdRMkRRTUpTR1Y2RkVSU09QUVpEQU1SV0dBNFRFT0JSR0FZREE3QlJQUkpEQ01aV0dWNkRJT0pRSEVaQ0dVU1BFTkpFTVRSREdJWURFTlJOR0E0UzJNUllFQVlUQU9SUUdBUlGjcHJjy0B-rrhR64UfpW9yX3ByywAAAAAAAAAApW9yX2NtywAAAAAAAAAAomNtywAAAAAAAAAAo3BjZLMyMDI2LTA5LTI5IDEwOjAwOjAwonJ0o1JGTqNicmSiUk-kbXJpZMCjbXJuwKNoZHDAo2ZybqCjc3Juqk5hbm8gUXVlZW6jb2NuAaRwcmtzwKNkZXTLAAAAAAAAAACiY3CCoXCShaF0szIwMjYtMDktMjggMTA6MDA6MDChYctAZHQo9cKPXKFjo1VTRKJ0eaZhbW91bnSidHqjR01UhaF0szIwMjYtMDktMjkgMTA6MDA6MDChYctAZHQo9cKPXKFjo1VTRKJ0eaZhbW91bnSidHqjR01UonJ0o1JGTqRzaGlkpjQ0ODEyNaNzaWQCo2hpZKdscDZkNjdko29jY5GBoWEBo2N1cqNVU0SiZ26iU0eiY2mqMjAyNi0wOS0zMKJjb6oyMDI2LTEwLTAzo2dpZKCiY3LLAAAAAAAAAACkc3NpZNkwc2Vzc2lvbl8wMWEwYzYzMzgzNGNIQkxoM2FNZjEyS01wNEtHRVBDRVVQc1NEV0ZQo2lzaMKjc3NwrnByb3ZpZGVyRGlyZWN0o2lmbcKlaWZjaHLCo2lmcsKlc2VhaWSnbHA2ZDY3ZKJua7FsaXRlYXBpb25ib2FyZGluZ6J0eJKEoWnDoWSpU2FsZXMgdGF4oWHLQETrhR64UeyhY6NVU0SEoWnDoWS4U2VydmljZSBjaGFyZ2UgKHRheGFibGUpoWHLQEPQo9cKPXGhY6NVU0SibHDAo2JrdAOkbXNwYctAhPDhR64Ue6Rtc3Bjo1VTRA==",
+            "supplier": "nuitee",
+            "supplierId": 2,
+            "rates": [
+              {
+                "rateId": "I5NFGVCNJVFFOTKVGNDU2TKSKFDTIWKUJ5HEUV2HKUZUIS2OKRDFAUKZKNDU2USRI5ETGRCBJ5FFIR2CGZCEKTKCKNDVSWKUIFGUEVCQKJJVONCYGJLEWTRWIZDVEMZUJNLEUVKJG5BFESKFLFCUON2CKVDVKWSEKM3UISSLIJKFMS2TIQ2EORJTKRJU2QSRI5GVSVCNJZFFUSCBGNCFCNSMJZFVMWKTI5HEEVKIIFMVIRKOJJCEOSKZKRHU6QSOI5ITERCRJVFFGR2WGZDEKUSTJ5IFCWSEIFGVEV2HIE2FIRKPIJJEOQKZIRATOQSSKBJEURCDJVNFOR2WGZCEST2KKFEEKWSDI5KVGUCFJZFEKTKUKJCEOSKZIRCU4USOI5ATIUZSJVJFSRKBLFKECT2SKFDUCUSRPQ2DSMBOHEZHYMRQGI3C2MBZFUZDSIBRGA5DAMB2GAYHYUSPPR6HY7COMFXG6ICROVSWK3T4GAXDAMD4GAXDAMD4PQYC4MBQPQYC4MBQ",
+                "occupancyNumber": 1,
+                "name": "Nano Queen",
+                "maxOccupancy": 1,
+                "adultCount": 1,
+                "childCount": 0,
+                "childrenAges": [],
+                "boardType": "RO",
+                "boardName": "Room Only",
+                "remarks": "",
+                "priceType": "commission",
+                "commission": [
+                  {
+                    "amount": 0,
+                    "currency": "USD"
+                  }
+                ],
+                "retailRate": {
+                  "total": [
+                    {
+                      "amount": 490.92,
+                      "currency": "USD"
+                    }
+                  ],
+                  "suggestedSellingPrice": [
+                    {
+                      "amount": 670.11,
+                      "currency": "USD",
+                      "source": "providerDirect"
+                    }
+                  ],
+                  "initialPrice": [
+                    {
+                      "amount": 490.92,
+                      "currency": "USD"
+                    }
+                  ],
+                  "taxesAndFees": [
+                    {
+                      "included": true,
+                      "description": "Sales tax",
+                      "amount": 41.84,
+                      "currency": "USD"
+                    },
+                    {
+                      "included": true,
+                      "description": "Service charge (taxable)",
+                      "amount": 39.63,
+                      "currency": "USD"
+                    }
+                  ]
+                },
+                "cancellationPolicies": {
+                  "cancelPolicyInfos": [
+                    {
+                      "cancelTime": "2026-09-28 10:00:00",
+                      "amount": 163.63,
+                      "currency": "USD",
+                      "type": "amount",
+                      "timezone": "GMT"
+                    },
+                    {
+                      "cancelTime": "2026-09-29 10:00:00",
+                      "amount": 163.63,
+                      "currency": "USD",
+                      "type": "amount",
+                      "timezone": "GMT"
+                    }
+                  ],
+                  "hotelRemarks": [],
+                  "refundableTag": "RFN"
+                },
+                "paymentTypes": [
+                  "NUITEE_PAY"
+                ],
+                "providerCommission": {
+                  "amount": 0,
+                  "currency": ""
+                },
+                "perks": [],
+                "promotions": null
+              }
+            ],
+            "offerRetailRate": {
+              "amount": 490.92,
+              "currency": "USD"
+            },
+            "suggestedSellingPrice": {
+              "amount": 670.11,
+              "currency": "USD",
+              "source": "providerDirect"
+            },
+            "offerInitialPrice": {
+              "amount": 490.92,
+              "currency": "USD"
+            },
+            "priceType": "commission",
+            "rateType": "package",
+            "paymentTypes": [
+              "NUITEE_PAY"
+            ]
+          }
+        ],
+        "et": 10800
+      }
+    ],
+    "guestLevel": 0,
+    "sandbox": true
+  }
+}
