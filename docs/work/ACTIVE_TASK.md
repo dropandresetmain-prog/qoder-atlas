@@ -34,7 +34,10 @@ Founder URL: `http://127.0.0.1:8787/`
 Active clone (after hung-server restart, pristine TEMPLATE clone): `ns_demo_cl_f267d541469946d9`
 Workspace: `b96791c7-189f-4a59-ae30-b7cb5e6068b4`
 
-## Do not
+## Post-acceptance triage (Park / Accept — not recording-blocking)
 
-- Reopen planner/RC-6/authority architecture
-- Execute Jordan sandbox in this checkpoint
+- Overview `summary.ready=0` with READY population: **Park** — `summary` is case-queue counts; use `populationSummary` ([Overview summary ready bug](f3f85a0c-ae60-4689-925b-12240088341b)).
+- Gates: anti-hardcoding CLEAN, boundary CLEAN, focused a5 units 13/13 ([Anti-hardcoding + unit gates](cbb9902f-971c-49bd-97ee-78bb61745b8a)).
+- Reset lease-before-swap race: **Park** for sequential founder Reset; hold mutex later ([Branch diff risk review](bf71f0ac-d1f5-461d-8a0a-a428f42ae3f2)).
+- Wall-time authority under CONTROLLED: **Accept Risk** for demo execute; document split later (same review).
+- Jordan D1 UNKNOWN with CURRENT: **Investigate/Act** — not lag; overallVerdict/overview clock seam ([Jordan D1 UNKNOWN status](9d04b7e4-d448-4770-b699-471f9b2714ed)); fix in flight without touching live recording server.
