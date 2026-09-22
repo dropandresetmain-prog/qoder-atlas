@@ -29,10 +29,10 @@ export function projectOperatorOverview(input: OperatorOverviewFacts): OperatorO
     recovering: items.filter((item) => item.status === 'RECOVERING').length,
     unknown: items.filter((item) => item.status === 'UNKNOWN').length,
   };
-  // The population is carried through, not recomputed: every status here is
-  // an authoritative backend verdict. `populationSummary` counts that
-  // collection, deliberately separate from `summary`, which stays a count of
-  // the case-driven queue.
+  // `summary` counts only the case-driven queue (`items`). `populationSummary`
+  // counts the full traveller population. They diverge by design — e.g.
+  // summary.ready === 0 while populationSummary.ready > 0 when no queue row
+  // is READY but assessed travellers are.
   const population = (input.population ?? []).map((entry) => ({
     journeyRef: entry.journeyRef,
     tripRef: entry.tripRef,

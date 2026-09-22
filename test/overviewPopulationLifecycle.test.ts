@@ -50,6 +50,7 @@ test('CURRENT subjects alone are SETTLED', () => {
     },
   ]));
   assert.deepEqual(view.populationAssessmentLifecycle, { state: 'SETTLED', pendingCount: 0 });
+  assert.equal(view.summary.ready, 0, 'case queue empty: summary does not mirror population READY');
   assert.equal(view.populationSummary.ready, 1);
   assert.equal(view.populationSummary.disrupted, 1);
 });
