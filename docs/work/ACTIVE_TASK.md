@@ -30,8 +30,8 @@ Jordan D2 AT_RISK → D3 DISRUPTED; recommendation AWAITING_AUTHORITY; `Cost not
 CANCEL_STAY current penalty USD 0, freeCancellationUntil 2026-09-29T23:59:59Z,
 scheduledCancellationPenalty USD 670.77; 167.69 absent.
 
-Founder URL after final Reset: `http://127.0.0.1:8787/`
-Active clone: `ns_demo_cl_90dbd69cb03742ea`
+Founder URL: `http://127.0.0.1:8787/`
+Active clone (after hung-server restart, pristine TEMPLATE clone): `ns_demo_cl_f267d541469946d9`
 Workspace: `b96791c7-189f-4a59-ae30-b7cb5e6068b4`
 
 ## Do not
