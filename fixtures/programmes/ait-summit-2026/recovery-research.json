@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "hotelPoliciesFile": "../../../data/ait-demo-input-pack/global/hotel-property-policies.json",
+  "entryPoliciesFile": "../../../data/ait-demo-input-pack/global/reviewed-entry-policies.json",
+  "sourceConnectionProviderKind": "demo-dataset:ait-summit-2026",
+  "overnightTargets": [
+    {
+      "arrivalAirportSourceRef": "SOURCE_PLACE:place-nrt",
+      "hotelPolicyId": "hotel-policy-narita-gateway-2026",
+      "jurisdictionSourceRef": "SOURCE_JURISDICTION:jur-jp",
+      "countryCode": "JP",
+      "entryPolicyId": "jp-short-visit-sg-passport-2026-09"
+    }
+  ],
+  "existingVisitTargets": [
+    {
+      "visitSourceRef": "SOURCE_INTENDED_VISIT:ait-draft-09-singapore-destination",
+      "jurisdictionSourceRef": "SOURCE_JURISDICTION:jur-sg",
+      "entryPolicyId": "sg-issued-passport-eligibility-2026-09",
+      "countryCode": "SG"
+    }
+  ],
+  "passportSelections": [
+    {
+      "travellerSourceRef": "SOURCE_TRAVELLER_DRAFT:ait-draft-09",
+      "guestNationality": "SG"
+    }
+  ],
+  "stayReplacementBinding": {
+    "stayElementId": "z-xdzAxcv",
+    "propertyExternalRef": { "system": "nuitee-hotel-id", "value": "lp6d67d" },
+    "passport": { "guestNationality": "SG" },
+    "guests": { "adults": 1, "rooms": 1 },
+    "provenance": {
+      "mode": "REPLAY",
+      "observedAt": "2026-09-21T01:40:00.000Z",
+      "sourceRefs": ["z-xdzAxcv"]
+    }
+  }
+}

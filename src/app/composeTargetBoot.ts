@@ -12,9 +12,12 @@
  * composition (`src/app/compose.ts`) is not imported here or transitively
  * from anything this module imports.
  */
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { loadConfig, mergeEnvWithDotenvFiles, type AppConfig } from '../config/config.ts';
 import { composeTargetEndpoints, type TargetEndpoints } from './target/composeTargetEndpoints.ts';
 import { provisionConfiguredDataset } from './demo/provisionDataset.ts';
+import { datasetDirectoryFromEnv } from './demo/datasetLoader.ts';
 import { runBaselineEvaluation } from './demo/baselineEvaluation.ts';
 import { captureWorld } from '../persistence/postgres/world/pgCurrentState.ts';
 import { createM6Registry } from '../resolution/evaluation/registry.ts';
@@ -234,10 +237,13 @@ export async function composeTargetBoot(
   } else {
     console.log('[qwen] Model Studio not composed (credentials absent) — AI domain suggestion unavailable');
   }
+  const explicitResearch = resolved.NORTHSTAR_RECOVERY_RESEARCH_CONFIG?.trim();
+  const datasetResearch = datasetDirectoryFromEnv(resolved);
+  const bundledResearch = datasetResearch ? join(datasetResearch, 'recovery-research.json') : undefined;
   const recoveryResearch = await composeTargetRecoveryResearch({
     config: adapterConfig,
     cwd: options.cwd ?? process.cwd(),
-    configurationFile: resolved.NORTHSTAR_RECOVERY_RESEARCH_CONFIG,
+    configurationFile: explicitResearch || (bundledResearch && existsSync(bundledResearch) ? bundledResearch : undefined),
     pool: endpoints.app.pool,
     workspaceId: config.workspaceId,
     actorPrincipalId: lifecycleActor,

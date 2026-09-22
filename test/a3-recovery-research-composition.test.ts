@@ -7,6 +7,16 @@ import { join, resolve } from 'node:path';
 import { loadConfig } from '../src/config/config.ts';
 import { composeTargetRecoveryResearch, RecoveryResearchConfigurationSchema } from '../src/app/composeTargetRecoveryResearch.ts';
 
+test('the demo dataset research file composes without workspace ids', async () => {
+  const configurationFile = resolve('fixtures/programmes/ait-summit-2026/recovery-research.json');
+  const result = await composeTargetRecoveryResearch({
+    config: loadConfig({ ADAPTER_MODE: 'REPLAY' }), cwd: process.cwd(), configurationFile,
+    pool: undefined as never, workspaceId: randomUUID(), actorPrincipalId: 'test',
+    reviewerPrincipalId: randomUUID(), uow: () => { throw new Error('composition must not write'); },
+  });
+  assert.ok(result, 'reviewed hotel research composes from the dataset file');
+});
+
 test('reviewed recovery composition is absent without explicit configuration', async () => {
   const result = await composeTargetRecoveryResearch({
     config: loadConfig({ ADAPTER_MODE: 'REPLAY' }), cwd: process.cwd(),
