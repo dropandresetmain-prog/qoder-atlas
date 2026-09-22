@@ -196,6 +196,12 @@ export const RecoveryStrategyChangeViewSchema = z.strictObject({
   currentWindow: z.strictObject({ start: z.string().min(1), end: z.string().min(1) }).optional(),
   /** Window this option proposes, when the effect carries one. */
   proposedWindow: z.strictObject({ start: z.string().min(1), end: z.string().min(1) }).optional(),
+  /** Current cancellation loss when the effect is CANCEL_STAY. */
+  cancellationPenalty: z.strictObject({ amount: z.string().min(1), currency: z.string().length(3) }).optional(),
+  /** Free-cancellation window end when current loss is zero only until then. */
+  freeCancellationUntil: z.iso.datetime({ offset: true }).optional(),
+  /** Provider-stated penalty after the free window; not current loss. */
+  scheduledCancellationPenalty: z.strictObject({ amount: z.string().min(1), currency: z.string().length(3) }).optional(),
 });
 export type RecoveryStrategyChangeView = z.infer<typeof RecoveryStrategyChangeViewSchema>;
 

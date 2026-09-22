@@ -138,8 +138,14 @@ export function createTargetRecoveryCostContext(
   clock: () => string = () => new Date().toISOString(),
 ) {
   const ratesByWorld = new WeakMap<CapturedWorld, Map<string, Promise<FxRateEvidence[]>>>();
-  return async (input: { effects: readonly ScenarioEffect[]; basis: { world: CapturedWorld } }) => {
+  return async (input: {
+    effects: readonly ScenarioEffect[];
+    basis: { world: CapturedWorld; now?: string };
+  }) => {
     const world = input.basis.world;
+    const comparedAt = typeof input.basis.now === 'string' && input.basis.now.length > 0
+      ? input.basis.now
+      : clock();
     const journeyIds = new Set<string>();
     const currencies = new Set<string>();
     for (const effect of input.effects) {
@@ -150,8 +156,10 @@ export function createTargetRecoveryCostContext(
         const item = world.journeyItems.find((candidate) => candidate.id === effect.journeyItemId);
         if (!item) return undefined;
         journeyIds.add(item.journeyId);
-        if (effect.effectKind === 'CANCEL_STAY') currencies.add(effect.cancellationPenalty.currency);
-        else if (effect.offerPrice) currencies.add(effect.offerPrice.currency);
+        if (effect.effectKind === 'CANCEL_STAY') {
+          currencies.add(effect.cancellationPenalty.currency);
+          if (effect.scheduledCancellationPenalty) currencies.add(effect.scheduledCancellationPenalty.currency);
+        } else if (effect.offerPrice) currencies.add(effect.offerPrice.currency);
       }
     }
     if (!journeyIds.size) {
@@ -164,7 +172,7 @@ export function createTargetRecoveryCostContext(
           .filter((currency): currency is string => currency !== null && currency.length > 0),
       );
       if (currencies.size !== 1) return undefined;
-      return { homeCurrency: [...currencies][0]!, rates: [], comparedAt: clock() };
+      return { homeCurrency: [...currencies][0]!, rates: [], comparedAt };
     }
     const organisationIds = new Set<string>();
     for (const journeyId of journeyIds) {
@@ -191,6 +199,6 @@ export function createTargetRecoveryCostContext(
       pending.push(request);
     }
     const rates = (await Promise.all(pending)).flat();
-    return { homeCurrency, rates, comparedAt: clock() };
+    return { homeCurrency, rates, comparedAt };
   };
 }

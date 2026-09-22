@@ -610,9 +610,23 @@ export interface StayContext {
   lateArrivalSupported?: boolean;
   cancellation?: {
     refundable: boolean;
+    /**
+     * Free-cancellation window end, when the provider states one.
+     * Before this instant a refundable booking's current cancellation fee is zero;
+     * `fee` / `penaltySchedule` describe the post-deadline exposure.
+     */
     deadline?: IsoDateTime;
-    /** Exact provider-reported penalty, when one is available. */
+    /**
+     * Provider-stated cancellation fee that applies once any free window has
+     * ended (or immediately when no free window exists). Callers that need
+     * "loss if cancelled now" must evaluate this against `deadline` and now.
+     */
     fee?: Money;
+    /**
+     * Timed penalty tiers when the provider publishes more than one amount.
+     * Each tier becomes effective at `effectiveFrom` (inclusive).
+     */
+    penaltySchedule?: Array<{ effectiveFrom: IsoDateTime; fee: Money }>;
     /** Conservative ceiling for a confirmed nonrefundable booking. */
     maximumLoss?: Money;
     maximumLossBasis?: 'NONREFUNDABLE_BOOKING_PRICE';

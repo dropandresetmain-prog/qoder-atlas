@@ -1,5 +1,5 @@
-/**
- * Northstar — application-owned FX rate evidence store (ADR-052).
+﻿/**
+ * Northstar â€” application-owned FX rate evidence store (ADR-052).
  *
  * Evidenced FX observations with provenance and an effective period, persisted
  * beside preferences/dossiers in the same SQLite database and re-validated on
@@ -11,15 +11,11 @@
  * Like `dossierStore.ts`, this is deliberately NOT part of the frozen entity
  * registry: market-data evidence is not authoritative graph state.
  */
-import { z } from 'zod';
 import type { DatabaseSync } from 'node:sqlite';
 import { FxRateEvidenceSchema, type FxRateEvidence } from '../engine/fx.ts';
+import { FxRateBundleSchema, type FxRateBundle } from './fxRateBundle.ts';
 
-/** Bundle wire shape for `fx-rates.json` inside a scenario directory. */
-export const FxRateBundleSchema = z.strictObject({
-  rates: z.array(FxRateEvidenceSchema).default([]),
-});
-export type FxRateBundle = z.infer<typeof FxRateBundleSchema>;
+export { FxRateBundleSchema, type FxRateBundle };
 
 export interface FxRateStore {
   save(rate: FxRateEvidence): Promise<void>;

@@ -270,6 +270,11 @@ export interface NuiteeRetrieveRaw {
     /** Direct observed booking total from retrieve responses. */
     price?: number | string;
     currency?: string;
+    /**
+     * Provider free-cancellation end. When present this is authoritative for
+     * the free window even if cancelPolicyInfos only lists post-deadline fees.
+     */
+    lastFreeCancellationDate?: string | null;
     roomTypes?: NuiteeRoomTypeRaw[];
     cancellationPolicies?: {
       cancelPolicyInfos?: NuiteeCancelPolicyInfoRaw[] | null;
@@ -736,29 +741,68 @@ function toIsoDeadline(value: unknown, timezone: unknown): string | undefined {
 }
 
 /**
- * Provider-neutral cancellation posture from cancelPolicyInfos:
- * deadline = latest zero-penalty cancelTime; fee = first positive penalty.
+ * Provider-neutral cancellation posture from cancelPolicyInfos (+ optional
+ * lastFreeCancellationDate).
+ *
+ * Nuitee/liteAPI tiers use cancelTime as the instant a listed amount becomes
+ * effective — not as "this fee applies right now". A positive-only schedule
+ * with refundableTag RFN therefore still has a free window until that time
+ * (or until lastFreeCancellationDate when the provider states one).
  */
-function cancellationPosture(infos: NuiteeCancelPolicyInfoRaw[] | null | undefined): {
+function cancellationPosture(
+  infos: NuiteeCancelPolicyInfoRaw[] | null | undefined,
+  options: { lastFreeCancellationDate?: string | null; refundable?: boolean } = {},
+): {
   deadline?: string;
   fee?: { amount: number; currency: string };
+  penaltySchedule?: Array<{ effectiveFrom: string; fee: { amount: number; currency: string } }>;
 } {
-  const deadlineInfos = (infos ?? [])
-    .filter((info) => typeof info.cancelTime === 'string' && toNumber(info.amount) === 0)
-    .sort((a, b) => String(a.cancelTime).localeCompare(String(b.cancelTime)));
-  const penaltyInfo = (infos ?? []).find((info) => {
-    const amount = toNumber(info.amount);
-    return amount !== undefined && amount > 0;
-  });
-  const lastDeadline = deadlineInfos.length > 0 ? deadlineInfos[deadlineInfos.length - 1]! : undefined;
-  const deadline = lastDeadline ? toIsoDeadline(lastDeadline.cancelTime, lastDeadline.timezone) : undefined;
-  const penaltyAmount = penaltyInfo ? toNumber(penaltyInfo.amount) : undefined;
-  const penaltyCurrency = penaltyInfo ? toCurrency(penaltyInfo.currency) : undefined;
+  const schedule = (infos ?? [])
+    .flatMap((info) => {
+      const amount = toNumber(info.amount);
+      const currency = toCurrency(info.currency);
+      if (amount === undefined || currency === undefined) return [];
+      const effectiveFrom = typeof info.cancelTime === 'string'
+        ? toIsoDeadline(info.cancelTime, info.timezone)
+        : undefined;
+      // A tier with no cancelTime is already in force (immediate fee / ceiling).
+      return [{ effectiveFrom, fee: { amount, currency } }];
+    })
+    .sort((a, b) => {
+      if (!a.effectiveFrom && !b.effectiveFrom) return 0;
+      if (!a.effectiveFrom) return -1;
+      if (!b.effectiveFrom) return 1;
+      return a.effectiveFrom.localeCompare(b.effectiveFrom);
+    });
+
+  const zeroDeadlines = schedule
+    .filter((tier) => tier.fee.amount === 0 && tier.effectiveFrom)
+    .map((tier) => tier.effectiveFrom!);
+  const positiveTiers = schedule.filter((tier) => tier.fee.amount > 0);
+  const statedFreeUntil = typeof options.lastFreeCancellationDate === 'string'
+    && options.lastFreeCancellationDate.length > 0
+    ? toIsoDeadline(options.lastFreeCancellationDate, 'UTC')
+    : undefined;
+  const firstTimedPositive = positiveTiers.find((tier) => tier.effectiveFrom);
+  // Prefer the provider's explicit free-cancel end; otherwise the latest zero
+  // tier, otherwise (when refundable) the first timed positive tier's
+  // effectiveFrom as "free until the penalty starts".
+  const deadline = statedFreeUntil
+    ?? (zeroDeadlines.length > 0 ? zeroDeadlines[zeroDeadlines.length - 1] : undefined)
+    ?? (options.refundable === true && firstTimedPositive?.effectiveFrom
+      ? firstTimedPositive.effectiveFrom
+      : undefined);
+  const fee = positiveTiers[0]?.fee
+    ?? (schedule.find((tier) => tier.fee.amount === 0)?.fee);
+  const penaltySchedule = schedule.flatMap((tier) => (
+    tier.effectiveFrom
+      ? [{ effectiveFrom: tier.effectiveFrom, fee: tier.fee }]
+      : []
+  ));
   return {
     ...(deadline ? { deadline } : {}),
-    ...(penaltyAmount !== undefined && penaltyCurrency !== undefined
-      ? { fee: { amount: penaltyAmount, currency: penaltyCurrency } }
-      : {}),
+    ...(fee ? { fee } : {}),
+    ...(penaltySchedule.length > 0 ? { penaltySchedule } : {}),
   };
 }
 
@@ -802,7 +846,9 @@ export function normalizeSearch(raw: NuiteeSearchRaw): HotelSearchOutcome {
       if (totalPrice === undefined) continue;
       const rate = roomType.rates?.[0];
       const policies = rate?.cancellationPolicies;
-      const posture = cancellationPosture(policies?.cancelPolicyInfos);
+      const posture = cancellationPosture(policies?.cancelPolicyInfos, {
+        refundable: policies?.refundableTag === 'RFN',
+      });
       const view: HotelRateView = {
         // The offerId is the opaque handle quoteRate/book need; preserved
         // exactly, never reinterpreted.
@@ -930,7 +976,10 @@ export function normalizeRetrieve(raw: NuiteeRetrieveRaw): HotelBookingStatusVie
     const roomTotal = sumRetailTotals(data.roomTypes);
     if (roomTotal) view.totalPrice = roomTotal;
   }
-  const posture = cancellationPosture(data.cancellationPolicies?.cancelPolicyInfos);
+  const posture = cancellationPosture(data.cancellationPolicies?.cancelPolicyInfos, {
+    lastFreeCancellationDate: data.lastFreeCancellationDate,
+    refundable: data.cancellationPolicies?.refundableTag === 'RFN',
+  });
   if (posture.fee) view.cancellationFee = posture.fee;
   return view;
 }
@@ -1028,12 +1077,18 @@ export function normalizeStayContext(raw: NuiteeRetrieveRaw): StayContext {
   }
   const policies = data.cancellationPolicies;
   if (policies && typeof policies.refundableTag === 'string') {
-    const posture = cancellationPosture(policies.cancelPolicyInfos);
+    const posture = cancellationPosture(policies.cancelPolicyInfos, {
+      lastFreeCancellationDate: data.lastFreeCancellationDate,
+      refundable: policies.refundableTag === 'RFN',
+    });
     const cancellation: NonNullable<StayContext['cancellation']> = {
       refundable: policies.refundableTag === 'RFN',
     };
     if (posture.deadline) cancellation.deadline = posture.deadline;
     if (posture.fee) cancellation.fee = posture.fee;
+    if (posture.penaltySchedule && posture.penaltySchedule.length > 0) {
+      cancellation.penaltySchedule = posture.penaltySchedule;
+    }
     const observedPrice = toNumber(data.price);
     const observedCurrency = toCurrency(data.currency);
     const hasValidObservedPrice = observedPrice !== undefined

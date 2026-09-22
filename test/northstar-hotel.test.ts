@@ -223,9 +223,9 @@ test('RV-N7 hotel: REPLAY getStayContext honors Checkpoint-C semantics', async (
   assert.equal(ctx.propertyName, CAPTURED_HOTEL_NAME);
   assert.equal(ctx.cancellation?.refundable, true);
   assert.deepEqual(ctx.cancellation?.fee, { amount: 569.4, currency: 'USD' });
-  // The captured rate has a penalty-only policy: no zero-fee window exists,
-  // so no deadline is fabricated.
-  assert.equal(ctx.cancellation?.deadline, undefined);
+  // lastFreeCancellationDate (and the positive tier's cancelTime) establish the
+  // free window; the listed amount is the post-deadline exposure.
+  assert.equal(ctx.cancellation?.deadline, '2026-10-01T23:59:59Z');
 });
 
 test('A3 hotel: confirmed NRFN context exposes a conservative booking-price loss ceiling', () => {

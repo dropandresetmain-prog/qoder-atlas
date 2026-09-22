@@ -28,6 +28,7 @@ import {
   type DatasetJurisdictions,
   type DatasetProgramme,
 } from './datasetSchema.ts';
+import { FxRateBundleSchema, type FxRateBundle } from '../fxRateBundle.ts';
 import { mergeEnvWithDotenvFiles } from '../../config/config.ts';
 
 /** Required: the programme/roster document. */
@@ -40,6 +41,8 @@ export const JURISDICTIONS_FILE = 'jurisdictions.json';
 export const JOURNEY_REQUIREMENTS_FILE = 'journey-requirements.json';
 /** Optional explicit source-owned landside visit declarations. */
 export const INTENDED_VISITS_FILE = 'intended-visits.json';
+/** Optional organisation budget FX evidence for recovery-cost comparison. */
+export const FX_RATES_FILE = 'fx-rates.json';
 
 export interface LoadedDataset {
   /** Stable dataset identity, derived from the configured directory name. */
@@ -54,6 +57,8 @@ export interface LoadedDataset {
   jurisdictions: DatasetJurisdictions | undefined;
   journeyRequirements?: DatasetJourneyRequirements;
   intendedVisits?: DatasetIntendedVisits;
+  /** Budget FX observations when the dataset ships `fx-rates.json`. */
+  fxRates?: FxRateBundle;
 }
 
 export class DatasetLoadError extends Error {
@@ -255,6 +260,16 @@ export async function loadDataset(directory: string): Promise<LoadedDataset> {
     intendedVisits = parsed.data;
   }
 
+  const fxRatesRaw = await readJsonFile(directory, FX_RATES_FILE);
+  let fxRates: FxRateBundle | undefined;
+  if (fxRatesRaw) {
+    const parsed = FxRateBundleSchema.safeParse(fxRatesRaw.parsed);
+    if (!parsed.success) {
+      throw new DatasetLoadError(`${FX_RATES_FILE} does not match the dataset contract: ${parsed.error.message}`, directory);
+    }
+    fxRates = parsed.data;
+  }
+
   return {
     datasetKey: path.basename(directory),
     directory,
@@ -265,5 +280,6 @@ export async function loadDataset(directory: string): Promise<LoadedDataset> {
     jurisdictions,
     journeyRequirements,
     intendedVisits,
+    fxRates,
   };
 }

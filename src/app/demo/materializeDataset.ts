@@ -60,9 +60,11 @@ import {
   allocateReservationLine,
   createReservation,
   createTransportService,
+  recordFxObservation,
 } from '../../persistence/postgres/commands/arrangementCommands.ts';
 import { DatasetIdentityMinter } from './datasetIds.ts';
 import type { LoadedDataset } from './datasetLoader.ts';
+import { FX_RATES_FILE } from './datasetLoader.ts';
 import type { DatasetDeclaredTravel, DatasetIntendedVisit, DatasetJourneyRequirement, DatasetRule, DatasetTraveller } from './datasetSchema.ts';
 import {
   DatasetMappingError,
@@ -1135,6 +1137,32 @@ export async function materializeDataset(params: MaterializeDatasetParams): Prom
     }
   }
 
+  // Organisation budget FX evidence — required for mixed-currency recovery cost
+  // comparison. Bundle ids may be semantic; PostgreSQL stores UUID observations
+  // minted deterministically from the dataset rate id.
+  if (dataset.fxRates) {
+    for (const rate of dataset.fxRates.rates) {
+      const observationId = ids.id('fx-observation', rate.id);
+      mustOk(
+        await recordFxObservation(uow(), {
+          ...identity,
+          idempotencyKey: ids.key('fx-observation', rate.id),
+          observation: {
+            id: observationId,
+            baseCurrency: rate.baseCurrency,
+            quoteCurrency: rate.homeCurrency,
+            rate: String(rate.rate),
+            asOf: rate.observedAt,
+            sourceId: rate.sourceId,
+            ...(rate.validUntil ? { expiresAt: rate.validUntil } : {}),
+          },
+        }),
+        `recordFxObservation(${rate.id})`,
+      );
+      bump('fxObservations');
+    }
+  }
+
   return {
     datasetKey: dataset.datasetKey,
     contentHash: dataset.contentHash,
@@ -1220,7 +1248,9 @@ function notMaterialized(dataset: LoadedDataset, travellers: readonly DatasetTra
     file !== 'programme.json' &&
     file !== 'ground-transfers.json' &&
     file !== 'jurisdictions.json' &&
-    file !== 'intended-visits.json',
+    file !== 'intended-visits.json' &&
+    file !== FX_RATES_FILE &&
+    file !== 'journey-requirements.json',
   );
   for (const file of files) {
     out.push(`${file}: money/custody-shaped content whose target home (cost allocations, protected data refs) is not built in this increment`);

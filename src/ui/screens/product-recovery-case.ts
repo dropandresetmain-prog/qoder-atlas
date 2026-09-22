@@ -78,6 +78,20 @@ function changesHtml(strategy: RecoveryStrategyView): string {
   }).join('')}</ul>`;
 }
 
+function cancelStayNoteHtml(strategy: RecoveryStrategyView): string {
+  const cancel = strategy.changes.find((change) => change.effectKind === 'CANCEL_STAY');
+  if (!cancel) return '';
+  const parts = ['Cancellation of the displaced stay is proposed, not completed.'];
+  if (cancel.freeCancellationUntil && cancel.scheduledCancellationPenalty) {
+    parts.push(
+      `Free cancellation is available until ${decisionTime(cancel.freeCancellationUntil, cancel.timeZone)}; after that, potential loss ${decisionMoney(cancel.scheduledCancellationPenalty)}.`,
+    );
+  } else if (cancel.cancellationPenalty) {
+    parts.push(`Current cancellation loss ${decisionMoney(cancel.cancellationPenalty)}.`);
+  }
+  return `<p class="cw-muted" data-test="cancel-stay-economics">${e(parts.join(' '))}</p>`;
+}
+
 /** Compact spend/loss for the decision panel only — not a second full table. */
 function moneySummaryHtml(candidate: PlanningCandidateView | undefined): string {
   const cost = decisionCosts(candidate?.costComparison);
@@ -315,7 +329,7 @@ function recommendationHtml(view: RecoveryCaseView): string {
         ${details(`outcome-checks-${strategy.strategyRef}`, 'All projected outcome checks', list(strategy.resolves.map((c) => `${c.projectedVerdict === 'PASS' ? 'Passed' : c.projectedVerdict === 'FAIL' ? 'Failed' : 'Unconfirmed'} — ${decisionText(c.personLabel, 'Traveller')}`)))}
       </div>
     </section>
-    ${strategy.changes.some((c) => c.effectKind === 'CANCEL_STAY') ? '<p class="cw-muted">Cancellation of the displaced stay is proposed, not completed.</p>' : ''}
+    ${strategy.changes.some((c) => c.effectKind === 'CANCEL_STAY') ? cancelStayNoteHtml(strategy) : ''}
     ${costBreakdownHtml(candidate, strategy.strategyRef)}
     ${strategy.executionBlocker ? `<p class="cw-muted" data-test="option-execution-blocker"><strong>Cannot be carried out yet:</strong> ${e(executionBlockerLine(strategy.executionBlocker))}</p>` : ''}
   </article>`;

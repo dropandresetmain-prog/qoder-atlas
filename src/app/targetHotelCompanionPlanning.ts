@@ -117,6 +117,8 @@ export interface CapturedHotelQuote {
     reservationLineId: string;
     cancellationPenalty: ExactMoney;
     cancellationPenaltyBasis: 'PROVIDER_POLICY' | 'NONREFUNDABLE_BOOKING_PRICE_CEILING';
+    freeCancellationUntil?: Instant;
+    scheduledCancellationPenalty?: ExactMoney;
     provider: {
       stayElementId: string;
       policyProvenance: PlanningToolProvenance;
@@ -161,13 +163,83 @@ function exactPrice(price: unknown): ExactMoney | undefined {
   return parsed.success && !parsed.data.amount.startsWith('-') ? parsed.data : undefined;
 }
 
-function cancellationPenalty(value: unknown, now: Instant): { amount: ExactMoney; basis: 'PROVIDER_POLICY' | 'NONREFUNDABLE_BOOKING_PRICE_CEILING' } | undefined {
+/** Current cancellation loss at `now` from normalized stay-context evidence. */
+export function evaluateStayCancellationPenalty(value: unknown, now: Instant): {
+  amount: ExactMoney;
+  basis: 'PROVIDER_POLICY' | 'NONREFUNDABLE_BOOKING_PRICE_CEILING';
+  freeCancellationUntil?: Instant;
+  scheduledCancellationPenalty?: ExactMoney;
+} | undefined {
   if (value === null || typeof value !== 'object') return undefined;
   const cancellation = (value as { cancellation?: unknown }).cancellation;
   if (cancellation === null || typeof cancellation !== 'object') return undefined;
-  const raw = cancellation as { refundable?: unknown; deadline?: unknown; fee?: unknown; maximumLoss?: unknown; maximumLossBasis?: unknown };
+  const raw = cancellation as {
+    refundable?: unknown;
+    deadline?: unknown;
+    fee?: unknown;
+    maximumLoss?: unknown;
+    maximumLossBasis?: unknown;
+    penaltySchedule?: unknown;
+  };
   const fee = exactPrice(raw.fee);
-  if (!fee) {
+  const deadlineMs = typeof raw.deadline === 'string' ? Date.parse(raw.deadline) : Number.NaN;
+  const nowMs = Date.parse(now);
+  const freeWindowOpen = raw.refundable === true
+    && Number.isFinite(deadlineMs)
+    && Number.isFinite(nowMs)
+    && deadlineMs > nowMs;
+  const schedule = Array.isArray(raw.penaltySchedule)
+    ? raw.penaltySchedule.flatMap((tier) => {
+      if (tier === null || typeof tier !== 'object') return [];
+      const entry = tier as { effectiveFrom?: unknown; fee?: unknown };
+      const amount = exactPrice(entry.fee);
+      if (!amount || typeof entry.effectiveFrom !== 'string') return [];
+      const fromMs = Date.parse(entry.effectiveFrom);
+      if (!Number.isFinite(fromMs)) return [];
+      return [{ effectiveFrom: entry.effectiveFrom, fromMs, amount }];
+    }).sort((a, b) => a.fromMs - b.fromMs)
+    : [];
+
+  try {
+    if (fee) {
+      // A positive listed fee is the post-deadline / scheduled exposure. While
+      // the free window is still open the current cancellation loss is zero.
+      if (freeWindowOpen) {
+        return {
+          amount: { amount: '0', currency: fee.currency },
+          basis: 'PROVIDER_POLICY',
+          freeCancellationUntil: raw.deadline as Instant,
+          ...(compareExactMoney(fee, { amount: '0', currency: fee.currency }) > 0
+            ? { scheduledCancellationPenalty: fee }
+            : {}),
+        };
+      }
+      if (compareExactMoney(fee, { amount: '0', currency: fee.currency }) > 0) {
+        return { amount: fee, basis: 'PROVIDER_POLICY' };
+      }
+      // Explicit zero fee is only authoritative while refundable and still before deadline.
+      if (raw.refundable === true && freeWindowOpen) {
+        return { amount: fee, basis: 'PROVIDER_POLICY', freeCancellationUntil: raw.deadline as Instant };
+      }
+    }
+
+    // Prefer the latest schedule tier that is already effective at planning now.
+    if (schedule.length > 0 && Number.isFinite(nowMs)) {
+      const active = [...schedule].reverse().find((tier) => tier.fromMs <= nowMs);
+      if (active) {
+        return { amount: active.amount, basis: 'PROVIDER_POLICY' };
+      }
+      if (raw.refundable === true) {
+        const firstPositive = schedule.find((tier) => compareExactMoney(tier.amount, { amount: '0', currency: tier.amount.currency }) > 0);
+        return {
+          amount: { amount: '0', currency: (firstPositive ?? schedule[0]!).amount.currency },
+          basis: 'PROVIDER_POLICY',
+          ...(typeof raw.deadline === 'string' ? { freeCancellationUntil: raw.deadline } : {}),
+          ...(firstPositive ? { scheduledCancellationPenalty: firstPositive.amount } : {}),
+        };
+      }
+    }
+
     // A supplier's non-refundable tag does not establish an exact refund or
     // charge. An explicitly normalized booking-price ceiling lets the operator
     // authorize the conservative exposure while the actual outcome remains open.
@@ -175,18 +247,13 @@ function cancellationPenalty(value: unknown, now: Instant): { amount: ExactMoney
     return raw.fee === undefined && raw.refundable === false && raw.maximumLossBasis === 'NONREFUNDABLE_BOOKING_PRICE'
       && maximum && compareExactMoney(maximum, { amount: '0', currency: maximum.currency }) > 0
       ? { amount: maximum, basis: 'NONREFUNDABLE_BOOKING_PRICE_CEILING' } : undefined;
-  }
-  try {
-    if (compareExactMoney(fee, { amount: '0', currency: fee.currency }) > 0) return { amount: fee, basis: 'PROVIDER_POLICY' };
-    const deadline = typeof raw.deadline === 'string' ? Date.parse(raw.deadline) : Number.NaN;
-    // A zero cancellation amount is safe only when the provider explicitly
-    // says this booking is refundable and its free-cancellation deadline is
-    // still in the future. Missing policy evidence remains unknown.
-    if (raw.refundable === true && Number.isFinite(deadline) && deadline > Date.parse(now)) return { amount: fee, basis: 'PROVIDER_POLICY' };
   } catch {
     return undefined;
   }
-  return undefined;
+}
+
+function cancellationPenalty(value: unknown, now: Instant) {
+  return evaluateStayCancellationPenalty(value, now);
 }
 
 function sameRate(a: HotelRateView, b: HotelRateView): boolean {
@@ -555,9 +622,25 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
               const contextResult = results.find((candidate) => candidate.requestId === contextBinding.contextRequest.id
                 && candidate.operation === 'hotel.context' && candidate.status === 'SUCCEEDED');
               const penalty = contextResult ? cancellationPenalty(contextResult.normalizedEvidence, input.now) : undefined;
-              return penalty && contextResult ? { cancellationPenalty: penalty.amount, cancellationPenaltyBasis: penalty.basis, policyProvenance: contextResult.provenance } : undefined;
+              return penalty && contextResult
+                ? {
+                  cancellationPenalty: penalty.amount,
+                  cancellationPenaltyBasis: penalty.basis,
+                  ...(penalty.freeCancellationUntil ? { freeCancellationUntil: penalty.freeCancellationUntil } : {}),
+                  ...(penalty.scheduledCancellationPenalty
+                    ? { scheduledCancellationPenalty: penalty.scheduledCancellationPenalty }
+                    : {}),
+                  policyProvenance: contextResult.provenance,
+                }
+                : undefined;
             })
-            .find((candidate): candidate is { cancellationPenalty: ExactMoney; cancellationPenaltyBasis: 'PROVIDER_POLICY' | 'NONREFUNDABLE_BOOKING_PRICE_CEILING'; policyProvenance: PlanningToolProvenance } => candidate !== undefined)
+            .find((candidate): candidate is {
+              cancellationPenalty: ExactMoney;
+              cancellationPenaltyBasis: 'PROVIDER_POLICY' | 'NONREFUNDABLE_BOOKING_PRICE_CEILING';
+              freeCancellationUntil?: Instant;
+              scheduledCancellationPenalty?: ExactMoney;
+              policyProvenance: PlanningToolProvenance;
+            } => candidate !== undefined)
           : undefined;
         if (replacement && !policy) continue;
         const offer: ResolvedStayOffer = {
@@ -576,6 +659,10 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
               reservationLineId: replacement.reservationLineId,
               cancellationPenalty: policy.cancellationPenalty,
               cancellationPenaltyBasis: policy.cancellationPenaltyBasis,
+              ...(policy.freeCancellationUntil ? { freeCancellationUntil: policy.freeCancellationUntil } : {}),
+              ...(policy.scheduledCancellationPenalty
+                ? { scheduledCancellationPenalty: policy.scheduledCancellationPenalty }
+                : {}),
               provider: { stayElementId: replacement.stayElementId, policyProvenance: policy.policyProvenance },
             },
           } : {}),
@@ -645,7 +732,19 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
           key,
           effects: [
             ...stem.effects,
-            { effectKind: 'CANCEL_STAY', journeyItemId: quote.replacement.oldJourneyItemId, reservationLineId: quote.replacement.reservationLineId, cancellationPenalty: quote.replacement.cancellationPenalty, cancellationPenaltyBasis: quote.replacement.cancellationPenaltyBasis },
+            {
+              effectKind: 'CANCEL_STAY',
+              journeyItemId: quote.replacement.oldJourneyItemId,
+              reservationLineId: quote.replacement.reservationLineId,
+              cancellationPenalty: quote.replacement.cancellationPenalty,
+              cancellationPenaltyBasis: quote.replacement.cancellationPenaltyBasis,
+              ...(quote.replacement.freeCancellationUntil
+                ? { freeCancellationUntil: quote.replacement.freeCancellationUntil }
+                : {}),
+              ...(quote.replacement.scheduledCancellationPenalty
+                ? { scheduledCancellationPenalty: quote.replacement.scheduledCancellationPenalty }
+                : {}),
+            },
             { effectKind: 'ADD_JOURNEY_STAY', proposedJourneyItemId: quote.context.proposedJourneyItemId, journeyId: quote.journeyId, orderKey: quote.context.orderKey, offerId: quote.offer.offerId, offerPrice: quote.offer.price, visit: quote.context.visit, replacesReservationLineId: quote.replacement.reservationLineId },
           ],
           affectedSubjectRefs: [

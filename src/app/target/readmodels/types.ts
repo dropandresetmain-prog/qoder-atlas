@@ -202,6 +202,9 @@ export interface RecoveryStrategyChangeFact {
   timeZone?: string;
   currentWindow?: { start: string; end: string };
   proposedWindow?: { start: string; end: string };
+  cancellationPenalty?: { amount: string; currency: string };
+  freeCancellationUntil?: string;
+  scheduledCancellationPenalty?: { amount: string; currency: string };
 }
 
 export interface RecoveryStrategyFact {

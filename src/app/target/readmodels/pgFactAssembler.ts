@@ -350,6 +350,8 @@ const EFFECT_SUBJECT: Readonly<Record<string, { field: string; kind: string }>> 
   CHANGE_PROGRAMME_ITEM_TIME: { field: 'programmeItemId', kind: 'PROGRAMME_ITEM' },
   ALTER_JOURNEY_ITEM_INTENT: { field: 'journeyItemId', kind: 'JOURNEY_ITEM' },
   SELECT_OFFER: { field: 'journeyItemId', kind: 'JOURNEY_ITEM' },
+  CANCEL_STAY: { field: 'journeyItemId', kind: 'JOURNEY_ITEM' },
+  ADD_JOURNEY_STAY: { field: 'proposedJourneyItemId', kind: 'JOURNEY_ITEM' },
   PROPOSE_ALLOCATION: { field: 'reservationLineId', kind: 'RESERVATION_LINE' },
   CHANGE_SUPPORT_ASSIGNMENT: { field: 'constraintDefinitionId', kind: 'CONSTRAINT_DEFINITION' },
   WAIVE_OBJECTIVE: { field: 'objectiveId', kind: 'OBJECTIVE' },
@@ -373,6 +375,14 @@ function windowOf(value: unknown): { start: string; end: string } | undefined {
   const { start, end } = value as { start?: unknown; end?: unknown };
   if (typeof start !== 'string' || typeof end !== 'string') return undefined;
   return { start, end };
+}
+
+function moneyOf(value: unknown): { amount: string; currency: string } | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const { amount, currency } = value as { amount?: unknown; currency?: unknown };
+  if (typeof amount !== 'string' || amount.length === 0) return undefined;
+  if (typeof currency !== 'string' || currency.length !== 3) return undefined;
+  return { amount, currency };
 }
 
 /**
@@ -461,7 +471,14 @@ async function projectCaseStrategies(
       ORDER BY recovery_strategy_id, strategy_version`,
     [workspaceId, strategyIds],
   );
-  interface EffectFact { effectKind: string; subjectRef?: string; proposedWindow?: { start: string; end: string } }
+  interface EffectFact {
+    effectKind: string;
+    subjectRef?: string;
+    proposedWindow?: { start: string; end: string };
+    cancellationPenalty?: { amount: string; currency: string };
+    freeCancellationUntil?: string;
+    scheduledCancellationPenalty?: { amount: string; currency: string };
+  }
   const effectsByStrategy = new Map<string, EffectFact[]>();
   const programmeItemIds = new Set<string>();
   for (const row of effectRows.rows) {
@@ -476,10 +493,18 @@ async function projectCaseStrategies(
         programmeItemIds.add(subjectRef.slice('PROGRAMME_ITEM:'.length));
       }
       const proposedWindow = windowOf(effect.proposedWindow);
+      const cancellationPenalty = moneyOf(effect.cancellationPenalty);
+      const scheduledCancellationPenalty = moneyOf(effect.scheduledCancellationPenalty);
+      const freeCancellationUntil = typeof effect.freeCancellationUntil === 'string'
+        ? effect.freeCancellationUntil
+        : undefined;
       list.push({
         effectKind,
         ...(subjectRef ? { subjectRef } : {}),
         ...(proposedWindow ? { proposedWindow } : {}),
+        ...(cancellationPenalty ? { cancellationPenalty } : {}),
+        ...(freeCancellationUntil ? { freeCancellationUntil } : {}),
+        ...(scheduledCancellationPenalty ? { scheduledCancellationPenalty } : {}),
       });
     }
     effectsByStrategy.set(row.recovery_strategy_id, list);
@@ -525,6 +550,11 @@ async function projectCaseStrategies(
         ...(item?.timeZone ? { timeZone: item.timeZone } : {}),
         ...(item?.window ? { currentWindow: item.window } : {}),
         ...(effect.proposedWindow ? { proposedWindow: effect.proposedWindow } : {}),
+        ...(effect.cancellationPenalty ? { cancellationPenalty: effect.cancellationPenalty } : {}),
+        ...(effect.freeCancellationUntil ? { freeCancellationUntil: effect.freeCancellationUntil } : {}),
+        ...(effect.scheduledCancellationPenalty
+          ? { scheduledCancellationPenalty: effect.scheduledCancellationPenalty }
+          : {}),
       };
     });
     const projectedPeople = summaries.map((entry) => ({

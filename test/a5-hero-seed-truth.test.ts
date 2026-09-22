@@ -137,6 +137,9 @@ test('Jordan four-night stay is the confirmed lyf Bugis booking, with its real c
   };
   const context = normalizeStayContext(recording.raw);
   assert.equal(context.cancellation?.refundable, true);
-  assert.equal(context.cancellation?.deadline, undefined);
+  assert.equal(context.cancellation?.deadline, '2026-09-29T23:59:59Z');
   assert.deepEqual(context.cancellation?.fee, { amount: 670.77, currency: 'USD' });
+  assert.deepEqual(context.cancellation?.penaltySchedule, [
+    { effectiveFrom: '2026-09-29T23:59:59Z', fee: { amount: 670.77, currency: 'USD' } },
+  ]);
 });

@@ -8,6 +8,15 @@
       "sourceId": "src-syn-ait-event",
       "authority": "CONNECTED",
       "observedAt": "2026-09-01T00:00:00+08:00"
+    },
+    {
+      "id": "fx-jpy-sgd-frankfurter-2026-09-01",
+      "baseCurrency": "JPY",
+      "homeCurrency": "SGD",
+      "rate": 0.00795,
+      "sourceId": "src-frankfurter-ecb-2026-09-01",
+      "authority": "CONNECTED",
+      "observedAt": "2026-09-01T00:00:00Z"
     }
   ]
 }

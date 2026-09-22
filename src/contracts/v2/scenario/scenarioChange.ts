@@ -73,9 +73,18 @@ export const ScenarioEffectSchema = z.discriminatedUnion('effectKind', [
     effectKind: z.literal('CANCEL_STAY'),
     journeyItemId: SubjectIdSchema,
     reservationLineId: SubjectIdSchema,
+    /** Current cancellation loss if the stay is cancelled at planning now. */
     cancellationPenalty: ExactMoneySchema,
     /** Why this is an authority ceiling, never a claim of an observed charge. */
     cancellationPenaltyBasis: z.enum(['PROVIDER_POLICY', 'NONREFUNDABLE_BOOKING_PRICE_CEILING']).optional(),
+    /** Free-cancellation window end when current loss is zero only until then. */
+    freeCancellationUntil: z.iso.datetime({ offset: true }).optional(),
+    /**
+     * Provider-stated penalty that becomes current after `freeCancellationUntil`.
+     * Never counted as current recovery spend or current loss while the free
+     * window remains open.
+     */
+    scheduledCancellationPenalty: ExactMoneySchema.optional(),
   }),
   z.strictObject({
     effectKind: z.literal('PROPOSE_ALLOCATION'),

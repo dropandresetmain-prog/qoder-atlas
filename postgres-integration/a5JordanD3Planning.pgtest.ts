@@ -544,7 +544,14 @@ describe('A5 Jordan D3 planning (composed REPLAY transport research)', () => {
 
     const recommended = await pool.query<{
       strategy_id: string;
-      scenario_change: { effects?: Array<{ effectKind?: string; cancellationPenalty?: { amount?: string; currency?: string } }> };
+      scenario_change: {
+        effects?: Array<{
+          effectKind?: string;
+          cancellationPenalty?: { amount?: string; currency?: string };
+          freeCancellationUntil?: string;
+          scheduledCancellationPenalty?: { amount?: string; currency?: string };
+        }>;
+      };
     }>(
       `SELECT s.id AS strategy_id, s.scenario_change
          FROM recovery_planning_attempts a
@@ -562,7 +569,10 @@ describe('A5 Jordan D3 planning (composed REPLAY transport research)', () => {
     const replayCancel = replayEffects.find((effect) => effect.effectKind === 'CANCEL_STAY');
     assert.ok(replayCancel, JSON.stringify(replayKinds));
     assert.equal(replayCancel.cancellationPenalty?.currency, 'USD');
-    assert.equal(Number(replayCancel.cancellationPenalty?.amount), 670.77);
+    assert.equal(Number(replayCancel.cancellationPenalty?.amount), 0);
+    assert.equal(replayCancel.freeCancellationUntil, '2026-09-29T23:59:59Z');
+    assert.equal(Number(replayCancel.scheduledCancellationPenalty?.amount), 670.77);
+    assert.equal(replayCancel.scheduledCancellationPenalty?.currency, 'USD');
     // Sandbox book/cancel is destructive and was already proven with this flag set.
     // The default gate stops at the replayed recommendation so a second run does not
     // cancel the same provider booking again.
