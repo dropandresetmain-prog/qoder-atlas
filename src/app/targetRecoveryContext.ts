@@ -399,21 +399,24 @@ export class TargetRecoveryContextPreparer {
       && selection.credentialVersionId === target.passport.credentialVersionId
       && selection.intendedVisitIds.includes(target.visitId));
     if (exact) return true;
-    const sameCredential = selections.find((selection) => selection.credentialId === target.passport.credentialId);
+    const credentialId = target.passport.credentialId;
+    const credentialVersionId = target.passport.credentialVersionId;
+    if (!credentialId || !credentialVersionId) return false;
+    const sameCredential = selections.find((selection) => selection.credentialId === credentialId);
     const journey = world.journeys.find((candidate) => candidate.id === target.journeyId);
     if (!journey) return false;
     const selectionId = deterministicUuid(
       RUNTIME_ID_NAMESPACES.planning,
-      `${this.deps.workspaceId}|existing-visit-credential|${target.journeyId}|${target.visitId}|${target.passport.credentialVersionId}`,
+      `${this.deps.workspaceId}|existing-visit-credential|${target.journeyId}|${target.visitId}|${credentialVersionId}`,
     );
     const result = await selectCredential(this.deps.uow(), {
       workspaceId: this.deps.workspaceId,
       actorPrincipalId: this.deps.actorPrincipalId,
-      idempotencyKey: `existing-visit-credential:${target.journeyId}:${target.visitId}:${target.passport.credentialVersionId}`,
+      idempotencyKey: `existing-visit-credential:${target.journeyId}:${target.visitId}:${credentialVersionId}`,
       journeyId: target.journeyId,
       expectedRevision: journey.revision,
-      credentialId: target.passport.credentialId,
-      credentialVersionId: target.passport.credentialVersionId,
+      credentialId,
+      credentialVersionId,
       scopeIntendedVisitIds: [...new Set([...(sameCredential?.intendedVisitIds ?? []), target.visitId])],
       selectionId,
     });

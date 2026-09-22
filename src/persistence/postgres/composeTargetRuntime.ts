@@ -28,11 +28,14 @@ export interface TargetRuntime {
 export async function composeTargetRuntime(
   overrides: Partial<PostgresTargetConfig> = {},
   env: NodeJS.ProcessEnv = process.env,
+  options: { pool?: Pool; skipMigrate?: boolean } = {},
 ): Promise<TargetRuntime & { migrationResult: MigrateResult }> {
   const config = { ...loadPostgresTargetConfig(env), ...overrides };
-  const pool = createTargetPool(config);
+  const pool = options.pool ?? createTargetPool(config);
   const migrationsDir = config.migrationsDir ?? DEFAULT_MIGRATIONS_DIR;
-  const migrationResult = await runMigrations(pool, migrationsDir);
+  const migrationResult = options.skipMigrate
+    ? { applied: [], alreadyApplied: [] }
+    : await runMigrations(pool, migrationsDir);
 
   return {
     pool,

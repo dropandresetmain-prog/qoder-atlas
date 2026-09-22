@@ -29,6 +29,10 @@ export interface TargetApplicationOptions {
   actorId?: string;
   postgres?: Partial<PostgresTargetConfig>;
   env?: NodeJS.ProcessEnv;
+  /** When set, reuse this pool (e.g. demo swappable clone) instead of opening a new one. */
+  pool?: Pool;
+  /** Skip migrate when the injected pool is already a migrated clone/template. */
+  skipMigrate?: boolean;
 }
 
 export interface TargetApplication {
@@ -93,7 +97,14 @@ export interface TargetApplication {
 export async function composeTargetApplication(
   options: TargetApplicationOptions,
 ): Promise<TargetApplication> {
-  const runtime = await composeTargetRuntime(options.postgres ?? {}, options.env ?? process.env);
+  const runtime = await composeTargetRuntime(
+    options.postgres ?? {},
+    options.env ?? process.env,
+    {
+      ...(options.pool ? { pool: options.pool } : {}),
+      ...(options.skipMigrate ? { skipMigrate: true } : {}),
+    },
+  );
   const actorId = options.actorId ?? `m9-app:${options.workspaceId}`;
   const reassessmentWorker = new PgReassessmentWorker(runtime.pool, { actorId });
 

@@ -20,6 +20,8 @@ import { provisionConfiguredDataset } from './demo/provisionDataset.ts';
 import { provisionDatasetSandboxInputsIfEnabled } from './demo/sandboxExecutionInputs.ts';
 import { datasetDirectoryFromEnv } from './demo/datasetLoader.ts';
 import { runBaselineEvaluation } from './demo/baselineEvaluation.ts';
+import { demoCloneResetEnabled, openDemoWorkingClone, clearDemoRuntimeSession, DEMO_CLONE_DB_PREFIX } from './demo/demoBaselineClone.ts';
+import { dropDisposableDatabase } from '../persistence/postgres/databaseTemplateClone.ts';
 import { captureWorld } from '../persistence/postgres/world/pgCurrentState.ts';
 import { createM6Registry } from '../resolution/evaluation/registry.ts';
 import { assessSubject } from '../resolution/evaluation/assess.ts';
@@ -121,27 +123,50 @@ export async function composeTargetBoot(
       ? env
       : mergeEnvWithDotenvFiles(env, options.cwd ?? process.cwd());
   const config = loadTargetBootConfig(resolved);
-  const endpoints = await composeTargetEndpoints({ workspaceId: config.workspaceId, env: resolved });
+
+  // Founder/demo local boot: open a pristine working clone from a frozen
+  // baseline template so Reset can hand over another clone in seconds.
+  const useDemoClone = demoCloneResetEnabled(resolved);
+  const demoSession = useDemoClone
+    ? await openDemoWorkingClone({ workspaceId: config.workspaceId, env: resolved })
+    : undefined;
+
+  const endpoints = await composeTargetEndpoints({
+    workspaceId: config.workspaceId,
+    env: resolved,
+    ...(demoSession
+      ? {
+          pool: demoSession.swappable.pool,
+          postgres: { database: demoSession.workingDatabaseName },
+          skipMigrate: true,
+        }
+      : {}),
+  });
   // Idempotent boot-time provisioning (same category as composeTargetRuntime
   // already running schema migrations at boot) — not a data/authority
   // decision. A workspace row must exist before any command referencing it
   // can commit; this never touches an already-provisioned workspace's data.
-  await endpoints.app.pool.query(
-    `INSERT INTO workspaces (id, name) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING`,
-    [config.workspaceId, `northstar:${config.workspaceId}`],
-  );
+  // Clone boot already carries the workspace from the frozen template.
+  if (!demoSession) {
+    await endpoints.app.pool.query(
+      `INSERT INTO workspaces (id, name) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING`,
+      [config.workspaceId, `northstar:${config.workspaceId}`],
+    );
+  }
 
   // Idempotent dataset provisioning. Absent configuration this does nothing;
   // an already-provisioned dataset is reused; the same dataset identity with
   // different content fails the boot rather than layering a second world.
-  // Nothing a browser can request reaches this path.
+  // Clone boot skips this — the template already materialised the baseline.
   const actorPrincipalId = `northstar-boot:${config.workspaceId}`;
-  const provisioning = await provisionConfiguredDataset({
-    pool: endpoints.app.pool,
-    workspaceId: config.workspaceId,
-    actorPrincipalId,
-    env: resolved,
-  });
+  const provisioning = demoSession
+    ? { status: 'ALREADY_PROVISIONED' as const, datasetKey: demoSession.datasetKey, contentHash: demoSession.contentHash }
+    : await provisionConfiguredDataset({
+      pool: endpoints.app.pool,
+      workspaceId: config.workspaceId,
+      actorPrincipalId,
+      env: resolved,
+    });
   if (provisioning.status === 'MATERIALIZED') {
     console.log(
       `[atlas] provisioned dataset ${provisioning.datasetKey} ` +
@@ -150,12 +175,15 @@ export async function composeTargetBoot(
     );
   } else if (provisioning.status === 'ALREADY_PROVISIONED') {
     console.log(
-      `[atlas] dataset ${provisioning.datasetKey} already provisioned ` +
-        `content=${provisioning.contentHash.slice(0, 16)} — reusing existing state`,
+      demoSession
+        ? `[atlas] demo working clone ${demoSession.workingDatabaseName} `
+          + `dataset=${provisioning.datasetKey} content=${provisioning.contentHash.slice(0, 16)}`
+        : `[atlas] dataset ${provisioning.datasetKey} already provisioned `
+          + `content=${provisioning.contentHash.slice(0, 16)} — reusing existing state`,
     );
   }
   const datasetDirectory = datasetDirectoryFromEnv(resolved);
-  if (datasetDirectory && provisioning.status !== 'NOT_CONFIGURED') {
+  if (!demoSession && datasetDirectory && provisioning.status !== 'NOT_CONFIGURED') {
     const sandboxInputs = await provisionDatasetSandboxInputsIfEnabled({
       pool: endpoints.app.pool,
       uow: () => endpoints.app.unitOfWork(),
@@ -172,11 +200,14 @@ export async function composeTargetBoot(
 
   // Baseline assessments come from the real evaluator, and only for subjects
   // that hold none. A restart against the same database evaluates nothing.
-  const baseline = await runBaselineEvaluation({
-    pool: endpoints.app.pool,
-    workspaceId: config.workspaceId,
-    actorPrincipalId,
-  });
+  // Clone boot already ran baseline on the template.
+  const baseline = demoSession
+    ? { evaluated: 0, verdicts: {} as Record<string, number> }
+    : await runBaselineEvaluation({
+      pool: endpoints.app.pool,
+      workspaceId: config.workspaceId,
+      actorPrincipalId,
+    });
   if (baseline.evaluated > 0) {
     console.log(`[atlas] baseline evaluation assessed ${baseline.evaluated} journeys ${JSON.stringify(baseline.verdicts)}`);
   }
@@ -185,14 +216,17 @@ export async function composeTargetBoot(
   // coverage (approver: authorize; runtime executor: dispatch). Idempotent;
   // never a decision or an approval. See workspaceAuthority.ts for the
   // coverage-at-provisioning limit it reports.
-  const authority = await provisionWorkspaceAuthority({
-    pool: endpoints.app.pool,
-    uow: () => endpoints.app.unitOfWork(),
-    workspaceId: config.workspaceId,
-    actorPrincipalId,
-    now: new Date().toISOString(),
-    operatorAuthSubject: resolved.NORTHSTAR_OPERATOR_AUTH_SUBJECT?.trim() || undefined,
-  });
+  // Clone boot already provisioned authority on the template.
+  const authority = demoSession
+    ? { status: 'ALREADY_PROVISIONED' as const, coverageCount: 0, uncoveredSubjectCount: 0, principals: { operator: 'template', executor: 'template' } }
+    : await provisionWorkspaceAuthority({
+      pool: endpoints.app.pool,
+      uow: () => endpoints.app.unitOfWork(),
+      workspaceId: config.workspaceId,
+      actorPrincipalId,
+      now: new Date().toISOString(),
+      operatorAuthSubject: resolved.NORTHSTAR_OPERATOR_AUTH_SUBJECT?.trim() || undefined,
+    });
   console.log(
     `[atlas] workspace authority ${authority.status} coverage=${authority.coverageCount} ` +
       `operator=${authority.principals.operator} executor=${authority.principals.executor}` +
@@ -478,6 +512,11 @@ export async function composeTargetBoot(
     async close() {
       services.stop();
       await endpoints.close();
+      if (demoSession) {
+        const working = demoSession.workingDatabaseName;
+        clearDemoRuntimeSession();
+        await dropDisposableDatabase(working, DEMO_CLONE_DB_PREFIX).catch(() => undefined);
+      }
     },
   };
 }

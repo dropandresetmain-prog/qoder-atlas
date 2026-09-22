@@ -20,18 +20,30 @@ Close remaining demo/runtime defects for founder video recording:
 
 ## Checkpoint ledger
 
-- [ ] CP-A — Cancellation semantics + Jordan economic proof
-- [ ] CP-B — Shared production baseline clone primitive under `src/`
-- [ ] CP-C — Demo runtime Reset using pristine clone handover
+- [x] CP-A — Cancellation semantics + Jordan economic proof (`29e1ae1`)
+- [x] CP-B/C — Shared production baseline clone primitive + demo Reset pristine-clone handover (this commit)
 - [ ] CP-D — 3x Sarah + Jordan REPLAY founder acceptance
 
-## In progress — CP-A
+## CP-A (done)
 
-Root cause (confirmed): Nuitée `cancelPolicyInfos` positive tier `cancelTime` is when the fee *becomes* effective; `lastFreeCancellationDate` was ignored; planner treated first positive fee as current loss immediately.
+Root cause: Nuitée `cancelTime` = when fee becomes effective; `lastFreeCancellationDate` ignored.
+D3 `12:30Z` before free-cancel `23:59:59Z` → current loss USD 0; scheduled USD 670.77.
+FX: materialize `fx-rates.json` (+ JPY→SGD) into PG so costs compare.
 
-D3 clock `2026-09-29T21:30+09:00` = `12:30Z` is before free-cancel `2026-09-29T23:59:59Z` → current loss USD 0; scheduled exposure USD 670.77.
+## CP-B/C (in progress → commit)
 
-FX gap: `fx-rates.json` (USD→SGD 1.35) was hashed but not materialized into PG `fx_observations` → cost comparison UNAVAILABLE → UI "Cost not compared".
+Architecture:
+- `src/persistence/postgres/databaseTemplateClone.ts` — reusable TEMPLATE primitives
+- `src/persistence/postgres/swappablePool.ts` — atomic pool swap, stable HTTP
+- `src/app/demo/demoBaselineIdentity.ts` — migrations+dataset(+sandbox/research) identity
+- `src/app/demo/demoBaselineClone.ts` — template build once / working clone / reset handover
+- `composeTargetBoot` opens working clone when demo dataset configured
+- `demoReset` prefers clone handover; never delete-before-reprovision on that path
+- `aitFixtureClone.ts` wraps the shared primitive
+
+Measured (light PG proof `a5DemoCloneReset.pgtest.ts`):
+- 3× product Reset: **3499 / 2119 / 2532 ms** (all under 10s)
+- Mutation absent after reset; refused reset leaves working world
 
 ## Do not
 

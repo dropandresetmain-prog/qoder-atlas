@@ -11,6 +11,14 @@ import { createHash, randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { loadPostgresTargetConfig, type PostgresTargetConfig } from '../src/persistence/postgres/config.ts';
 import { createTargetPool, type Pool } from '../src/persistence/postgres/pool.ts';
+import {
+  assertDisposableDatabaseName as assertDisposableDatabaseNamePrimitive,
+  cloneDatabaseFromTemplate,
+  createEmptyDatabase,
+  dropDisposableDatabase,
+  freezeTemplateDatabase,
+  makeDisposableName,
+} from '../src/persistence/postgres/databaseTemplateClone.ts';
 import { runMigrations } from '../src/persistence/postgres/migrate.ts';
 import { loadDataset, type LoadedDataset } from '../src/app/demo/datasetLoader.ts';
 import { provisionDataset } from '../src/app/demo/provisionDataset.ts';
@@ -30,14 +38,6 @@ export const AIT_BUNDLE_DIR = fileURLToPath(
 export const AIT_FIXTURE_DB_PREFIX = 'ns_ait_fx_';
 /** Disposable clone DB prefix. */
 export const AIT_CLONE_DB_PREFIX = 'ns_ait_cl_';
-
-const PROTECTED_DATABASE_NAMES = new Set([
-  'postgres',
-  'template0',
-  'template1',
-  'template_postgis',
-  'northstar_test',
-]);
 
 export type AitWorldMode = 'fresh' | 'clone';
 
@@ -82,15 +82,8 @@ export function assertDisposableDatabaseName(
   databaseName: string,
   kind: 'fixture' | 'clone',
 ): void {
-  if (PROTECTED_DATABASE_NAMES.has(databaseName) || databaseName.startsWith('template')) {
-    throw new Error(`refusing to operate on protected database "${databaseName}"`);
-  }
-  if (kind === 'fixture' && !isAitFixtureDatabaseName(databaseName)) {
-    throw new Error(`fixture database must start with ${AIT_FIXTURE_DB_PREFIX}, got "${databaseName}"`);
-  }
-  if (kind === 'clone' && !isAitCloneDatabaseName(databaseName)) {
-    throw new Error(`clone database must start with ${AIT_CLONE_DB_PREFIX}, got "${databaseName}"`);
-  }
+  const prefix = kind === 'fixture' ? AIT_FIXTURE_DB_PREFIX : AIT_CLONE_DB_PREFIX;
+  assertDisposableDatabaseNamePrimitive(databaseName, prefix);
 }
 
 /** Working pools must never point at the frozen fixture template. */
@@ -109,48 +102,9 @@ function baseConfig(): PostgresTargetConfig {
   return loadPostgresTargetConfig();
 }
 
-function adminPool(): Pool {
-  return createTargetPool(baseConfig());
-}
-
-async function terminateDatabaseBackends(admin: Pool, databaseName: string): Promise<void> {
-  await admin.query(
-    `SELECT pg_terminate_backend(pid)
-       FROM pg_stat_activity
-      WHERE datname = $1
-        AND pid <> pg_backend_pid()`,
-    [databaseName],
-  );
-}
-
-async function createEmptyDatabase(databaseName: string): Promise<void> {
-  const admin = adminPool();
-  try {
-    // Prefer PostGIS template when present; fall back to default template.
-    const templates = await admin.query<{ datname: string }>(
-      `SELECT datname FROM pg_database WHERE datname = 'template_postgis'`,
-    );
-    if (templates.rowCount && templates.rowCount > 0) {
-      await admin.query(`CREATE DATABASE "${databaseName}" TEMPLATE template_postgis`);
-    } else {
-      await admin.query(`CREATE DATABASE "${databaseName}"`);
-    }
-  } finally {
-    await admin.end();
-  }
-}
-
 async function dropDatabase(databaseName: string, kind: 'fixture' | 'clone'): Promise<void> {
-  assertDisposableDatabaseName(databaseName, kind);
-  const admin = adminPool();
-  try {
-    await terminateDatabaseBackends(admin, databaseName);
-    // Clear template flag if set, then drop.
-    await admin.query(`UPDATE pg_database SET datistemplate = false WHERE datname = $1`, [databaseName]).catch(() => undefined);
-    await admin.query(`DROP DATABASE IF EXISTS "${databaseName}" WITH (FORCE)`);
-  } finally {
-    await admin.end();
-  }
+  const prefix = kind === 'fixture' ? AIT_FIXTURE_DB_PREFIX : AIT_CLONE_DB_PREFIX;
+  await dropDisposableDatabase(databaseName, prefix);
 }
 
 /**
@@ -159,17 +113,7 @@ async function dropDatabase(databaseName: string, kind: 'fixture' | 'clone'): Pr
  */
 export async function freezeFixtureDatabase(databaseName: string): Promise<void> {
   assertDisposableDatabaseName(databaseName, 'fixture');
-  const admin = adminPool();
-  try {
-    await terminateDatabaseBackends(admin, databaseName);
-    await admin.query(`REVOKE CONNECT ON DATABASE "${databaseName}" FROM PUBLIC`);
-    const cfg = baseConfig();
-    await admin.query(`REVOKE CONNECT ON DATABASE "${databaseName}" FROM "${cfg.user}"`).catch(() => undefined);
-    // Mark as template so accidental DROP is harder and intent is clear.
-    await admin.query(`UPDATE pg_database SET datistemplate = true WHERE datname = $1`, [databaseName]);
-  } finally {
-    await admin.end();
-  }
+  await freezeTemplateDatabase(databaseName, AIT_FIXTURE_DB_PREFIX);
 }
 
 export async function dropAitFixtureDatabase(databaseName: string): Promise<void> {
@@ -184,9 +128,7 @@ export async function buildAitFixtureDatabase(options?: {
   databaseName?: string;
   runBaseline?: boolean;
 }): Promise<AitFixtureHandle> {
-  const databaseName =
-    options?.databaseName ??
-    `${AIT_FIXTURE_DB_PREFIX}${randomUUID().replace(/-/g, '').slice(0, 16)}`;
+  const databaseName = options?.databaseName ?? makeDisposableName(AIT_FIXTURE_DB_PREFIX);
   assertDisposableDatabaseName(databaseName, 'fixture');
   const runBaseline = options?.runBaseline !== false;
   const workspaceId = AIT_FIXTURE_WORKSPACE_ID;
@@ -261,21 +203,15 @@ export async function cloneAitFixtureDatabase(
       `clone source must be an AiT fixture (${AIT_FIXTURE_DB_PREFIX}*), got "${fixtureDatabaseName}"`,
     );
   }
-  const databaseName =
-    options?.databaseName ??
-    `${AIT_CLONE_DB_PREFIX}${randomUUID().replace(/-/g, '').slice(0, 16)}`;
+  const databaseName = options?.databaseName ?? makeDisposableName(AIT_CLONE_DB_PREFIX);
   assertDisposableDatabaseName(databaseName, 'clone');
   assertWorkingDatabaseNotFixture(databaseName, fixtureDatabaseName);
 
-  const admin = adminPool();
   const started = performance.now();
-  try {
-    // Ensure no backends remain on the fixture (TEMPLATE requires this).
-    await terminateDatabaseBackends(admin, fixtureDatabaseName);
-    await admin.query(`CREATE DATABASE "${databaseName}" TEMPLATE "${fixtureDatabaseName}"`);
-  } finally {
-    await admin.end();
-  }
+  await cloneDatabaseFromTemplate(fixtureDatabaseName, databaseName, {
+    sourceRequiredPrefix: AIT_FIXTURE_DB_PREFIX,
+    targetRequiredPrefix: AIT_CLONE_DB_PREFIX,
+  });
   const cloneMs = performance.now() - started;
   const postgresOverrides: Partial<PostgresTargetConfig> = { database: databaseName };
   const pool = createTargetPool({ ...baseConfig(), ...postgresOverrides });
@@ -510,7 +446,7 @@ export async function buildFreshAitBaselineDatabase(): Promise<{
   buildMs: number;
   drop: () => Promise<void>;
 }> {
-  const databaseName = `${AIT_FIXTURE_DB_PREFIX}fresh_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+  const databaseName = makeDisposableName(`${AIT_FIXTURE_DB_PREFIX}fresh_`, 12);
   assertDisposableDatabaseName(databaseName, 'fixture');
   const workspaceId = AIT_FIXTURE_WORKSPACE_ID;
   const started = performance.now();

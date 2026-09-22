@@ -38,6 +38,7 @@ import { provisionDatasetSandboxInputsIfEnabled } from './sandboxExecutionInputs
 import { runBaselineEvaluation } from './baselineEvaluation.ts';
 import { provisionWorkspaceAuthority } from '../target/workspaceAuthority.ts';
 import { tryAcquireWorkspaceOperationLease } from '../target/workspaceOperationLease.ts';
+import { getDemoRuntimeSession, resetOntoPristineClone } from './demoBaselineClone.ts';
 
 /**
  * Tables that carry `workspace_id` but are NOT demo-mutated world state:
@@ -208,6 +209,42 @@ async function runReset(params: DemoResetParams, env: NodeJS.ProcessEnv): Promis
     timingsMs[phase] = t - phaseStart;
     phaseStart = t;
   };
+
+  // Prefer pristine PostgreSQL TEMPLATE clone handover when the demo runtime
+  // session is open. Never delete the current world before a replacement clone
+  // exists and the live pool has swapped onto it.
+  if (getDemoRuntimeSession()) {
+    const lease = await tryAcquireWorkspaceOperationLease(pool, workspaceId);
+    if (!lease) {
+      return { status: 'IN_PROGRESS', code: 'RESET_IN_PROGRESS', message: 'A reset or external execution cycle is already running for this workspace.' };
+    }
+    try {
+      mark('lock');
+      const external = await findExternalExecutionResetBlocker(lease.client, workspaceId);
+      if (external) {
+        return {
+          status: 'REFUSED',
+          code: 'EXTERNAL_EXECUTION_HISTORY_PRESENT',
+          message: `Reset is unavailable: ${external.capabilityRef} has durable external execution state (${external.status}). Reconcile and retain the workspace for audit.`,
+        };
+      }
+    } finally {
+      // Release before the clone swap — the lease client belongs to the old DB.
+      await lease.release();
+    }
+    const cloneReset = await resetOntoPristineClone({ env });
+    mark('cloneHandover');
+    return {
+      status: 'RESET',
+      workspaceId,
+      tables: cloneReset.tables,
+      deletedRows: 0,
+      provisioning: cloneReset.provisioning,
+      baselineEvaluated: 0,
+      authority: cloneReset.authority,
+      timingsMs: { ...timingsMs, ...cloneReset.timingsMs },
+    };
+  }
 
   const lease = await tryAcquireWorkspaceOperationLease(pool, workspaceId);
   if (!lease) {
