@@ -17,6 +17,7 @@ import { renderFormEnhancementScript } from './interaction.ts';
 import { renderProgrammeChangeEnhancementScript } from './programme-change-interaction.ts';
 import { renderCaseResolutionEnhancementScript } from './case-resolution-interaction.ts';
 import { renderShellRuntimeScript } from './shellRuntime.ts';
+import { renderDemoConsolePopoverScript, DEFAULT_TRIGGER_DELAY_SECONDS } from './demoConsolePopover.ts';
 
 export type NavTarget = 'dashboard' | 'programme' | 'case' | 'decisions' | 'activity' | 'traveller';
 
@@ -58,8 +59,9 @@ export interface PageOptions {
    */
   resetDemo?: boolean;
   /**
-   * Faint Demo Console link (opens `/demo/control` in a new tab). Only when
-   * the demo/reset gate is open — same gate as resetDemo.
+   * Faint Demo Console top-bar control. Opens an anchored popover (same
+   * `/api/v2/demo/*` endpoints as the standalone `/demo/control` fallback
+   * page) instead of navigating away. Only when the demo/reset gate is open.
    */
   demoConsole?: boolean;
   /** Back link rendered above the page body (`renderBackLink`). */
@@ -87,6 +89,9 @@ export function renderPage(options: PageOptions, bodyHtml: string): string {
   const shellRuntime = isOperator
     ? renderShellRuntimeScript({ intervalMs: options.active === 'dashboard' ? 2000 : 4000 })
     : '';
+  const demoConsoleRuntime = isOperator && options.demoConsole
+    ? renderDemoConsolePopoverScript()
+    : '';
   const backLink = options.backLink
     ? `<div class="shell shell-back">${renderBackLink(options.backLink.label, options.backLink.href)}</div>`
     : '';
@@ -108,6 +113,7 @@ ${caseResolutionScript}
 ${renderFormEnhancementScript()}
 ${isOperator ? renderProfileMenuScript() : ''}
 ${shellRuntime}
+${demoConsoleRuntime}
 </body>
 </html>`;
 }
@@ -130,8 +136,39 @@ const SHELL_CSS = `
 .reset-demo-btn:disabled, [data-action]:disabled { opacity: .55; cursor: progress; }
 .reset-demo-status, [data-action-status] { font-size: 12px; color: var(--text-soft); }
 [data-action-status]:empty { display: none; }
-.demo-console-link { font-size: 12px; color: var(--text-soft); text-decoration: none; opacity: 0.55; padding: 4px 6px; border-radius: 4px; }
+.demo-console-widget { position: relative; display: inline-flex; }
+.demo-console-link { font: inherit; font-size: 12px; color: var(--text-soft); background: none; border: none; text-decoration: none; opacity: 0.55; padding: 4px 6px; border-radius: 4px; cursor: pointer; }
 .demo-console-link:hover, .demo-console-link:focus-visible { opacity: 0.9; color: var(--text); outline: 1px solid var(--border); outline-offset: 2px; }
+.demo-console-pop { position: absolute; top: calc(100% + 6px); right: 0; z-index: 200; width: 340px; max-width: min(340px, calc(100vw - 24px)); max-height: 80vh; overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18); padding: 14px; font-size: 13px; color: var(--text); }
+.demo-console-pop[hidden] { display: none; }
+.demo-console-pop h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-soft); margin: 14px 0 8px; font-weight: 600; }
+.demo-console-pop .dc-pop-head strong { display: block; font-size: 14px; margin-bottom: 2px; }
+.demo-console-pop .dc-note { font-size: 12px; color: var(--text-soft); margin: 0; }
+.demo-console-pop .dc-pending-note { font-size: 12px; color: var(--text-soft); background: rgba(15, 23, 42, 0.05); border-radius: 6px; padding: 6px 8px; margin: 10px 0 0; }
+.demo-console-pop .dc-pending-note[hidden] { display: none; }
+.demo-console-pop .dc-delay-row { display: flex; gap: 12px; }
+.demo-console-pop .dc-delay-opt { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text); }
+.demo-console-pop .dc-group h3 { margin-top: 12px; }
+.demo-console-pop .dc-control { margin: 0 0 8px; }
+.demo-console-pop button[data-demo-console], .demo-console-pop button.dc-reset {
+  font: inherit; font-size: 12px; padding: 6px 10px; border-radius: 6px; width: 100%; text-align: left;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer;
+}
+.demo-console-pop button[data-demo-console]:hover:not(:disabled), .demo-console-pop button.dc-reset:hover:not(:disabled) { background: rgba(15, 23, 42, 0.04); }
+.demo-console-pop button:disabled { opacity: 0.55; cursor: progress; }
+.demo-console-pop button.dc-reset { border-color: #c9a0a0; color: #6b2a2a; }
+.demo-console-pop .dc-status { font-size: 11px; color: var(--text-soft); min-height: 1.1em; margin: 4px 0 0; white-space: pre-wrap; }
+.demo-console-pop .dc-status.is-ok { color: #1f6b3a; }
+.demo-console-pop .dc-status.is-err { color: #8a1f1f; }
+.demo-console-pop .dc-utility { border-top: 1px solid var(--border); padding-top: 10px; }
+.demo-console-pop details { margin-top: 6px; font-size: 11px; color: var(--text-soft); }
+.demo-console-pop pre { margin: 6px 0 0; padding: 8px; background: rgba(15, 23, 42, 0.04); border-radius: 4px; overflow: auto; max-height: 180px; }
+.dc-overlay { position: fixed; top: 72px; right: 16px; z-index: 300; display: flex; align-items: center; gap: 10px; background: rgba(15, 23, 42, 0.92); color: #fff; font-size: 13px; padding: 8px 12px; border-radius: 8px; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.28); }
+.dc-overlay[hidden] { display: none; }
+.dc-overlay.is-ok { background: rgba(31, 107, 58, 0.92); }
+.dc-overlay.is-err { background: rgba(138, 31, 31, 0.92); }
+.dc-overlay-cancel { font: inherit; font-size: 12px; padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.45); background: transparent; color: #fff; cursor: pointer; }
+.dc-overlay-cancel:hover { background: rgba(255, 255, 255, 0.12); }
 `;
 
 /** Closes the profile popover when the operator clicks anywhere outside it. */
@@ -191,7 +228,7 @@ function renderOperatorTopbar(options: PageOptions): string {
     right.push(renderProfileMenu(options.operatorInitials ?? 'A', options.profileResetAction, options.eventName));
   }
   if (options.demoConsole) {
-    right.unshift(`<a class="demo-console-link" data-test="demo-console-link" href="/demo/control" target="_blank" rel="noopener noreferrer" title="Open Demo Console in a new tab">Demo Console</a>`);
+    right.unshift(renderDemoConsoleControl());
   }
   if (options.resetDemo) {
     right.unshift(`<span class="reset-demo" data-test="reset-demo"><button type="button" class="reset-demo-btn" data-action="reset-demo" data-test="reset-demo-btn" title="Return the demo to its starting state">Reset demo</button><span class="reset-demo-status" data-action-status role="status" aria-live="polite"></span></span>`);
@@ -203,6 +240,55 @@ function renderOperatorTopbar(options: PageOptions): string {
   ${nav}
   ${tbRight}
 </header>`;
+}
+
+/**
+ * The faint `Demo Console` top-bar control: a toggle button (no navigation)
+ * plus its anchored popover shell and the persistent top-right countdown
+ * status. Popover content (the configured control catalog, preflight
+ * detail) is filled in by `demoConsolePopover.ts`'s client script from the
+ * same `/api/v2/demo/*` endpoints the standalone `/demo/control` page uses —
+ * this function only emits static chrome, never a second control
+ * implementation.
+ */
+function renderDemoConsoleControl(): string {
+  const delayOptions: Array<{ value: string; label: string }> = [
+    { value: 'off', label: 'Off' },
+    { value: '3', label: '3s' },
+    { value: '5', label: '5s' },
+  ];
+  const delayRadios = delayOptions.map((opt) => `
+        <label class="dc-delay-opt"><input type="radio" name="dc-delay" value="${escapeHtml(opt.value)}" ${opt.value === String(DEFAULT_TRIGGER_DELAY_SECONDS) ? 'checked' : ''}>${escapeHtml(opt.label)}</label>`).join('');
+  return `<div class="demo-console-widget" data-test="demo-console-widget">
+    <button type="button" class="demo-console-link" data-demo-console-toggle data-test="demo-console-toggle" aria-haspopup="true" aria-expanded="false" title="Open the Demo Console">Demo Console</button>
+    <div class="demo-console-pop" data-demo-console-pop data-test="demo-console-pop" role="dialog" aria-label="Demo Console" hidden>
+      <div class="dc-pop-head">
+        <strong>Demo Console</strong>
+        <p class="dc-note">Triggers configured demo inputs through normal product boundaries.</p>
+      </div>
+      <p class="dc-pending-note" data-demo-console-pending-note hidden></p>
+      <section class="dc-delay" data-test="demo-console-pop-delay">
+        <h3>Trigger delay</h3>
+        <div class="dc-delay-row">${delayRadios}</div>
+      </section>
+      <div data-demo-console-controls data-test="demo-console-pop-controls"><p class="dc-note">Loading controls…</p></div>
+      <section class="dc-utility" data-test="demo-console-pop-preflight">
+        <h3>Demo readiness</h3>
+        <button type="button" data-demo-console="preflight" data-test="demo-console-pop-preflight-btn">Run preflight</button>
+        <p class="dc-status" data-demo-console-status="preflight" role="status" aria-live="polite"></p>
+        <details data-test="demo-console-pop-preflight-detail"><summary>Detailed checks</summary><pre data-demo-console-detail="preflight"></pre></details>
+      </section>
+      <section class="dc-utility dc-reset-section" data-test="demo-console-pop-reset">
+        <h3>Demo state</h3>
+        <button type="button" class="dc-reset" data-action="reset-demo" data-test="demo-console-pop-reset-btn" title="Return the demo to its starting state">Reset demo</button>
+        <p class="dc-status" data-action-status role="status" aria-live="polite"></p>
+      </section>
+    </div>
+    <div class="dc-overlay" data-demo-console-overlay data-test="demo-console-overlay" role="status" aria-live="polite" hidden>
+      <span data-demo-console-overlay-text></span>
+      <button type="button" class="dc-overlay-cancel" data-demo-console-overlay-cancel data-test="demo-console-overlay-cancel">Cancel</button>
+    </div>
+  </div>`;
 }
 
 /**
