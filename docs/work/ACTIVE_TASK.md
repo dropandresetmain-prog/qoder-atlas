@@ -63,7 +63,9 @@ Recommendation glance: Changes prefers the programme window the option moves. Pr
 
 Overview and Case HTML now load the durable activity feed into the compact rail. The recommendation’s “Directly affected” step uses the projected blast radius, and the wider reassessment list stays behind “View all trip checks”. Active-change framing is centered so the affected traveller stays in the incident box.
 
-Still open on this pass: staged Sarah progression, three fresh-world Sarah repeats, founder process must set `NORTHSTAR_SYNTHETIC_SANDBOX_INPUTS=1` before reset, remaining hero copy, reset profiling, physical browser QC.
+The airline demo control now displaces the original bookings, waits at the demo boundary so a polling overview can show “Checking the impact…”, then applies the replacement. A shared service with pending reassessment from that signal reads as changed. The production Overview no longer renders “Apply simulated airline update”; the endpoint remains. Status chips have more internal padding.
+
+Still open on this pass: three fresh-world Sarah browser runs, Jordan D1–D3 overnight recommendation on a reset with the sandbox marker, reset profiling, physical browser QC.
 
 Do not reopen the hotel penalty amount or the graph colour rule. The comparator change above is the founder-QC economics fix; it does not reopen RC-6.
 

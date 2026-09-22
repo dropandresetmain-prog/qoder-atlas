@@ -1651,7 +1651,27 @@ async function loadOperatorOverviewFactsInner(
              OR (COALESCE(s.actual_departure, s.estimated_departure) IS NOT NULL
               AND s.published_departure IS NOT NULL
               AND COALESCE(s.actual_departure, s.estimated_departure) IS DISTINCT FROM s.published_departure)
-             OR EXISTS (SELECT 1 FROM active_service_changes changed_service WHERE changed_service.subject_id = s.id)) AS changed
+             OR EXISTS (SELECT 1 FROM active_service_changes changed_service WHERE changed_service.subject_id = s.id)
+             OR EXISTS (
+               SELECT 1
+                 FROM signal_subjects pending_subject
+                 JOIN scheduled_reassessments pending_work
+                   ON pending_work.workspace_id = pending_subject.workspace_id
+                  AND pending_work.change_signal_id = pending_subject.change_signal_id
+                  AND pending_work.state IN ('PENDING', 'CLAIMED')
+                  AND pending_work.subject_kind = 'JOURNEY'
+                 JOIN journey_items pending_item
+                   ON pending_item.workspace_id = pending_subject.workspace_id
+                  AND pending_item.journey_id = pending_work.subject_id
+                  AND pending_item.lifecycle_status <> 'DROPPED'
+                 JOIN transport_item_details pending_transport
+                   ON pending_transport.workspace_id = pending_item.workspace_id
+                  AND pending_transport.journey_item_id = pending_item.id
+                  AND pending_transport.selected_service_id = s.id
+                WHERE pending_subject.workspace_id = s.workspace_id
+                  AND pending_subject.subject_kind = 'TRANSPORT_SERVICE'
+                  AND pending_subject.subject_id = s.id
+             )) AS changed
        FROM journey_items ji
        JOIN transport_item_details td ON td.workspace_id = ji.workspace_id AND td.journey_item_id = ji.id
        JOIN transport_services s ON s.workspace_id = td.workspace_id AND s.id = td.selected_service_id

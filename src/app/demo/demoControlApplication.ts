@@ -187,7 +187,14 @@ async function applyConfiguredAirlineRebooking(
     uow: deps.uow,
     pool: deps.pool,
   };
-  const ingress = await acceptProviderDisruptionDemoEvent(commandCtx, event);
+  const ingress = await acceptProviderDisruptionDemoEvent(commandCtx, event, {
+    // One public trigger, two provider facts. The pause is only so a polling
+    // overview can show the displaced service while reassessment is still
+    // pending. It is not part of viability, authority, or execution.
+    afterDisruptionReceived: () => new Promise((resolve) => {
+      setTimeout(resolve, 2500);
+    }),
+  });
   if (!ingress.ok) {
     return {
       ok: false,

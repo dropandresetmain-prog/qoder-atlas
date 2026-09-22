@@ -25,7 +25,6 @@ export function renderProductOperatorOverview(
   options: ProductOperatorOverviewOptions = {},
 ): string {
   const surface = adaptOperatorOverviewToDashboard(view);
-  const airlineConfigured = view.demoIngress?.airlineRebookingConfigured === true;
   const lifecycle = view.populationAssessmentLifecycle;
   const total = overviewCountedTotal(view);
   const organiser = view.eventContext?.organiserLabel;
@@ -46,7 +45,7 @@ export function renderProductOperatorOverview(
   <div class="page-head v5-page-head" data-poll-region="overview-heading">
     <div class="v5-page-head-main">${eyebrow}<h1>${escapeHtml(surface.title)}</h1>
       <p class="sub">What has changed, and where your attention belongs.</p>
-      <p class="sub" data-test="overview-reconciling"${lifecycle.state === 'RECONCILING' ? '' : ' hidden'}>Reconciling changes…</p></div>
+      <p class="sub" data-test="overview-reconciling"${lifecycle.state === 'RECONCILING' ? '' : ' hidden'}>Checking the impact…</p></div>
     <div class="v5-page-head-aside">${eventLine}<div data-poll-region="overview-summary">${surface.summaryHtml}</div></div></div>
   <div class="v5-overview-layout">
     <div class="v5-overview-main">
@@ -72,12 +71,6 @@ export function renderProductOperatorOverview(
         </div>
         <div data-poll-region="overview-roster" aria-label="All participants">${surface.rosterHtml}</div>
       </section>
-      <details class="section" data-test="simulated-airline-update" data-region-key="simulated-airline-update" data-configured="${airlineConfigured ? 'true' : 'false'}">
-        <summary><strong>Simulated airline update</strong></summary>
-        <p class="b-extra">Disclosed demo control: applies the organiser-supplied simulated airline cancellation and rebooking through the normal provider-event boundary.</p>
-        <p data-test="simulated-airline-update-status" data-action-status class="sim-status">${airlineConfigured ? 'Ready. Applying posts a disclosed simulated provider event through the normal HTTP boundary.' : 'Demo trigger not configured on this runtime.'}</p>
-        <button type="button" class="btn" data-test="simulated-airline-update-apply"${airlineConfigured ? '' : ' disabled'}>Apply simulated airline update</button>
-      </details>
     </div>
     <aside class="v5-context-rail" aria-label="Needs attention">
       <h2 class="v5-rail-title">Needs attention <span>${surface.attentionCount} open ${surface.attentionCount === 1 ? 'story' : 'stories'}</span></h2>

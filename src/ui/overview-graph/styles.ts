@@ -16,7 +16,7 @@ export const OVERVIEW_GRAPH_CSS = `
 .og-head { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--line-soft); }
 .og-head h2 { margin: 0; font-size: 16px; letter-spacing: -0.01em; }
 .og-head .og-sub { margin: 2px 0 0; font-size: 12.5px; color: var(--text-soft); }
-.og-live { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 650; color: #1f7a5a; background: #f0faf6; border: 1px solid #bde3d6; }
+.og-live { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; padding: 8px 16px; font-size: 12px; font-weight: 650; line-height: 1.3; color: #1f7a5a; background: #f0faf6; border: 1px solid #bde3d6; }
 .og-live i { width: 8px; height: 8px; border-radius: 50%; background: #1f9d78; box-shadow: 0 0 0 4px rgba(31,157,120,.12); }
 .og-live.is-active { color: #b3323e; background: #fff6f7; border-color: #f2c1c6; }
 .og-live.is-active i { background: #df3b49; box-shadow: 0 0 0 4px rgba(223,59,73,.1); }

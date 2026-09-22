@@ -1,8 +1,8 @@
 /// <reference lib="dom" />
 /**
  * R4-F1 (C) — the V7.2 Event Overview graph must never intercept clicks meant
- * for the page: the sticky shell header (nav, Reset demo), the graph's own
- * toolbar, and the `Apply simulated airline update` control below it.
+ * for the page: the sticky shell header (nav, Reset demo) and the graph's own
+ * toolbar. The production overview does not render the old airline trigger.
  *
  * Real Chromium, real shell + overview renderer, no database. For every scroll
  * position (so the graph passes UNDER the sticky header, the original defect)
@@ -90,8 +90,6 @@ test.after(async () => {
 });
 
 const CONTROLS = [
-  '[data-test="simulated-airline-update-apply"]',
-  '[data-test="simulated-airline-update"] > summary',
   '[data-action="reset-demo"]',
   'header nav a',
   '.og-toolbar button',
@@ -169,7 +167,6 @@ for (const mode of ['collapsed', 'expanded'] as const) {
     try {
       await page.goto(baseUrl);
       await page.addStyleTag({ content: 'html{scroll-behavior:auto!important}' });
-      await page.evaluate(() => { (document.querySelector('[data-test="simulated-airline-update"]') as HTMLDetailsElement).open = true; });
       assert.ok(await page.locator('.og-viewport').count() > 0, 'event overview graph rendered');
       if (mode === 'expanded') await page.locator('.og-toolbar button[aria-label="Expand graph"]').click();
       const problems = await sweep(page);
@@ -198,13 +195,12 @@ for (const [name, viewport, expand] of [
   });
 }
 
-test('Apply and Reset actually receive a real click (not just hit-test)', async (t) => {
+test('Reset and navigation actually receive a real click (not just hit-test)', async (t) => {
   if (skipReason || !browser) { t.skip(skipReason ?? 'no browser'); return; }
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   try {
     await page.goto(baseUrl);
     await page.evaluate(() => {
-      (document.querySelector('[data-test="simulated-airline-update"]') as HTMLDetailsElement).open = true;
       const seen: string[] = [];
       (window as unknown as { __clicks: string[] }).__clicks = seen;
       document.addEventListener('click', (e) => {
@@ -217,9 +213,8 @@ test('Apply and Reset actually receive a real click (not just hit-test)', async 
     await page.evaluate(() => { const vp = document.querySelector('.og-viewport')!; window.scrollBy(0, vp.getBoundingClientRect().top - 10); });
     await page.locator('[data-action="reset-demo"]').click({ timeout: 3000 });
     await page.locator('header nav a', { hasText: 'Programme' }).click({ timeout: 3000 });
-    await page.locator('[data-test="simulated-airline-update-apply"]').click({ timeout: 3000 });
     const seen = await page.evaluate(() => (window as unknown as { __clicks: string[] }).__clicks);
-    assert.deepEqual(seen, ['reset-demo-btn', 'A', 'simulated-airline-update-apply']);
+    assert.deepEqual(seen, ['reset-demo-btn', 'A']);
   } finally {
     await page.close();
   }

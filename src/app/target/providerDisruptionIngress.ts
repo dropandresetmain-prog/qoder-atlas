@@ -287,9 +287,19 @@ export function canonicalDisruptionEventHash(event: TransportServiceCancelledWit
   return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
 }
 
+export interface ProviderDisruptionApplyOptions {
+  /**
+   * Demo-boundary seam. Invoked after the original bookings are displaced and
+   * before the replacement service is created, and only when that replacement
+   * does not already exist. Domain recovery does not wait here.
+   */
+  afterDisruptionReceived?: () => Promise<void>;
+}
+
 export async function acceptProviderDisruptionDemoEvent(
   ctx: TargetCommandContext,
-  event: ProviderDisruptionEvent
+  event: ProviderDisruptionEvent,
+  options: ProviderDisruptionApplyOptions = {},
 ): Promise<ProviderDisruptionResult> {
   try {
     // F3/F6: schema-validate the whole event BEFORE any work — invalid
@@ -702,6 +712,12 @@ export async function acceptProviderDisruptionDemoEvent(
 
         cancelledLineIds.push(line.id);
       }
+    }
+
+    // The replacement is a later provider fact. A demo caller may let the
+    // displaced original settle on screen before that fact is applied.
+    if (options.afterDisruptionReceived && existingReplacementService.rows.length === 0) {
+      await options.afterDisruptionReceived();
     }
 
     // Step 5: Create replacement transport service (F5: identity is minted

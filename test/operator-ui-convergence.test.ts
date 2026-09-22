@@ -69,8 +69,8 @@ test('Overview case navigation dominates and the full searchable population rema
   assert.doesNotMatch(html, /Open case →Show interaction/);
   assert.equal((html.match(/data-test="population-row"[^>]*data-journey-ref=/g) ?? []).length, 12);
   assert.equal((html.match(/data-test="population-row" hidden[^>]*data-journey-ref=/g) ?? []).length, 2);
-  assert.ok(html.indexOf('data-test="simulated-airline-update"') < html.indexOf('data-poll-region="overview-attention"'),
-    'demo control stays in the main column; Needs attention lives in the sticky rail after it');
+  assert.equal(html.includes('data-test="simulated-airline-update-apply"'), false,
+    'the production overview no longer carries the obsolete airline trigger; Demo Console owns it');
   const graphAt = html.indexOf('data-test="event-overview-graph"');
   const attentionAt = html.indexOf('data-poll-region="overview-attention"');
   const summaryAt = html.indexOf('data-poll-region="overview-summary"');
