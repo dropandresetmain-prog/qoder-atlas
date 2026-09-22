@@ -21,8 +21,16 @@ Close remaining demo/runtime defects for founder video recording:
 ## Checkpoint ledger
 
 - [x] CP-A — Cancellation semantics + Jordan economic proof (`29e1ae1`)
-- [x] CP-B/C — Shared production baseline clone primitive + demo Reset pristine-clone handover (this commit)
-- [ ] CP-D — 3x Sarah + Jordan REPLAY founder acceptance
+- [x] CP-B/C — Shared production baseline clone primitive + demo Reset pristine-clone handover (`17f62f9`)
+- [x] CP-D runtime unblock — wall-time authority grants + INPUT_CHANGED claim under CONTROLLED (`b6651b9`, `2df12e4`)
+- [ ] CP-D — 3x Sarah + Jordan REPLAY founder acceptance (in progress)
+
+## CP-D notes
+
+- Product Reset: `CLONE_FROM_TEMPLATE`, measured ~4.6–7.8s HTTP
+- GRANT_MISSING root cause: grants issued wall Sep 22 invisible under CONTROLLED Sep 21 — fixed in storedExecutionGate (authorityNow = wall)
+- Sarah EXECUTING stall: INPUT_CHANGED reassess retries with attempts>0 + wall next_run_at never claimed under CONTROLLED — fixed in pgAssessments.claim
+- Open-case inspection: healthy travellers RESOLVED; not five OPEN actionable cases
 
 ## CP-A (done)
 
