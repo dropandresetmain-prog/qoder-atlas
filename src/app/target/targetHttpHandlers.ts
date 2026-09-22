@@ -207,7 +207,8 @@ async function serveCase(ctx: TargetHttpContext, res: ServerResponse, url: URL, 
     // The shell carries the event name, open-decision count and Reset demo on
     // the Case page too; the Back link itself is rendered by the case screen
     // (renderBackLink) inside its page head.
-    sendHtml(res, 200, renderInShell('case', 'Recovery case', await pageChrome(ctx), renderProductRecoveryCase(view)));
+    const activity = await loadActivityFeed(ctx.app.pool, ctx.app.workspaceId).catch(() => undefined);
+    sendHtml(res, 200, renderInShell('case', 'Recovery case', await pageChrome(ctx), renderProductRecoveryCase(view, { activity })));
   } else {
     sendJson(res, 200, view);
   }
@@ -313,10 +314,11 @@ export async function handleTargetProductHttp(
         // The shell's own chrome, not a second one: brand, event context and
         // the nav the operator navigates with. The decision count is the
         // read model's own `decisionRequired` total.
+        const activity = await loadActivityFeed(ctx.app.pool, ctx.app.workspaceId).catch(() => undefined);
         sendHtml(
           res,
           200,
-          renderInShell('dashboard', 'Operations overview', shellContext(view), renderProductOperatorOverview(view)),
+          renderInShell('dashboard', 'Operations overview', shellContext(view), renderProductOperatorOverview(view, { activity })),
         );
       } else {
         sendJson(res, 200, view);

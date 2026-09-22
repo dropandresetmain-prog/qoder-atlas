@@ -108,17 +108,13 @@ export const OVERVIEW_GRAPH_SCRIPT = `
       // scale, which would make "Active change" the wider of the two views and
       // invert what the toggle means.
       var contextMargin = st.mode === 'focus' || st.view === 'change' ? 32 : 0;
-      var frame = fitOverviewCamera(box, rect.width, rect.height, top, bottom, st.expanded ? 24 : 12, st.mode === 'focus' ? 1.3 : 1.15, st.view === 'change' ? 'start' : 'center', contextMargin);
+      var frame = fitOverviewCamera(box, rect.width, rect.height, top, bottom, st.expanded ? 24 : 12, st.mode === 'focus' ? 1.3 : 1.15, 'center', contextMargin);
       if (!frame) return false;
       st.x = frame.x; st.y = frame.y; st.scale = frame.scale; st.fitted = true; st.frameSignature = signature;
       apply(animate); return true;
     }
     function syncPulses() {
-      pulses.forEach(function (p) {
-        var mp = p.querySelector('mpath'), href = mp && mp.getAttribute('href');
-        var edge = href ? edges.find(function (e) { return e.id === href.slice(1); }) : null;
-        if (edge) p.classList.toggle('og-dim', edge.classList.contains('og-dim'));
-      });
+      alignPulses(canvas);
     }
     function clearSelection() {
       st.selected = null;

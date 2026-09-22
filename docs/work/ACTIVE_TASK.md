@@ -61,7 +61,9 @@ Graph/read-model: a reprotection’s arrival card uses the original service’s 
 
 Recommendation glance: Changes prefers the programme window the option moves. Protects names the people whose verdict moves from not-passing to passing, not the first programme check that already passed. Passing commitment checks stay behind “View all trip checks”.
 
-Still open on this pass: staged Sarah progression, three fresh-world Sarah repeats, Jordan research composition from canonical passport/visit/stay, activity feed, remaining hero copy, reset profiling, physical browser QC.
+Overview and Case HTML now load the durable activity feed into the compact rail. The recommendation’s “Directly affected” step uses the projected blast radius, and the wider reassessment list stays behind “View all trip checks”. Active-change framing is centered so the affected traveller stays in the incident box.
+
+Still open on this pass: staged Sarah progression, three fresh-world Sarah repeats, synthetic passport provisioning, remaining hero copy, reset profiling, physical browser QC.
 
 Do not reopen the hotel penalty amount or the graph colour rule. The comparator change above is the founder-QC economics fix; it does not reopen RC-6.
 

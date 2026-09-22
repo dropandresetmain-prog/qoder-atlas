@@ -3,12 +3,13 @@
  * disclosures preserve full evidence. Graph state and native disclosures
  * survive refresh. Stops before consequential A4 work.
  */
-import type { PlanningCandidateView, RecoveryCaseView, RecoveryStrategyView } from '../../contracts/v2/product/readModels.ts';
+import type { ActivityFeed, PlanningCandidateView, RecoveryCaseView, RecoveryStrategyView } from '../../contracts/v2/product/readModels.ts';
 import { executionBlockerLine, executionBlockerShort, presentCaseWorkspace, type CaseRow, type CaseWorkspaceModel } from '../../app/target/adapters/caseWorkspacePresenter.ts';
 import { SHELL_LINKS } from '../../app/target/productShell.ts';
 import { CASE_COPY, CASE_CHANGE_TYPE_SENTENCE, CASE_REASON_SENTENCE } from '../copy.ts';
 import { escapeHtml, formatInstant } from '../html.ts';
 import { renderFocusedCaseGraph } from '../graph/index.ts';
+import { renderCompactActivityRail } from './product-activity-feed.ts';
 import { buildOriginalCurrentRegion, originalCurrentToggleScript } from '../originalCurrent.ts';
 import { casePollingScript } from '../casePolling.ts';
 import { OPERATOR_WORKSPACE_STYLES } from '../operatorWorkspaceStyles.ts';
@@ -227,7 +228,13 @@ function glanceChangesCell(strategy: RecoveryStrategyView, candidate: PlanningCa
   return 'Not supplied';
 }
 
-function glanceProtectsCell(strategy: RecoveryStrategyView): string {
+function glanceProtectsCell(strategy: RecoveryStrategyView, candidate: PlanningCandidateView | undefined): string {
+  const affected = candidate?.blastRadius?.directlyAffected ?? [];
+  if (affected.length > 0) {
+    const names = affected.slice(0, 2).map((item) => decisionText(item.label, 'Affected')).join(', ');
+    const more = affected.length > 2 ? `<span class="v5-glance-sub">+${affected.length - 2} more</span>` : '';
+    return `${e(names)}${more}`;
+  }
   const repaired = strategy.resolves.filter((person) => person.currentVerdict !== 'PASS' && person.projectedVerdict === 'PASS');
   if (repaired.length === 0) return 'No failing outcome recorded';
   const names = repaired.slice(0, 2).map((person) => decisionText(person.personLabel, 'Traveller')).join(', ');
@@ -246,10 +253,33 @@ function glanceBlockedByCell(strategy: RecoveryStrategyView): string {
   return e(executionBlockerShort(strategy.executionBlocker));
 }
 
+function changeStepHtml(strategy: RecoveryStrategyView, candidate: PlanningCandidateView | undefined): string {
+  const moves = strategy.changes.map((change) => changeSummary(change)).filter((line) => line.length > 0);
+  const proposal = candidate?.proposal;
+  const hasItinerary = (proposal?.flights.length ?? 0) + (proposal?.stays.length ?? 0) > 0;
+  const itinerary = hasItinerary ? proposalHtml(candidate, { parts: 'itinerary' }) : '';
+  if (moves.length === 0) return itinerary || proposalHtml(candidate, { parts: 'itinerary' });
+  return `${list(moves)}${itinerary}`;
+}
+
+function affectedStepHtml(candidate: PlanningCandidateView | undefined): string {
+  const blast = candidate?.blastRadius;
+  if (!blast) return proposalHtml(candidate, { parts: 'commitments', timingDisclosure: true });
+  const lines = [
+    ...blast.changed.map((item) => `Changes ${decisionText(item.label, 'a recorded item')}`),
+    ...blast.directlyAffected.map((item) => decisionText(item.label, 'Directly affected')),
+  ];
+  const primary = lines.length ? list(lines) : '<p class="cw-muted">No direct change was recorded for this option.</p>';
+  const rest = blast.reassessed.length
+    ? details(`trip-checks-${candidate?.candidateKey ?? 'option'}`, `View all trip checks (${blast.reassessed.length})`, list(blast.reassessed.map((item) => decisionText(item.label, 'Rechecked'))))
+    : '';
+  return `${primary}${rest}`;
+}
+
 function recommendationGlanceHtml(strategy: RecoveryStrategyView, candidate: PlanningCandidateView | undefined): string {
   return `<dl class="v5-rec-glance">
     <div class="v5-glance-cell"><dt>Changes</dt><dd>${glanceChangesCell(strategy, candidate)}</dd></div>
-    <div class="v5-glance-cell"><dt>Protects</dt><dd>${glanceProtectsCell(strategy)}</dd></div>
+    <div class="v5-glance-cell"><dt>Protects</dt><dd>${glanceProtectsCell(strategy, candidate)}</dd></div>
     <div class="v5-glance-cell"><dt>Costs</dt><dd>${glanceCostsCell(candidate)}</dd></div>
     <div class="v5-glance-cell"><dt>Blocked by</dt><dd>${glanceBlockedByCell(strategy)}</dd></div>
   </dl>`;
@@ -276,8 +306,8 @@ function recommendationHtml(view: RecoveryCaseView): string {
       <p class="v5-rec-verdict">${e(recommendationVerdict(strategy))}</p>
     </div>
     ${recommendationGlanceHtml(strategy, candidate)}
-    <section class="v5-rec-step" data-step="1"><h4>What changes</h4>${proposalHtml(candidate, { parts: 'itinerary' })}</section>
-    <section class="v5-rec-step" data-step="2"><h4>What it protects</h4>${proposalHtml(candidate, { parts: 'commitments', timingDisclosure: true })}</section>
+    <section class="v5-rec-step" data-step="1"><h4>What changes</h4>${changeStepHtml(strategy, candidate)}</section>
+    <section class="v5-rec-step" data-step="2"><h4>Directly affected</h4>${affectedStepHtml(candidate)}</section>
     <section class="v5-rec-step" data-step="3"><h4>Why this one</h4>
       <div class="cw-block">${list(reasons)}
         <p class="cw-muted">${strategy.projectedSummary.pass} passed · ${strategy.projectedSummary.fail} failed · ${strategy.projectedSummary.unknown} unconfirmed across ${strategy.projectedSummary.total} assessed item${strategy.projectedSummary.total === 1 ? '' : 's'}.</p>
@@ -457,6 +487,13 @@ function recommendSheet(view: RecoveryCaseView): string {
     <h2>${e(title)}</h2>
     <a class="btn btn-primary" href="#cw-recommendation">Review recommendation →</a></section>`;
 }
+function caseActivityRail(view: RecoveryCaseView, feed: ActivityFeed | undefined, m: CaseWorkspaceModel): string {
+  if (!feed) return compactActivity(m);
+  const matched = feed.entries.filter((entry) => entry.caseRef === view.caseRef);
+  const scoped = matched.length > 0 ? { ...feed, entries: matched } : feed;
+  return renderCompactActivityRail(scoped, { limit: 4, logHref: SHELL_LINKS.activity });
+}
+
 function compactActivity(m: CaseWorkspaceModel): string {
   const rows = m.activity.rows.slice(0, 4);
   const body = rows.length
@@ -480,7 +517,7 @@ function wholeTripFoot(view: RecoveryCaseView): string {
   return `<div class="v5-trip-foot" data-test="whole-trip-state" data-trip-verdict="${e(verdict)}"><span>Whole trip</span><strong class="tone-${presented.tone}">${e(label)}</strong></div>`;
 }
 
-export function renderProductRecoveryCase(view: RecoveryCaseView): string {
+export function renderProductRecoveryCase(view: RecoveryCaseView, options: { readonly activity?: ActivityFeed } = {}): string {
   const m = presentCaseWorkspace(view);
   const attrs = `data-case-ref="${e(view.caseRef)}" data-case-status="${e(view.status)}" data-case-phase="${m.phase}" data-projection-revision="${e(String(view.change.projectionRevision))}"${view.change.changeCursor ? ` data-change-cursor="${e(view.change.changeCursor)}"` : ''}`;
   const optionsRegion = `<div data-test="recovery-controls" data-case-ref="${e(view.caseRef)}">
@@ -513,7 +550,7 @@ export function renderProductRecoveryCase(view: RecoveryCaseView): string {
       <aside class="v5-case-rail case-decision-rail" aria-label="Decision">
         ${recommendSheet(view)}
         ${region('approval', approvalHtml(view, m), 'cw-poll-approval')}
-        ${compactActivity(m)}
+        ${caseActivityRail(view, options.activity, m)}
         ${wholeTripFoot(view)}
       </aside>
     </div>
