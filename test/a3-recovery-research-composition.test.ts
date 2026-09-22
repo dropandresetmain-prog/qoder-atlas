@@ -29,6 +29,8 @@ test('explicit source configuration composes read-only HOTEL and rejects duplica
       passportSelections: [selection],
     };
     assert.equal(RecoveryResearchConfigurationSchema.safeParse({ ...config, passportSelections: [selection, selection] }).success, false);
+    const withoutIds = { ...selection, credentialId: undefined, credentialVersionId: undefined };
+    assert.equal(RecoveryResearchConfigurationSchema.safeParse({ ...config, passportSelections: [withoutIds] }).success, true);
     assert.equal(RecoveryResearchConfigurationSchema.safeParse({ ...config, passportSelections: [] }).success, false);
     const configurationFile = join(directory, 'research.json');
     await writeFile(configurationFile, JSON.stringify(config));

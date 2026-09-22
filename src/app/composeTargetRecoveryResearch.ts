@@ -11,7 +11,7 @@ import { HotelPropertyPolicySchema } from '../resolution/planning/hotelPropertyP
 import { ReviewedEntryPolicySchema } from '../resolution/planning/reviewedEntryEvidence.ts';
 import { composeTargetHotelResearch } from './targetHotelResearch.ts';
 import { createTargetRecoveryContextPreparer } from './targetRecoveryContext.ts';
-import { createStayReplacementContextResolver } from './targetStayReplacementContext.ts';
+import { createStayReplacementContextResolver, type StayReplacementBinding } from './targetStayReplacementContext.ts';
 import { PlanningToolProvenanceSchema } from '../contracts/v2/planning/planningTool.ts';
 
 const SourceRef = (kind: string) => z.string().regex(new RegExp(`^SOURCE_${kind}:\\S+$`));
@@ -29,20 +29,20 @@ export const RecoveryResearchConfigurationSchema = z.strictObject({
   })).min(1).max(8),
   passportSelections: z.array(z.strictObject({
     travellerSourceRef: SourceRef('TRAVELLER_DRAFT'),
-    credentialId: z.uuid(),
-    credentialVersionId: z.uuid(),
+    credentialId: z.uuid().optional(),
+    credentialVersionId: z.uuid().optional(),
     guestNationality: z.string().regex(/^[A-Z]{2}$/),
   })).min(1).max(32),
   existingVisitTargets: z.array(z.strictObject({
     visitSourceRef: SourceRef('INTENDED_VISIT'),
-    visitId: z.uuid(),
+    visitId: z.uuid().optional(),
     jurisdictionSourceRef: SourceRef('JURISDICTION'),
     entryPolicyId: z.string().min(1),
     countryCode: z.string().regex(/^[A-Z]{2}$/),
   })).max(8).optional(),
   stayReplacementBinding: z.strictObject({
-    reservationId: z.uuid(),
-    reservationLineId: z.uuid(),
+    reservationId: z.uuid().optional(),
+    reservationLineId: z.uuid().optional(),
     stayElementId: z.string().min(1),
     propertyExternalRef: z.strictObject({ system: z.string().min(1), value: z.string().min(1) }),
     areaSearch: z.strictObject({
@@ -50,9 +50,13 @@ export const RecoveryResearchConfigurationSchema = z.strictObject({
       longitude: z.number().min(-180).max(180),
       radiusKm: z.number().positive().max(50),
     }).optional(),
-    passport: z.strictObject({ credentialId: z.uuid(), credentialVersionId: z.uuid(), guestNationality: z.string().regex(/^[A-Z]{2}$/) }),
+    passport: z.strictObject({
+      credentialId: z.uuid().optional(),
+      credentialVersionId: z.uuid().optional(),
+      guestNationality: z.string().regex(/^[A-Z]{2}$/),
+    }),
     guests: z.strictObject({ adults: z.number().int().positive(), rooms: z.number().int().positive() }),
-    visitId: z.uuid(),
+    visitId: z.uuid().optional(),
     provenance: PlanningToolProvenanceSchema,
   }).optional(),
 }).superRefine((value, context) => {
@@ -68,6 +72,84 @@ export const RecoveryResearchConfigurationSchema = z.strictObject({
     countries.set(target.jurisdictionSourceRef, target.countryCode);
   }
 });
+
+type ResearchConfiguration = z.infer<typeof RecoveryResearchConfigurationSchema>;
+
+/** Fill reservation, passport and visit ids from source records when a static file cannot name workspace uuids. */
+async function completeStayBinding(
+  pool: Pool,
+  workspaceId: string,
+  configuration: ResearchConfiguration,
+): Promise<StayReplacementBinding | undefined> {
+  const binding = configuration.stayReplacementBinding;
+  if (!binding) return undefined;
+  let reservationId = binding.reservationId;
+  let reservationLineId = binding.reservationLineId;
+  if (!reservationId || !reservationLineId) {
+    const stay = await pool.query<{ reservation_id: string; line_id: string }>(
+      `SELECT rsv.id AS reservation_id, line.id AS line_id
+         FROM external_records er
+         JOIN external_record_links link
+           ON link.workspace_id = er.workspace_id AND link.external_record_id = er.id
+          AND link.canonical_subject_kind = 'RESERVATION' AND link.superseded_at IS NULL
+         JOIN reservations rsv ON rsv.workspace_id = link.workspace_id AND rsv.id = link.canonical_subject_id
+         JOIN reservation_lines line
+           ON line.workspace_id = rsv.workspace_id AND line.reservation_id = rsv.id AND line.product_type = 'STAY'
+        WHERE er.workspace_id = $1 AND er.record_type = 'SOURCE_BOOKING_REFERENCE' AND er.external_id = $2`,
+      [workspaceId, binding.stayElementId],
+    );
+    if (stay.rows.length !== 1) return undefined;
+    reservationId = stay.rows[0]!.reservation_id;
+    reservationLineId = stay.rows[0]!.line_id;
+  }
+  let credentialId = binding.passport.credentialId;
+  let credentialVersionId = binding.passport.credentialVersionId;
+  if (!credentialId || !credentialVersionId) {
+    if (configuration.passportSelections.length !== 1) return undefined;
+    const externalId = configuration.passportSelections[0]!.travellerSourceRef.slice('SOURCE_TRAVELLER_DRAFT:'.length);
+    const passport = await pool.query<{ credential_id: string; version_id: string }>(
+      `SELECT tc.id AS credential_id, tc.current_version_id AS version_id
+         FROM travel_credentials tc
+         JOIN travellers t ON t.workspace_id = tc.workspace_id AND t.id = tc.traveller_id
+         JOIN external_record_links l
+           ON l.workspace_id = t.workspace_id AND l.canonical_subject_kind = 'TRAVELLER'
+          AND l.canonical_subject_id = t.id AND l.superseded_at IS NULL
+         JOIN external_records r ON r.workspace_id = l.workspace_id AND r.id = l.external_record_id
+        WHERE tc.workspace_id = $1 AND tc.kind = 'PASSPORT' AND tc.issuer_country = $2
+          AND r.record_type = 'SOURCE_TRAVELLER_DRAFT' AND r.external_id = $3`,
+      [workspaceId, binding.passport.guestNationality, externalId],
+    );
+    if (passport.rows.length !== 1 || !passport.rows[0]!.version_id) return undefined;
+    credentialId = passport.rows[0]!.credential_id;
+    credentialVersionId = passport.rows[0]!.version_id;
+  }
+  let visitId = binding.visitId;
+  if (!visitId) {
+    const targets = configuration.existingVisitTargets ?? [];
+    if (targets.length !== 1) return undefined;
+    const externalId = targets[0]!.visitSourceRef.slice('SOURCE_INTENDED_VISIT:'.length);
+    const visit = await pool.query<{ id: string }>(
+      `SELECT iv.id
+         FROM intended_visits iv
+         JOIN external_record_links l
+           ON l.workspace_id = iv.workspace_id AND l.canonical_subject_kind = 'JOURNEY'
+          AND l.canonical_subject_id = iv.journey_id AND l.superseded_at IS NULL
+         JOIN external_records r ON r.workspace_id = l.workspace_id AND r.id = l.external_record_id
+        WHERE iv.workspace_id = $1 AND iv.transit_intent = false
+          AND r.record_type = 'SOURCE_INTENDED_VISIT' AND r.external_id = $2`,
+      [workspaceId, externalId],
+    );
+    if (visit.rows.length !== 1) return undefined;
+    visitId = visit.rows[0]!.id;
+  }
+  return {
+    reservationId, reservationLineId, stayElementId: binding.stayElementId,
+    propertyExternalRef: binding.propertyExternalRef,
+    ...(binding.areaSearch ? { areaSearch: binding.areaSearch } : {}),
+    passport: { credentialId, credentialVersionId, guestNationality: binding.passport.guestNationality },
+    guests: binding.guests, visitId, provenance: binding.provenance,
+  };
+}
 
 /** Missing configuration leaves the capability unavailable; malformed configuration fails boot. */
 export async function composeTargetRecoveryResearch(input: {
@@ -147,12 +229,12 @@ export async function composeTargetRecoveryResearch(input: {
         .find((target) => target.jurisdictionSourceRef === `SOURCE_JURISDICTION:${rows.rows[0]!.external_id}`)?.countryCode;
     },
   });
-  const resolveStayReplacement = configuration.stayReplacementBinding
-    ? createStayReplacementContextResolver(configuration.stayReplacementBinding) : undefined;
   return {
     hotel,
     async prepare(context: Parameters<typeof preparer.prepare>[0]) {
       const prepared = await preparer.prepare(context);
+      const binding = await completeStayBinding(input.pool, input.workspaceId, configuration);
+      const resolveStayReplacement = binding ? createStayReplacementContextResolver(binding) : undefined;
       return {
         ...prepared,
         ...(prepared.hotelPlanning && resolveStayReplacement ? {

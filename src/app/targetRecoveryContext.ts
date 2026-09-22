@@ -31,8 +31,12 @@ export interface OvernightTargetConfiguration {
 
 export interface PassportSelectionConfiguration {
   travellerSourceRef: string;
-  credentialId: string;
-  credentialVersionId: string;
+  /**
+   * Canonical passport ids when the caller already has them. When omitted, the
+   * unique passport for this traveller and issuing state is used.
+   */
+  credentialId?: string;
+  credentialVersionId?: string;
   /** Explicit provider nationality input; passport schema deliberately has no inferred nationality field. */
   guestNationality: string;
 }
@@ -40,8 +44,8 @@ export interface PassportSelectionConfiguration {
 /** An existing canonical visit to research; this never creates a visit. */
 export interface ExistingVisitTargetConfiguration {
   visitSourceRef: string;
-  /** Canonical child id supplied by the source materializer; never recomputed here. */
-  visitId: string;
+  /** Canonical child id when already known. When omitted, the journey's single non-transit visit is used. */
+  visitId?: string;
   entryPolicyId: string;
   countryCode: string;
 }
@@ -316,13 +320,24 @@ export class TargetRecoveryContextPreparer {
     for (const configured of this.deps.configuration.passportSelections) {
       const travellerId = await this.resolveAlias(connectionId, configured.travellerSourceRef, 'SOURCE_TRAVELLER_DRAFT', 'TRAVELLER');
       if (!travellerId || selections.has(travellerId) || !Iso2Schema.safeParse(configured.guestNationality).success) continue;
-      const credential = world.credentials.find((candidate) => candidate.id === configured.credentialId
-        && candidate.travellerId === travellerId && candidate.kind === 'PASSPORT');
-      const version = world.credentialVersions.find((candidate) => candidate.id === configured.credentialVersionId
-        && candidate.credentialId === configured.credentialId && candidate.kind === 'PASSPORT');
-      if (!credential || !version || version.issuingStateCode !== configured.guestNationality) continue;
+      const matches = world.credentials.flatMap((credential) => {
+        if (credential.travellerId !== travellerId || credential.kind !== 'PASSPORT') return [];
+        if (configured.credentialId && credential.id !== configured.credentialId) return [];
+        const version = world.credentialVersions.find((candidate) => candidate.kind === 'PASSPORT'
+          && candidate.credentialId === credential.id
+          && (!configured.credentialVersionId || candidate.id === configured.credentialVersionId)
+          && candidate.issuingStateCode === configured.guestNationality);
+        return version ? [{ credential, version }] : [];
+      });
+      if (matches.length !== 1) continue;
+      const { credential, version } = matches[0]!;
       if (!await this.authoritativeNationality(travellerId, configured.guestNationality)) continue;
-      selections.set(travellerId, configured);
+      selections.set(travellerId, {
+        travellerSourceRef: configured.travellerSourceRef,
+        credentialId: credential.id,
+        credentialVersionId: version.id,
+        guestNationality: configured.guestNationality,
+      });
     }
     return selections;
   }
@@ -336,13 +351,17 @@ export class TargetRecoveryContextPreparer {
   private async resolveExistingVisitAlias(
     connectionId: string,
     sourceRef: string,
-    expectedVisitId: string,
+    expectedVisitId: string | undefined,
     world: CapturedWorld,
   ): Promise<WIntendedVisit | undefined> {
     const journeyId = await this.resolveAlias(connectionId, sourceRef, 'SOURCE_INTENDED_VISIT', 'JOURNEY');
     if (!journeyId) return undefined;
-    const visit = world.intendedVisits.find((candidate) => candidate.id === expectedVisitId);
-    return visit?.journeyId === journeyId ? visit : undefined;
+    if (expectedVisitId) {
+      const visit = world.intendedVisits.find((candidate) => candidate.id === expectedVisitId);
+      return visit?.journeyId === journeyId ? visit : undefined;
+    }
+    const visits = world.intendedVisits.filter((candidate) => candidate.journeyId === journeyId && !candidate.transitIntent);
+    return visits.length === 1 ? visits[0] : undefined;
   }
 
   private async resolveExistingVisits(connectionId: string, world: CapturedWorld): Promise<ResolvedExistingVisit[]> {

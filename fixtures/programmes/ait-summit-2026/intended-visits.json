@@ -1,0 +1,16 @@
+{
+  "sourceId": "src-syn-ait-destination-visit",
+  "observedAt": "2026-08-25T09:00:00+00:00",
+  "visits": [
+    {
+      "id": "ait-draft-09-singapore-destination",
+      "travellerDraftId": "ait-draft-09",
+      "jurisdictionId": "jur-sg",
+      "stayItemRef": {
+        "system": "journey-item",
+        "value": "ait-draft-09#2"
+      },
+      "transitIntent": false
+    }
+  ]
+}
