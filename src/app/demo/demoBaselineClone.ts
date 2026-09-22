@@ -98,17 +98,36 @@ async function resolveBaselineIdentity(params: {
 }
 
 async function findTemplateByIdentity(admin: Pool, identity: string): Promise<string | undefined> {
-  // Template DBs are named ns_demo_fx_<identityPrefix>_<random> — look up via
-  // a sidecar marker table is unavailable on frozen templates without connect.
-  // We encode the first 16 hex chars of identity into the database name.
+  // Only reuse databases explicitly frozen as templates. Incomplete builds are
+  // ordinary DBs under the same name prefix and must never be cloned as baseline.
   const marker = identity.slice(0, 16);
   const result = await admin.query<{ datname: string }>(
     `SELECT datname FROM pg_database
       WHERE datname LIKE $1
+        AND datistemplate = true
       ORDER BY datname`,
     [`${DEMO_TEMPLATE_DB_PREFIX}${marker}%`],
   );
   return result.rows[0]?.datname;
+}
+
+/** Drop leftover incomplete template builds that never reached freeze. */
+async function dropOrphanTemplateBuilds(admin: Pool, identity: string): Promise<void> {
+  const marker = identity.slice(0, 16);
+  const result = await admin.query<{ datname: string }>(
+    `SELECT datname FROM pg_database
+      WHERE datname LIKE $1
+        AND datistemplate = false`,
+    [`${DEMO_TEMPLATE_DB_PREFIX}${marker}%`],
+  );
+  for (const row of result.rows) {
+    console.warn(`[atlas] dropping incomplete demo template build ${row.datname}`);
+    await dropDisposableDatabase(row.datname, DEMO_TEMPLATE_DB_PREFIX).catch((error) => {
+      console.warn(
+        `[atlas] incomplete template drop deferred: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
+  }
 }
 
 async function buildTemplateDatabase(params: {
@@ -218,6 +237,7 @@ export async function openDemoWorkingClone(params: {
   let datasetKey = dataset.datasetKey;
   let contentHash = dataset.contentHash;
   try {
+    await dropOrphanTemplateBuilds(admin, identity);
     templateDatabaseName = await findTemplateByIdentity(admin, identity);
   } finally {
     await admin.end();

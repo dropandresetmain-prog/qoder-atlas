@@ -50,8 +50,20 @@ async function listenEarlyHealth(port: number): Promise<Server> {
 }
 
 async function closeServer(server: Server): Promise<void> {
+  // Drop keep-alive clients so close() cannot hang forever after a long boot
+  // (browsers/probes often hold the early health listener open).
+  const withForce = server as Server & { closeAllConnections?: () => void };
+  withForce.closeAllConnections?.();
   await new Promise<void>((resolve, reject) => {
-    server.close((error) => (error ? reject(error) : resolve()));
+    const timer = setTimeout(() => {
+      withForce.closeAllConnections?.();
+      resolve();
+    }, 2_000);
+    server.close((error) => {
+      clearTimeout(timer);
+      if (error) reject(error);
+      else resolve();
+    });
   });
 }
 

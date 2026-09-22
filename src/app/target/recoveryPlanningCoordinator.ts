@@ -317,24 +317,55 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
 
       let prepared: Awaited<ReturnType<NonNullable<RecoveryPlanningCoordinatorDeps['preparePlanningContext']>>> | undefined;
       if (deps.preparePlanningContext) {
-        const originalBasis = basis;
-        prepared = await deps.preparePlanningContext({ recoveryCaseId: input.recoveryCaseId, now, world: basis.world, failing: basis.failing });
-        const preparationCompletedAt = deps.completionClock?.() ?? new Date().toISOString();
-        const current = await new PgCurrentStateReader(deps.pool).loadFor(deps.workspaceId, originalBasis.world.manifest);
-        const recaptured = await capturePlanningBasis(deps, input.recoveryCaseId, now, prepared.additionalPlaceIds);
-        if (!recaptured || recaptured.basisAssessmentId !== originalBasis.basisAssessmentId
-          || !assessManifestCurrentness(originalBasis.world.manifest, current, now).current) {
-          // Retain truthful preparation evidence against the superseded basis.
-          // This audit command promotes no strategy and does not bypass the
-          // completion command's pending-reassessment/currentness checks.
+        const maxPreparationPasses = 3;
+        let preparationStale:
+          | {
+              originalBasis: NonNullable<typeof basis>;
+              prepared: NonNullable<typeof prepared>;
+              preparationCompletedAt: string;
+            }
+          | undefined;
+        for (let pass = 0; pass < maxPreparationPasses; pass += 1) {
+          const originalBasis = basis;
+          prepared = await deps.preparePlanningContext({
+            recoveryCaseId: input.recoveryCaseId,
+            now,
+            world: basis.world,
+            failing: basis.failing,
+          });
+          const preparationCompletedAt = deps.completionClock?.() ?? new Date().toISOString();
+          const current = await new PgCurrentStateReader(deps.pool).loadFor(deps.workspaceId, originalBasis.world.manifest);
+          const recaptured = await capturePlanningBasis(deps, input.recoveryCaseId, now, prepared.additionalPlaceIds);
+          if (
+            recaptured
+            && recaptured.basisAssessmentId === originalBasis.basisAssessmentId
+            && assessManifestCurrentness(originalBasis.world.manifest, current, now).current
+          ) {
+            basis = recaptured;
+            preparationStale = undefined;
+            break;
+          }
+          preparationStale = { originalBasis, prepared, preparationCompletedAt };
+          // Preparation can legitimately mutate supporting state (credentials,
+          // researched places). Recapture and retry against the current basis
+          // instead of permanently claiming the (case, basis) attempt slot with
+          // STALE_RETRY_REQUIRED on the first soft invalidation.
+          const refreshed = await capturePlanningBasis(deps, input.recoveryCaseId, now, prepared.additionalPlaceIds);
+          if (!refreshed) {
+            break;
+          }
+          basis = refreshed;
+        }
+        if (preparationStale) {
+          const { originalBasis, prepared: stalePrepared, preparationCompletedAt } = preparationStale;
           const attempt = RecoveryPlanningAttemptSchema.parse({
             id: planningMinters(deps, input.recoveryCaseId, originalBasis.basisAssessmentId, now, 1).attemptId,
             recoveryCaseId: input.recoveryCaseId, basisAssessmentId: originalBasis.basisAssessmentId,
             basisManifest: originalBasis.world.manifest, startedAt: now,
             completedAt: completedAtAfterEvidence(preparationCompletedAt, [],
-              (prepared.evidence ?? []).flatMap((evidence) => evidence.provenance.observedAt ? [evidence.provenance.observedAt] : []), now),
+              (stalePrepared.evidence ?? []).flatMap((evidence) => evidence.provenance.observedAt ? [evidence.provenance.observedAt] : []), now),
             coordinatorVersion: deps.coordinatorVersion ?? R1_COORDINATOR_VERSION,
-            evidence: prepared.evidence ?? [],
+            evidence: stalePrepared.evidence ?? [],
           });
           const retained = await persistRecoveryPlanningAttempt(deps.uow(), {
             workspaceId: deps.workspaceId, actorPrincipalId: deps.actorPrincipalId,
@@ -345,7 +376,6 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
           return { ok: true, result: { planningAttemptRef: retained.value.attemptId as SubjectId,
             basisAssessmentId: originalBasis.basisAssessmentId as SubjectId, viableStrategyRefs: [], outcome: 'STALE_RETRY_REQUIRED' } };
         }
-        basis = recaptured;
       }
 
       const baseStrategyVersion = await nextStrategyVersion(deps.pool, deps.workspaceId, input.recoveryCaseId);
@@ -570,6 +600,15 @@ export function createRecoveryPlanningCoordinator(deps: RecoveryPlanningCoordina
       });
       if (!attemptPersisted.ok) {
         return { ok: false, error: applicationError('PLAN_PERSIST_FAILED', `planning completion: ${attemptPersisted.conflict.kind}: ${attemptPersisted.conflict.message}`) };
+      }
+      if (attemptPersisted.value.outcome !== core.result.outcome) {
+        return {
+          ok: false,
+          error: applicationError(
+            'PLAN_PERSIST_FAILED',
+            `planning completion replayed outcome ${attemptPersisted.value.outcome} while coordinator produced ${core.result.outcome}`,
+          ),
+        };
       }
 
       // R4-F2: bind each viable SELECT_OFFER strategy to its researched provider offer.

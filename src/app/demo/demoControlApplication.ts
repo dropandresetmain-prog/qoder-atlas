@@ -181,6 +181,15 @@ async function applyConfiguredAirlineRebooking(
     };
   }
   const event = await loadDisclosedDisruptionEvent(eventFile);
+  // Align the workspace evaluation clock with the disclosed event time before
+  // ingress/reassessment, matching timeline provider stages. Otherwise WALL
+  // "now" makes preparation look current while recapture sees a different
+  // basis and planning sticks on STALE_RETRY_REQUIRED with no strategies.
+  const evaluationNow = event.receivedAt as Instant;
+  await deps.evaluationClock.advanceTo(evaluationNow);
+  await new PgReassessmentWorker(deps.pool, { actorId: deps.actorPrincipalId })
+    .enqueueDue(evaluationNow, deps.workspaceId);
+
   const commandCtx = {
     workspaceId: deps.workspaceId,
     actorPrincipalId: deps.actorPrincipalId,

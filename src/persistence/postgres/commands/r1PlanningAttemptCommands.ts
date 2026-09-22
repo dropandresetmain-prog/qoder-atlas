@@ -349,6 +349,20 @@ export async function persistRecoveryPlanningCompletion(
         [params.workspaceId, attempt.recoveryCaseId, attempt.basisAssessmentId],
       );
       if (existing.rows[0]) {
+        // A retained STALE_RETRY_REQUIRED audit row for this basis must not be
+        // treated as a successful completion replay — that would return ok
+        // without promoting strategies while callers still see an in-memory
+        // AWAITING_AUTHORITY recommendation.
+        if (existing.rows[0].outcome === 'STALE_RETRY_REQUIRED') {
+          return {
+            ok: false,
+            conflict: typedConflict(
+              'STALE_AGGREGATE_REVISION',
+              `planning basis ${attempt.basisAssessmentId} already recorded STALE_RETRY_REQUIRED; reassess and plan against a current basis`,
+              [],
+            ),
+          };
+        }
         return {
           ok: true,
           value: { attemptId: existing.rows[0].id, recoveryCaseId: attempt.recoveryCaseId, basisAssessmentId: attempt.basisAssessmentId, outcome: existing.rows[0].outcome as RecoveryPlanningOutcome },
