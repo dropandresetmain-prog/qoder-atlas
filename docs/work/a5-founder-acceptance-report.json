@@ -1,0 +1,210 @@
+{
+  "startedAt": "2026-09-22T15:25:45.690Z",
+  "base": "http://127.0.0.1:8787",
+  "clone": "ns_demo_cl_e1f266f0063d4b4f",
+  "sarah": [
+    {
+      "run": 1,
+      "resetMs": 6039,
+      "caseId": "9b061672-ebb6-586e-ac13-757888e91c3b",
+      "strategyId": "a47ef1f3-0809-513e-a3ff-c8e53b4dcbcc",
+      "strategyDomain": "PROGRAMME",
+      "programmeTimes": [],
+      "spend": "selected among viable candidates: 0 regression(s), 1 improvement(s), blast radius 3, declared total exposure 0 minor unit(s)",
+      "finalStatus": "RESOLVED",
+      "clock": {
+        "mode": "CONTROLLED",
+        "now": "2026-09-21T01:40:00.000Z"
+      },
+      "errors": [],
+      "sarahAfter": {
+        "journeyRef": "JOURNEY:506b431c-8d6b-540c-8b7b-e3fe2c9f61fc",
+        "tripRef": "TRIP:992279c5-be42-5bc2-b81d-8dca42a72e75",
+        "travellerLabel": "Sarah Lim",
+        "obligation": "REQUIRED",
+        "status": "READY",
+        "remainderViability": "VIABLE",
+        "evaluation": "CURRENT",
+        "caseRef": "9b061672-ebb6-586e-ac13-757888e91c3b"
+      },
+      "openCases": []
+    },
+    {
+      "run": 2,
+      "resetMs": 10474,
+      "caseId": "4683a9c2-a354-56f4-912a-e1036bc5f42d",
+      "strategyId": "c5584a5c-7961-5dfc-a85f-5f0ae732256e",
+      "strategyDomain": "PROGRAMME",
+      "programmeTimes": [],
+      "spend": "selected among viable candidates: 0 regression(s), 1 improvement(s), blast radius 3, declared total exposure 0 minor unit(s)",
+      "finalStatus": "RESOLVED",
+      "clock": {
+        "mode": "CONTROLLED",
+        "now": "2026-09-21T01:40:00.000Z"
+      },
+      "errors": [],
+      "sarahAfter": {
+        "journeyRef": "JOURNEY:506b431c-8d6b-540c-8b7b-e3fe2c9f61fc",
+        "tripRef": "TRIP:992279c5-be42-5bc2-b81d-8dca42a72e75",
+        "travellerLabel": "Sarah Lim",
+        "obligation": "REQUIRED",
+        "status": "READY",
+        "remainderViability": "VIABLE",
+        "evaluation": "CURRENT",
+        "caseRef": "4683a9c2-a354-56f4-912a-e1036bc5f42d"
+      },
+      "openCases": []
+    },
+    {
+      "run": 3,
+      "resetMs": 3378,
+      "caseId": "25c0ebf3-0f2b-5b16-a34b-ea893d9c41d0",
+      "strategyId": "e60d63a3-d9b1-59bc-b335-ae6b41391058",
+      "strategyDomain": "PROGRAMME",
+      "programmeTimes": [],
+      "spend": "selected among viable candidates: 0 regression(s), 1 improvement(s), blast radius 3, declared total exposure 0 minor unit(s)",
+      "finalStatus": "RESOLVED",
+      "clock": {
+        "mode": "CONTROLLED",
+        "now": "2026-09-21T01:40:00.000Z"
+      },
+      "errors": [],
+      "sarahAfter": {
+        "journeyRef": "JOURNEY:506b431c-8d6b-540c-8b7b-e3fe2c9f61fc",
+        "tripRef": "TRIP:992279c5-be42-5bc2-b81d-8dca42a72e75",
+        "travellerLabel": "Sarah Lim",
+        "obligation": "REQUIRED",
+        "status": "READY",
+        "remainderViability": "VIABLE",
+        "evaluation": "CURRENT",
+        "caseRef": "25c0ebf3-0f2b-5b16-a34b-ea893d9c41d0"
+      },
+      "openCases": []
+    }
+  ],
+  "jordan": {
+    "resetMs": 4880,
+    "stages": [
+      {
+        "id": "delay_begins_connection_viable",
+        "status": 200,
+        "clock": {
+          "mode": "CONTROLLED",
+          "now": "2026-09-28T19:30:00.000Z"
+        },
+        "detail": "Delay begins; 95min remains before ZG053 — still viable above the 90-minute minimum connection requirement.",
+        "jordan": {
+          "journeyRef": "JOURNEY:299eba19-153b-5fb1-b8cd-8a6a14f4b5a0",
+          "tripRef": "TRIP:da040792-cec1-56f2-bd52-4093d3d90b65",
+          "travellerLabel": "Jordan Hale",
+          "obligation": "REQUIRED",
+          "status": "UNKNOWN",
+          "remainderViability": "UNKNOWN",
+          "evaluation": "CURRENT"
+        }
+      },
+      {
+        "id": "delay_increases_connection_at_risk",
+        "status": 200,
+        "clock": {
+          "mode": "CONTROLLED",
+          "now": "2026-09-28T22:00:00.000Z"
+        },
+        "detail": "Delay increases; 82 minutes remain before the onward departure — still physically possible, below the 90-minute minimum.",
+        "jordan": {
+          "journeyRef": "JOURNEY:299eba19-153b-5fb1-b8cd-8a6a14f4b5a0",
+          "tripRef": "TRIP:da040792-cec1-56f2-bd52-4093d3d90b65",
+          "travellerLabel": "Jordan Hale",
+          "obligation": "REQUIRED",
+          "status": "AT_RISK",
+          "remainderViability": "AT_RISK",
+          "evaluation": "CURRENT",
+          "caseRef": "51d6e7d1-2d60-5c58-91a4-11c903e1f534"
+        }
+      },
+      {
+        "id": "zg053_impossible",
+        "status": 200,
+        "clock": {
+          "mode": "CONTROLLED",
+          "now": "2026-09-29T12:30:00.000Z"
+        },
+        "detail": "ZG023 arrives after ZG053 departure — baseline connection is impossible.",
+        "jordan": {
+          "journeyRef": "JOURNEY:299eba19-153b-5fb1-b8cd-8a6a14f4b5a0",
+          "tripRef": "TRIP:da040792-cec1-56f2-bd52-4093d3d90b65",
+          "travellerLabel": "Jordan Hale",
+          "obligation": "REQUIRED",
+          "status": "DISRUPTED",
+          "remainderViability": "NOT_VIABLE",
+          "evaluation": "CURRENT",
+          "caseRef": "51d6e7d1-2d60-5c58-91a4-11c903e1f534"
+        }
+      }
+    ],
+    "caseId": "51d6e7d1-2d60-5c58-91a4-11c903e1f534",
+    "recommendation": {
+      "planningAttemptRef": "4fc23b8b-451d-5fe7-bdfa-9e04eb3cd8f1",
+      "basisAssessmentId": "c2d91ec7-6684-4979-a9f0-b8c73f269338",
+      "viableStrategyRefs": [
+        "92bf298c-2a96-56c2-abbe-03205cc0ec0a",
+        "f89e937e-2b55-5605-8833-fc7db159f458"
+      ],
+      "recommendation": {
+        "recommendedStrategyRef": "92bf298c-2a96-56c2-abbe-03205cc0ec0a",
+        "alternativeStrategyRefs": [
+          "f89e937e-2b55-5605-8833-fc7db159f458"
+        ],
+        "recommendationBasis": [
+          {
+            "code": "deterministic_comparison",
+            "summary": "selected among viable candidates: 0 regression(s), 1 improvement(s), blast radius 7, declared total exposure 81744 minor unit(s)",
+            "kind": "DETERMINISTIC_FACT"
+          }
+        ],
+        "tradeoffs": [
+          {
+            "strategyRef": "92bf298c-2a96-56c2-abbe-03205cc0ec0a",
+            "advantages": [
+              "1 subject(s) improve",
+              "no regressions among reassessed subjects"
+            ],
+            "disadvantages": [
+              "declared total exposure 81744 minor unit(s)"
+            ]
+          },
+          {
+            "strategyRef": "f89e937e-2b55-5605-8833-fc7db159f458",
+            "advantages": [
+              "1 subject(s) improve",
+              "no regressions among reassessed subjects"
+            ],
+            "disadvantages": [
+              "declared total exposure 83260 minor unit(s)"
+            ]
+          }
+        ],
+        "uncertainty": [],
+        "evidenceRefs": [],
+        "provenance": {
+          "kind": "DETERMINISTIC",
+          "comparatorVersion": "r1-comparator/1"
+        }
+      },
+      "outcome": "AWAITING_AUTHORITY"
+    },
+    "caseHtmlFlags": {
+      "costNotCompared": false,
+      "has670": false,
+      "hasZeroCancel": false,
+      "freeUntil": false,
+      "narita": false,
+      "overnight": false
+    },
+    "errors": [],
+    "planStatus": 200,
+    "replayNote": "REPLAY: plan only; no approve/execute"
+  },
+  "finishedAt": "2026-09-22T15:34:23.746Z",
+  "cloneFinal": "ns_demo_cl_306f46c85abc4bdf"
+}

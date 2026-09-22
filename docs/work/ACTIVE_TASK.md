@@ -5,57 +5,35 @@
 - Repo: `dropandresetmain-prog/qoder-atlas`
 - Worktree: `C:\Dev\qoder-atlas-a5-hero-e2e-closure`
 - Branch: `fix/a5-hero-e2e-closure`
-- Starting SHA: `7d4b1f5e3525294ab0585d08ae40d49e7ba3da24` (matched origin tip at start)
+- Starting SHA: `7d4b1f5e3525294ab0585d08ae40d49e7ba3da24`
+- Current HEAD: `6208786` (+ local script HTML path fix pending)
 
 ## Mission
 
-Close remaining demo/runtime defects for founder video recording:
-
-1. Fast safe demo Reset via proven PostgreSQL clone (productize, not test-only)
-2. Jordan incorrect cancellation economics (timed free-cancel window)
-3. Jordan mixed-currency cost presentation (`Cost not compared`)
-4. Sarah 3x repeatability via product Reset
-5. Stale/open-case inspection
-6. Final physical browser acceptance
+Close remaining demo/runtime defects for founder video recording.
 
 ## Checkpoint ledger
 
 - [x] CP-A — Cancellation semantics + Jordan economic proof (`29e1ae1`)
-- [x] CP-B/C — Shared production baseline clone primitive + demo Reset pristine-clone handover (`17f62f9`)
-- [x] CP-D runtime unblock — wall-time authority grants + INPUT_CHANGED claim under CONTROLLED (`b6651b9`, `2df12e4`)
-- [ ] CP-D — 3x Sarah + Jordan REPLAY founder acceptance (in progress)
+- [x] CP-B/C — Shared production baseline clone + Reset (`17f62f9`)
+- [x] CP-D runtime — wall grants + INPUT_CHANGED claim + quiesce swap (`b6651b9`, `2df12e4`, `eac5cc8`)
+- [x] CP-D acceptance — 3× Sarah RESOLVED + Jordan REPLAY plan (evidence in `docs/work/a5-founder-acceptance-report.json`)
 
-## CP-D notes
+## Founder acceptance evidence (2026-09-22)
 
-- Product Reset: `CLONE_FROM_TEMPLATE`, measured ~4.6–7.8s HTTP
-- GRANT_MISSING root cause: grants issued wall Sep 22 invisible under CONTROLLED Sep 21 — fixed in storedExecutionGate (authorityNow = wall)
-- Sarah EXECUTING stall: INPUT_CHANGED reassess retries with attempts>0 + wall next_run_at never claimed under CONTROLLED — fixed in pgAssessments.claim
-- Open-case inspection: healthy travellers RESOLVED; not five OPEN actionable cases
+Reset times (ms): 6039 / 10474 / 3378 / Jordan 4880 — all CLONE_FROM_TEMPLATE.
 
-## CP-A (done)
+Sarah ×3: PROGRAMME, exposure 0, blast 3, final RESOLVED, openCases=[], READY/VIABLE each time.
 
-Root cause: Nuitée `cancelTime` = when fee becomes effective; `lastFreeCancellationDate` ignored.
-D3 `12:30Z` before free-cancel `23:59:59Z` → current loss USD 0; scheduled USD 670.77.
-FX: materialize `fx-rates.json` (+ JPY→SGD) into PG so costs compare.
+Jordan D2 AT_RISK → D3 DISRUPTED; recommendation AWAITING_AUTHORITY; `Cost not compared` absent;
+CANCEL_STAY current penalty USD 0, freeCancellationUntil 2026-09-29T23:59:59Z,
+scheduledCancellationPenalty USD 670.77; 167.69 absent.
 
-## CP-B/C (in progress → commit)
-
-Architecture:
-- `src/persistence/postgres/databaseTemplateClone.ts` — reusable TEMPLATE primitives
-- `src/persistence/postgres/swappablePool.ts` — atomic pool swap, stable HTTP
-- `src/app/demo/demoBaselineIdentity.ts` — migrations+dataset(+sandbox/research) identity
-- `src/app/demo/demoBaselineClone.ts` — template build once / working clone / reset handover
-- `composeTargetBoot` opens working clone when demo dataset configured
-- `demoReset` prefers clone handover; never delete-before-reprovision on that path
-- `aitFixtureClone.ts` wraps the shared primitive
-
-Measured (light PG proof `a5DemoCloneReset.pgtest.ts`):
-- 3× product Reset: **3499 / 2119 / 2532 ms** (all under 10s)
-- Mutation absent after reset; refused reset leaves working world
+Founder URL after final Reset: `http://127.0.0.1:8787/`
+Active clone: `ns_demo_cl_90dbd69cb03742ea`
+Workspace: `b96791c7-189f-4a59-ae30-b7cb5e6068b4`
 
 ## Do not
 
 - Reopen planner/RC-6/authority architecture
-- Import `postgres-integration/` into app code
-- Accept 60–80s delete+reprovision Reset
 - Execute Jordan sandbox in this checkpoint

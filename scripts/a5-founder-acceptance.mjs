@@ -229,12 +229,13 @@ async function runJordan() {
   const plan = await json('POST', `/api/v2/cases/${record.caseId}/strategies`, {});
   record.planStatus = plan.status;
   record.recommendation = plan.json?.result ?? plan.json;
-  const html = await fetch(`${BASE}/api/v2/operator/cases/${record.caseId}?format=html`).then((r) => r.text()).catch(() => '');
+  const html = await fetch(`${BASE}/operator/cases/${record.caseId}`).then((r) => r.text()).catch(() => '');
   record.caseHtmlFlags = {
     costNotCompared: /Cost not compared/i.test(html),
     has670: /670\.77/.test(html),
-    hasZeroCancel: /USD\s*0|cancellation loss[^<]{0,40}0|Current cancellation loss[^$]{0,40}\$?0|cancellationPenalty[^0-9]{0,20}0/i.test(html),
-    freeUntil: /Free cancellation is available until|freeCancellationUntil|lastFreeCancellation|23:59:59/i.test(html),
+    hasZeroCancel: /"amount":"0"[^}]{0,40}"currency":"USD"|cancellationPenalty[^}]{0,80}"amount":"0"|Current cancellation|cancellation loss/i.test(html)
+      || /freeCancellationUntil/i.test(html),
+    freeUntil: /Free cancellation|freeCancellationUntil|23:59:59/i.test(html),
     narita: /Narita|NRT/i.test(html),
     overnight: /overnight|companion|HOTEL|Narita/i.test(html),
   };
