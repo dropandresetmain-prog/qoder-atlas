@@ -177,11 +177,15 @@ export function decisionCosts(comparison: PlanningCostComparisonView | undefined
   const spend = comparison.lines.filter((line) => line.kind.code === 'SELECT_OFFER' || line.kind.code === 'ADD_JOURNEY_STAY');
   const exposure = comparison.lines.filter((line) => line.kind.code === 'POLICY_PENALTY_ESTIMATE');
   const other = comparison.lines.filter((line) => !spend.includes(line) && !exposure.includes(line));
+  // Line items are provider evidence. A known-zero internal change has none,
+  // but the comparison totals are still the operator-facing spend and loss.
+  const declared = (money: { amount: string; currency: string } | undefined): string[] | undefined =>
+    money ? [decisionMoney(money)] : undefined;
   return {
     spend, exposure, other, comparison,
-    newSpend: sumDisplayedMoney(spend.map((line) => line.homeAmount)),
+    newSpend: sumDisplayedMoney(spend.map((line) => line.homeAmount)) ?? declared(comparison.newSpendHomeAmount),
     providerSpend: sumDisplayedMoney(spend.map((line) => line.providerAmount)),
-    potentialLoss: sumDisplayedMoney(exposure.map((line) => line.homeAmount)),
+    potentialLoss: sumDisplayedMoney(exposure.map((line) => line.homeAmount)) ?? declared(comparison.potentialLossHomeAmount),
   };
 }
 

@@ -282,6 +282,16 @@ test('exact price totals keep expenditure, provider currency and potential loss 
   assert.deepEqual(sumDisplayedMoney([{ amount: '1', currency: 'JPY' }, { amount: '0.20', currency: 'USD' }]), ['JPY 1', 'USD 0.20']);
   assert.equal(sumDisplayedMoney([{ amount: '1e5', currency: 'USD' }]), undefined);
   assert.equal(decisionCosts(undefined).unavailable?.includes('free'), true);
+  const zero = decisionCosts({
+    status: 'AVAILABLE', homeCurrency: 'USD', comparedAt: at,
+    totalHomeAmount: { amount: '0', currency: 'USD' },
+    newSpendHomeAmount: { amount: '0', currency: 'USD' },
+    potentialLossHomeAmount: { amount: '0', currency: 'USD' },
+    lines: [], selectedFxEvidence: [],
+  });
+  assert.equal(zero.unavailable, undefined);
+  assert.deepEqual(zero.newSpend, ['USD 0']);
+  assert.deepEqual(zero.potentialLoss, ['USD 0']);
   const html = renderProductRecoveryCase(view());
   assert.match(html, /data-test="cost-separated"/);
   assert.match(html, /data-test="cost-new-spend"/);

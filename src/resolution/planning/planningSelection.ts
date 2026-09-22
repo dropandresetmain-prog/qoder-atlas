@@ -29,7 +29,7 @@ import type { CandidateComparisonFacts } from './comparator.ts';
  */
 export function comparisonFactsFromEvidence(
   evidence: MaterialCandidateEvidence,
-  extra?: Pick<CandidateComparisonFacts, 'declaredCostMinorUnits' | 'satisfiedPreferenceCodes' | 'semanticNotes'>,
+  extra?: Pick<CandidateComparisonFacts, 'declaredCostMinorUnits' | 'scheduleDisplacementMs' | 'satisfiedPreferenceCodes' | 'semanticNotes'>,
 ): CandidateComparisonFacts | undefined {
   if (evidence.viability === undefined) return undefined;
   const blast = evidence.immediateChangeBlastRadius;
@@ -39,6 +39,7 @@ export function comparisonFactsFromEvidence(
     betterCount: evidence.outcomeDelta.filter((d) => d.delta === 'BETTER').length,
     blastRadiusSize: blast ? blast.changedRefs.length + blast.directlyAffectedRefs.length : 0,
     ...(extra?.declaredCostMinorUnits !== undefined ? { declaredCostMinorUnits: extra.declaredCostMinorUnits } : {}),
+    ...(extra?.scheduleDisplacementMs !== undefined ? { scheduleDisplacementMs: extra.scheduleDisplacementMs } : {}),
     ...(extra?.satisfiedPreferenceCodes !== undefined ? { satisfiedPreferenceCodes: [...extra.satisfiedPreferenceCodes] } : {}),
     ...(extra?.semanticNotes !== undefined ? { semanticNotes: [...extra.semanticNotes] } : {}),
   };

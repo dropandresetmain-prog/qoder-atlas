@@ -22,7 +22,12 @@ test('cost research uses captured owning organisation and reads each pair once p
   assert.deepEqual(requested, ['JPY:NZD']);
   assert.deepEqual(first, { homeCurrency: 'NZD', rates: [], comparedAt: '2030-01-02T00:00:00Z' });
   assert.deepEqual(world, before);
-  assert.equal(await contextFor({ effects: [], basis: { world } }), undefined);
+  const zero = await contextFor({ effects: [], basis: { world } });
+  assert.deepEqual(zero, { homeCurrency: 'NZD', rates: [], comparedAt: '2030-01-02T00:00:00Z' });
+  assert.deepEqual(requested, ['JPY:NZD'], 'a no-money candidate does not look up a rate');
+  world.organisations.push({ id: id(), revision: 1, defaultCurrencyCode: 'USD' });
+  assert.equal(await contextFor({ effects: [], basis: { world } }), undefined, 'two home currencies are not a guessed zero');
+  world.organisations.pop();
   world.journeys[0]!.responsibilityOrganisationId = null;
   assert.equal(await contextFor({ effects, basis: { world } }), undefined);
   assert.deepEqual(requested, ['JPY:NZD'], 'missing payer must not become a guessed currency lookup');

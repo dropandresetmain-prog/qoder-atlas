@@ -293,8 +293,12 @@ test('generality A: PROGRAMME domain via the real time-swap proposer yields a VI
   assert.ok(rec!.immediateChangeBlastRadius!.changedRefs.some((r) => r.kind === 'PROGRAMME_ITEM' && r.id === unmetItemId));
   assert.ok(rec!.reassessmentClosure!.reachedRefs.length > 0);
   assert.ok(rec!.outcomeDelta.some((d) => d.delta === 'BETTER'));
-  assert.equal(rec!.costComparison, undefined, 'a programme-only candidate omits cost instead of storing an unavailable warning');
+  assert.equal(rec!.costComparison, undefined, 'a programme-only candidate omits a stored comparison when no home currency can be named');
   assert.equal(costSupplierCalls, 1, 'the supplier is consulted once; a missing programme price is not stored as unknown cost');
+  assert.ok(
+    out.attempt.recommendation!.recommendationBasis.some((entry) => entry.summary.includes('declared total exposure 0')),
+    'no monetary effects still rank as known-zero exposure',
+  );
 });
 
 test('programme horizon keeps a viable counterpart past the old sixth and the global sixteenth', async () => {
@@ -434,6 +438,118 @@ test('coordinator compares captured provider prices with dated FX and retains un
       .flatMap((candidate) => candidate.costComparison?.status === 'AVAILABLE' ? [candidate.costComparison.homeCurrency] : [])),
     new Set(['JPY', 'NZD', 'KRW']),
   );
+});
+
+test('known-zero programme recovery beats a priced flight with a smaller blast radius', async () => {
+  const { basis, unmetItemId, journeyId } = programmeBasis();
+  const transportItemId = id();
+  const serviceId = id();
+  const offerId = id();
+  basis.world.journeyItems.push({
+    id: transportItemId, journeyId, kind: 'TRANSPORT', orderKey: '010', lifecycleStatus: 'PLANNED', flexible: false,
+    intendedWindow: null, desiredOriginPlaceId: 'p-a', desiredDestinationPlaceId: 'p-b', selectedServiceId: null,
+    intendedPlaceId: null, requiredNights: null, participationId: null, standaloneTitle: null, standaloneWindow: null,
+    resourceId: null, intendedLocationPlaceId: null,
+  });
+  basis.world.transportServices.push({
+    id: serviceId, revision: 1, mode: 'AIR', operator: 'test', originPlaceId: 'p-a', destinationPlaceId: 'p-b',
+    published: { departure: null, arrival: null }, estimated: { departure: null, arrival: null }, actual: { departure: null, arrival: null },
+  });
+  basis.registry = registryFlippingWhen(journeyId, () => true);
+  basis.effective = projectEffective(basis.world);
+  const out = await runRecoveryPlanning(basis, {
+    domainRegistry: defaultRecoveryDomainRegistry(),
+    availableCapabilities: ['FLIGHT', 'HOTEL'],
+    minters: minters(),
+    coordinatorVersion: COORDINATOR_VERSION,
+    comparatorVersion: COMPARATOR_VERSION,
+    proposers: [{ domain: 'PROGRAMME', proposer: {
+      id: 'test.zero-versus-paid', version: '1',
+      async propose(): Promise<ProposalCandidate[]> {
+        return [
+          {
+            key: 'paid-flight',
+            effects: [{ effectKind: 'SELECT_OFFER', journeyItemId: transportItemId, offerId, offerPrice: { amount: '400.00', currency: 'USD' } }],
+            affectedSubjectRefs: [{ kind: 'JOURNEY_ITEM', id: transportItemId }],
+            rationale: 'Buy a replacement flight.',
+            assumptions: [],
+          },
+          {
+            key: 'internal-swap',
+            effects: [
+              { effectKind: 'CHANGE_PROGRAMME_ITEM_TIME', programmeItemId: unmetItemId, proposedWindow: { start: LATE, end: '2030-06-02T16:00:00.000Z' } },
+              { effectKind: 'CHANGE_PROGRAMME_ITEM_TIME', programmeItemId: basis.world.programmeItems[1]!.id, proposedWindow: { start: EARLY, end: '2030-06-02T11:00:00.000Z' } },
+            ],
+            affectedSubjectRefs: [
+              { kind: 'PROGRAMME_ITEM', id: unmetItemId },
+              { kind: 'PROGRAMME_ITEM', id: basis.world.programmeItems[1]!.id },
+              { kind: 'JOURNEY', id: journeyId },
+            ],
+            rationale: 'Move the programme item later.',
+            assumptions: [],
+          },
+        ];
+      },
+    } }],
+    resolveOffersForDomain: () => [{ offerId, transportServiceId: serviceId }],
+    costContextForCandidate: async () => ({
+      homeCurrency: 'USD',
+      comparedAt: NOW,
+      rates: [],
+    }),
+  });
+  assert.equal(out.attempt.recommendation?.recommendedStrategyRef, 'strategy:internal-swap');
+  const swap = out.attempt.materialCandidates.find((candidate) => candidate.candidateKey === 'internal-swap');
+  assert.equal(swap?.costComparison?.status, 'AVAILABLE');
+  if (swap?.costComparison?.status === 'AVAILABLE') {
+    assert.deepEqual(swap.costComparison.newSpendHomeAmount, { amount: '0', currency: 'USD' });
+    assert.deepEqual(swap.costComparison.potentialLossHomeAmount, { amount: '0', currency: 'USD' });
+    assert.deepEqual(swap.costComparison.lines, []);
+  }
+  const paid = out.attempt.materialCandidates.find((candidate) => candidate.candidateKey === 'paid-flight');
+  assert.equal(paid?.costComparison?.status, 'AVAILABLE');
+});
+
+test('nearest viable programme swap wins over a later swap whose strategy ref sorts first', async () => {
+  const travellerA = id();
+  const jA = journeyRow(travellerA);
+  const programmeId = id();
+  const unmet = programmeItemRow(programmeId, EARLY, '2030-06-02T11:00:00.000Z');
+  unmet.id = 'unmet-item';
+  const far = programmeItemRow(programmeId, '2030-06-03T10:00:00.000Z', '2030-06-03T11:00:00.000Z');
+  far.id = 'aaa-far';
+  const near = programmeItemRow(programmeId, '2030-06-02T12:00:00.000Z', '2030-06-02T13:00:00.000Z');
+  near.id = 'zzz-near';
+  const world = emptyWorld({
+    travellers: [{ id: travellerA, revision: 1, lifecycleStatus: 'ACTIVE' }],
+    journeys: [jA],
+    programmes: [{ id: programmeId, revision: 1, eventId: id(), title: 'event', lifecycleStatus: 'ACTIVE' }],
+    programmeItems: [unmet, far, near],
+    participations: [{ id: id(), programmeItemId: unmet.id, travellerId: travellerA, obligation: 'REQUIRED', accepted: true, preparationWindow: null }],
+    focus: [{ kind: 'JOURNEY', id: jA.id }],
+  });
+  const subject: TypedRef = { kind: 'JOURNEY', id: jA.id };
+  const assessment = failingAssessment(subject, 'programme_participation', { kind: 'PROGRAMME_ITEM', id: unmet.id });
+  const basis: PlanningBasis = {
+    workspaceId: world.workspaceId, recoveryCaseId: id() as SubjectId, basisAssessmentId: assessment.id as SubjectId,
+    reason: 'CASE_OPENED', now: NOW, world, effective: projectEffective(world), failing: [{ subject, assessment }],
+    registry: registryFlippingWhen(jA.id, (w) => w.programmeItems.find((item) => item.id === unmet.id)!.window!.start !== EARLY),
+  };
+  const out = await runRecoveryPlanning(basis, {
+    domainRegistry: defaultRecoveryDomainRegistry(),
+    availableCapabilities: ['FLIGHT', 'HOTEL'],
+    proposers: [{ domain: 'PROGRAMME', proposer: createProgrammeTimeSwapProposer() }],
+    minters: minters(),
+    coordinatorVersion: COORDINATOR_VERSION,
+    comparatorVersion: COMPARATOR_VERSION,
+    costContextForCandidate: async () => ({ homeCurrency: 'USD', comparedAt: NOW, rates: [] }),
+  });
+  assert.equal(
+    out.attempt.recommendation?.recommendedStrategyRef,
+    `strategy:${PROGRAMME_TIME_SWAP_PROPOSER_ID}:unmet-item:zzz-near`,
+  );
+  const farCandidate = out.attempt.materialCandidates.find((candidate) => candidate.candidateKey.endsWith('aaa-far'));
+  assert.equal(farCandidate?.disposition, 'VIABLE_NOT_RECOMMENDED');
 });
 
 test('generality B: STAY domain via a different proposer + effect kind flows through the SAME coordinator', async () => {

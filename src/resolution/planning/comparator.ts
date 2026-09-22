@@ -52,10 +52,19 @@ export interface CandidateComparisonFacts {
   /** Size of the immediate change blast radius (changed + directly affected). Smaller is better. */
   blastRadiusSize: number;
   /**
-   * Declared cost in minor units, when the candidate has one. Absent sorts LAST
-   * (an undeclared cost is never treated as free).
+   * Declared cost in minor units, when the candidate has one.
+   * A priced action with no usable evidence leaves this absent and sorts LAST
+   * (unknown exposure is never treated as free). An internal strategy with no
+   * monetary effects at all is known-zero and must pass `0`, not omit the field.
    */
   declaredCostMinorUnits?: number;
+  /**
+   * Largest absolute programme-item start shift, in milliseconds, when the
+   * candidate moves programme time. Smaller is a nearer swap. Absent means this
+   * candidate is not a programme-time move, so it does not participate in this
+   * tiebreak. It never outranks regressions, cost, or an explicit preference.
+   */
+  scheduleDisplacementMs?: number;
   /**
    * Preference codes this candidate deterministically satisfies, computed from
    * canonical state (e.g. "keeps the session inside the traveller's declared
@@ -175,7 +184,13 @@ function compareCandidates(
   if (na.betterCount !== nb.betterCount) return nb.betterCount - na.betterCount;
   // 5. Smaller immediate blast radius wins, only after cost.
   if (na.blastRadiusSize !== nb.blastRadiusSize) return na.blastRadiusSize - nb.blastRadiusSize;
-  // 6. Stable tiebreak.
+  // 6. Among programme-time moves, the smaller schedule shift wins. This sits
+  //    ahead of the stable ref so a nearer slot is not lost to identifier order.
+  if (na.scheduleDisplacementMs !== undefined && nb.scheduleDisplacementMs !== undefined
+    && na.scheduleDisplacementMs !== nb.scheduleDisplacementMs) {
+    return na.scheduleDisplacementMs - nb.scheduleDisplacementMs;
+  }
+  // 7. Stable tiebreak.
   return a.localeCompare(b);
 }
 

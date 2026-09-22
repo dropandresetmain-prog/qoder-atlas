@@ -121,6 +121,41 @@ test('selectRecommendation: zero declared cost beats a paid smaller blast', () =
   assert.deepEqual(result!.alternativeStrategyRefs, ['paid-narrow', 'unknown-cost']);
 });
 
+test('selectRecommendation: nearer programme movement beats a later swap with a sorting-earlier ref', () => {
+  const result = selectRecommendation({
+    recoveryCaseId: CASE_ID,
+    viableCandidates: [viable('aaa-far'), viable('zzz-near')],
+    facts: [
+      facts('aaa-far', { declaredCostMinorUnits: 0, blastRadiusSize: 3, scheduleDisplacementMs: 24 * 60 * 60 * 1000 }),
+      facts('zzz-near', { declaredCostMinorUnits: 0, blastRadiusSize: 3, scheduleDisplacementMs: 2 * 60 * 60 * 1000 }),
+    ],
+    comparatorVersion: 'r1-comparator/test',
+  });
+  assert.ok(result);
+  assert.equal(result!.recommendedStrategyRef, 'zzz-near');
+  assert.deepEqual(result!.alternativeStrategyRefs, ['aaa-far']);
+});
+
+test('selectRecommendation: an explicit preference still outranks a nearer zero-cost swap', () => {
+  const result = selectRecommendation({
+    recoveryCaseId: CASE_ID,
+    viableCandidates: [viable('near-unpreferred'), viable('far-preferred')],
+    facts: [
+      facts('near-unpreferred', { declaredCostMinorUnits: 0, blastRadiusSize: 3, scheduleDisplacementMs: 60_000 }),
+      facts('far-preferred', {
+        declaredCostMinorUnits: 0,
+        blastRadiusSize: 3,
+        scheduleDisplacementMs: 86_400_000,
+        satisfiedPreferenceCodes: ['keep_host'],
+      }),
+    ],
+    preferences: [{ code: 'keep_host', priority: 'EXPLICIT_ORGANISATION_POLICY', inferred: false, summary: 'Keep the named host' }],
+    comparatorVersion: 'r1-comparator/test',
+  });
+  assert.ok(result);
+  assert.equal(result!.recommendedStrategyRef, 'far-preferred');
+});
+
 test('selectRecommendation: ranking never depends on input order (stable ref tiebreak)', () => {
   const candidates = [viable('b-ref'), viable('a-ref')];
   const equalFacts = [facts('b-ref'), facts('a-ref')];

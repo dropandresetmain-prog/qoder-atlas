@@ -253,11 +253,41 @@ function hasComparableCostEffect(effects: readonly ScenarioEffect[]): boolean {
     || effect.effectKind === 'CANCEL_STAY');
 }
 
+/**
+ * Largest absolute programme-item start shift. A bilateral swap moves two
+ * items by related amounts; the larger shift is how far the programme moves.
+ * Returns undefined when the candidate does not move programme time, or when
+ * a current window is missing so the shift cannot be measured.
+ */
+function programmeScheduleDisplacementMs(
+  effects: readonly ScenarioEffect[],
+  items: readonly { id: string; window: { start: string; end: string } | null }[],
+): number | undefined {
+  let max = 0;
+  let saw = false;
+  for (const effect of effects) {
+    if (effect.effectKind !== 'CHANGE_PROGRAMME_ITEM_TIME') continue;
+    const current = items.find((item) => item.id === effect.programmeItemId)?.window;
+    if (!current) return undefined;
+    const delta = Math.abs(Date.parse(effect.proposedWindow.start) - Date.parse(current.start));
+    if (!Number.isFinite(delta)) return undefined;
+    saw = true;
+    if (delta > max) max = delta;
+  }
+  return saw ? max : undefined;
+}
+
 function unavailableCost(code: 'CONTEXT_UNAVAILABLE' | 'MISSING_RATE_EVIDENCE', reason: string, comparedAt: Instant): MaterialCandidateCostComparison {
   return MaterialCandidateCostComparisonSchema.parse({ status: 'UNAVAILABLE', code, reason, comparedAt });
 }
 
-function declaredCostFacts(cost: MaterialCandidateCostComparison | undefined): Pick<CandidateComparisonFacts, 'declaredCostMinorUnits'> | undefined {
+function declaredCostFacts(
+  cost: MaterialCandidateCostComparison | undefined,
+  effects: readonly ScenarioEffect[],
+): Pick<CandidateComparisonFacts, 'declaredCostMinorUnits'> | undefined {
+  // No priced or penalty effect means there is no monetary exposure to discover.
+  // That is known zero, including when no home-currency record was stored.
+  if (!hasComparableCostEffect(effects)) return { declaredCostMinorUnits: 0 };
   if (cost?.status !== 'AVAILABLE') return undefined;
   const declaredCostMinorUnits = safeRecoveryCostMinorUnits(cost.totalHomeAmount);
   return declaredCostMinorUnits === undefined ? undefined : { declaredCostMinorUnits };
@@ -269,8 +299,8 @@ async function costComparisonForCandidate(input: {
   supplier: NonNullable<CoordinatorCoreDeps['costContextForCandidate']>;
   /**
    * Priced effects must record UNAVAILABLE when home-currency context is
-   * missing. Unpriced effects omit the comparison so an absent price is never
-   * stored as a warning that later ranks as unknown cost.
+   * missing. Effects with no monetary terms omit a stored comparison only when
+   * no home currency can be named; ranking still treats that case as known zero.
    */
   whenContextMissing?: 'unavailable' | 'omit';
 }): Promise<MaterialCandidateCostComparison | undefined> {
@@ -552,10 +582,21 @@ export async function runRecoveryPlanning(
       strategyRef: e.result.strategy.id as SubjectId, recommended: false, result: e.result,
       evidenceRefs: evidenceRefsForDomain(evidence, e.domainId),
     });
-    const costFacts = canRankDeclaredCosts ? declaredCostFacts(e.costComparison) : undefined;
-    const facts = comparisonFactsFromEvidence(provisional, deps.preferences?.length
-      ? { ...(costFacts ?? {}), satisfiedPreferenceCodes: satisfiedPreferenceCodes(provisional, deps.preferences) }
-      : costFacts);
+    const costFacts = canRankDeclaredCosts
+      ? declaredCostFacts(e.costComparison, e.result.strategy.scenarioChange.effects)
+      : undefined;
+    const scheduleDisplacementMs = programmeScheduleDisplacementMs(
+      e.result.strategy.scenarioChange.effects,
+      basis.world.programmeItems,
+    );
+    const extra = {
+      ...(costFacts ?? {}),
+      ...(scheduleDisplacementMs !== undefined ? { scheduleDisplacementMs } : {}),
+      ...(deps.preferences?.length
+        ? { satisfiedPreferenceCodes: satisfiedPreferenceCodes(provisional, deps.preferences) }
+        : {}),
+    };
+    const facts = comparisonFactsFromEvidence(provisional, extra);
     if (facts) provisionalFacts.push(facts);
   }
   const recommendation: StrategyRecommendation | undefined = viableCandidates.length > 0

@@ -154,7 +154,18 @@ export function createTargetRecoveryCostContext(
         else if (effect.offerPrice) currencies.add(effect.offerPrice.currency);
       }
     }
-    if (!journeyIds.size) return undefined;
+    if (!journeyIds.size) {
+      // No effect carries a provider price or penalty. Name the comparison
+      // currency only when every organisation with a default currency agrees,
+      // so a zero total can be stored without inventing a conversion.
+      const currencies = new Set(
+        world.organisations
+          .map((organisation) => organisation.defaultCurrencyCode)
+          .filter((currency): currency is string => currency !== null && currency.length > 0),
+      );
+      if (currencies.size !== 1) return undefined;
+      return { homeCurrency: [...currencies][0]!, rates: [], comparedAt: clock() };
+    }
     const organisationIds = new Set<string>();
     for (const journeyId of journeyIds) {
       const journey = world.journeys.find((candidate) => candidate.id === journeyId);
