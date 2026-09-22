@@ -452,12 +452,12 @@ export async function findRecoveryPlanningAttemptForBasis(
 }
 
 /**
- * Read helper: the most recently COMPLETED attempt for a case, if any. Serves
- * the C9 Case projection (freeze §12), which surfaces the latest decision-time
- * planning evidence. Orders by `completed_at DESC` (never by insertion/uuid) and
- * is backed by `idx_recovery_planning_attempts_case`
- * `(workspace_id, recovery_case_id, completed_at DESC)`; ties are broken by the
- * unique `(recovery_case_id, basis_assessment_id)` row so the result is stable.
+ * Read helper: the planning attempt the Case should show. Prefer an attempt
+ * whose basis assessment is still current. Two attempts can share `completed_at`
+ * when both were stamped with the evaluation clock; a superseded stale-retry
+ * row must not hide the plan for the current basis just because its assessment
+ * id sorts later. Among current bases, the latest completion wins, with the
+ * basis id only as a stable final tiebreak.
  */
 export async function findLatestRecoveryPlanningAttemptForCase(
   db: Queryable,
@@ -468,9 +468,15 @@ export async function findLatestRecoveryPlanningAttemptForCase(
     `SELECT id, recovery_case_id, basis_assessment_id, basis_manifest, started_at, completed_at,
              coordinator_version, domains, evidence, model_activities, material_candidates, viable_strategy_refs,
             recommendation, outcome
-       FROM recovery_planning_attempts
-      WHERE workspace_id = $1 AND recovery_case_id = $2
-      ORDER BY completed_at DESC, basis_assessment_id DESC
+       FROM recovery_planning_attempts attempt
+      WHERE attempt.workspace_id = $1 AND attempt.recovery_case_id = $2
+      ORDER BY EXISTS (
+                 SELECT 1 FROM assessments newer
+                  WHERE newer.workspace_id = attempt.workspace_id
+                    AND newer.supersedes_assessment_id = attempt.basis_assessment_id
+               ) ASC,
+               attempt.completed_at DESC,
+               attempt.basis_assessment_id DESC
       LIMIT 1`,
     [workspaceId, recoveryCaseId],
   );
