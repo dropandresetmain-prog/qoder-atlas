@@ -325,10 +325,16 @@ export class PgReassessmentWorker {
           SELECT id FROM scheduled_reassessments
            WHERE ((state = 'PENDING' AND (
                     next_run_at <= $2::timestamptz
-                    -- Input-change rows are stamped with wall-clock next_run_at.
-                    -- A scenario clock behind that wall time must still run them
-                    -- once; retries (attempts > 0) keep their backoff.
-                    OR (attempts = 0 AND next_run_at <= clock_timestamp())
+                    -- INPUT_CHANGED rows (and their retries) are stamped with
+                    -- wall-clock next_run_at. When the evaluation clock is
+                    -- CONTROLLED behind wall time, those rows must still run;
+                    -- otherwise drain stays EMPTY and dependent execution
+                    -- DEFERs forever on ASSESSMENT_NOT_CURRENT.
+                    OR (
+                      reason = 'INPUT_CHANGED'
+                      AND $2::timestamptz < clock_timestamp()
+                      AND next_run_at <= clock_timestamp()
+                    )
                   )) OR (state = 'CLAIMED' AND lease_expires_at < $2::timestamptz))
              AND ($4::uuid IS NULL OR workspace_id = $4::uuid)
            ORDER BY next_run_at, id

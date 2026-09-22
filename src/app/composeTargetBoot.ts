@@ -472,9 +472,9 @@ export async function composeTargetBoot(
     executorPrincipalId,
     ...(intelligence ? { intelligence } : {}),
     afterApproval: async () => {
-      // Approvals under CONTROLLED clocks need the same coerce→drain→execute
-      // path as wakeEvaluation: M6 enqueues with wall next_run_at, and a single
-      // execution pass often DEFERs until assessments are CURRENT again.
+      // Same coerce→drain→execute path as wakeEvaluation so CONTROLLED demos
+      // do not leave dependent programme intents DEFERRED after the first
+      // mutation. Bounded so approve HTTP cannot hang for minutes.
       const now = evaluationNow();
       await endpoints.app.pool.query(
         `UPDATE scheduled_reassessments
@@ -486,23 +486,15 @@ export async function composeTargetBoot(
         [config.workspaceId, now],
       );
       await endpoints.app.reassessmentWorker.enqueueDue(now, config.workspaceId);
-      await endpoints.app.reassessmentWorker.drainAvailable(now, pipeline, {
-        workspaceId: config.workspaceId,
-        maxItems: 200,
-        maxMs: 60_000,
-      });
-      await execution.runNow();
-      await externalExecution?.runNow();
-      // Second pass: first internal mutation invalidates assessments; drain +
-      // execute again so the dependent programme intent is not left EXECUTING
-      // until the next idle poll.
-      await endpoints.app.reassessmentWorker.drainAvailable(evaluationNow(), pipeline, {
-        workspaceId: config.workspaceId,
-        maxItems: 200,
-        maxMs: 60_000,
-      });
-      await execution.runNow();
-      await externalExecution?.runNow();
+      for (let pass = 0; pass < 3; pass += 1) {
+        await endpoints.app.reassessmentWorker.drainAvailable(evaluationNow(), pipeline, {
+          workspaceId: config.workspaceId,
+          maxItems: 100,
+          maxMs: 20_000,
+        });
+        await execution.runNow();
+        await externalExecution?.runNow();
+      }
       await lifecycle.runNow();
     },
     ...(externalCapabilityStatements.length > 0 ? { externalCapabilities: externalCapabilityStatements } : {}),
