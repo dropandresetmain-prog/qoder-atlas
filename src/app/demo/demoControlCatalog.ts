@@ -32,6 +32,16 @@ export interface DemoControlDefinition {
   order: number;
   /** Timeline stage id when variant is TIMELINE_*. */
   stageId?: string;
+  /**
+   * Optional later timeline stage whose evaluation clock is in force when this
+   * provider stage is applied. The provider event keeps its own timestamp.
+   */
+  thenStageId?: string;
+  /**
+   * `debug` stays on the full demo console and is omitted from the compact
+   * founder popover. Absent means the compact popover shows the control.
+   */
+  presentation?: 'compact' | 'debug';
 }
 
 export interface DemoControlCatalog {
@@ -50,6 +60,8 @@ interface RawControlEntry {
   description?: unknown;
   order?: unknown;
   stageId?: unknown;
+  thenStageId?: unknown;
+  presentation?: unknown;
 }
 
 interface RawCatalogFile {
@@ -82,6 +94,9 @@ function parseControl(raw: RawControlEntry): DemoControlDefinition | undefined {
   const description = asString(raw.description) ?? '';
   const order = typeof raw.order === 'number' && Number.isFinite(raw.order) ? raw.order : 100;
   const stageId = asString(raw.stageId);
+  const thenStageId = asString(raw.thenStageId);
+  const presentationRaw = asString(raw.presentation);
+  const presentation = presentationRaw === 'debug' || presentationRaw === 'compact' ? presentationRaw : undefined;
   if (!id || !label) return undefined;
   if (kind !== 'PROVIDER_EVENT' && kind !== 'EVALUATION_CLOCK_ADVANCE') return undefined;
   if (
@@ -106,6 +121,8 @@ function parseControl(raw: RawControlEntry): DemoControlDefinition | undefined {
     description,
     order,
     ...(stageId ? { stageId } : {}),
+    ...(thenStageId ? { thenStageId } : {}),
+    ...(presentation ? { presentation } : {}),
   };
 }
 

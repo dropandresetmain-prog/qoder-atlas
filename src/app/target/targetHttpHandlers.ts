@@ -685,6 +685,8 @@ export async function handleTargetProductHttp(
           description: control.description,
           order: control.order,
           ...(control.stageId ? { stageId: control.stageId } : {}),
+          ...(control.thenStageId ? { thenStageId: control.thenStageId } : {}),
+          ...(control.presentation ? { presentation: control.presentation } : {}),
         })),
       });
       return true;

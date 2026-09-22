@@ -13,7 +13,8 @@
 - [x] CP2 — seed/world truth. Jordan stay is confirmed lyf Bugis `z-xdzAxcv` (`lp6d67d`), four nights 29 Sep–3 Oct. Checked-in cancel tier is USD 670.77 with no zero-amount window, so the represented penalty is that full price, not zero and not the search-preview USD 167.69.
 - [x] CP3 — read-model/graph contract. Shared service CHANGED on schedule change and RECOVERED after reprotection. Four PASS travellers stay HEALTHY; a separate blocking failure stays FAILED. Proposed truth label is “Proposed · not committed”. Colour fix `617ed6a`. Focused graph tests 45 PASS / 0 FAIL.
 - [x] CP4 — Sarah product path. `b1SarahWorldRecovery.pgtest.ts` 1 PASS / 0 FAIL. Reprotection now runs because pending reassessments are claimable when the scenario clock is behind wall time. Planning evidence fits after the candidate jsonb cap moved to 1 MiB. Recommended domain PROGRAMME. Basis: 0 regressions, 1 improvement, blast radius 3. No declared cost on that candidate, so cost did not break the tie. Approved that recommendation, executed, reassessment PASS, case RESOLVED.
-- [x] QC-P1 — known-zero programme economics and nearest-swap tiebreak. Focused: comparator, coordinator generality, FX context, operator cost presentation. 41 PASS / 0 FAIL. PostgreSQL three-run repeatability not yet run.
+- [x] QC-P1 — known-zero programme economics and nearest-swap tiebreak. Focused: comparator, coordinator generality, FX context, operator cost presentation. 41 PASS / 0 FAIL. PostgreSQL three-run repeatability not yet run. SHA `e35214e`.
+- [x] QC-P4a — D3 demo control sets the configured overnight evaluation clock; compact popover hides `presentation: debug`. Catalog tests 6 PASS / 0 FAIL. Physical Jordan recommendation not yet re-run.
 - [ ] CP5 — Jordan full vertical
 - [ ] CP6 — same-world Sarah + Jordan product proof
 - [ ] Final gates
@@ -51,7 +52,9 @@ Founder-QC pass on `fix/a5-hero-e2e-closure` starting `23759dfc314a599c74a441eae
 
 Sarah first-run root cause (code, before the known-zero fix): a programme-only swap has no priced effect, so cost comparison was omitted. The comparator treats an omitted cost as unknown and sorts it last. A viable replacement flight with unavailable or positive cost, and a smaller blast radius, therefore became the primary recommendation (`Not compared`, airline booking not enabled). A later plan with no viable flight left only the programme swap. Known-zero exposure (`0`, empty provider lines) now ranks that internal swap ahead of a paid or unpriced flight when regressions match. Nearest programme movement is a tiebreak after blast radius, ahead of strategy-ref order.
 
-Still open on this pass: staged Sarah progression, three fresh-world Sarah repeats, Jordan D3 owning the overnight evaluation clock, graph/read-model truth, recommendation blast-radius presentation, activity feed, hero copy, Demo Console cleanup, reset profiling, physical browser QC.
+Jordan D3 demo control now applies the provider stage at its own observation time and sets the workspace evaluation clock from `thenStageId` (`overnight_narita_necessary`, `2026-09-29T21:30:00+09:00`). The standalone overnight clock control is `presentation: debug`, so the compact popover omits it and `/demo/control` still lists it. This does not by itself prove the multi-domain recommendation: that plan in `a5JordanD3Planning.pgtest.ts` also depends on sandbox passport, intended visit, and `NORTHSTAR_RECOVERY_RESEARCH_CONFIG`. If that config is absent at boot, hotel research is not composed.
+
+Still open on this pass: staged Sarah progression, three fresh-world Sarah repeats, graph/read-model truth, recommendation blast-radius presentation, activity feed, remaining hero copy, reset profiling, physical browser QC.
 
 Do not reopen the hotel penalty amount or the graph colour rule. The comparator change above is the founder-QC economics fix; it does not reopen RC-6.
 

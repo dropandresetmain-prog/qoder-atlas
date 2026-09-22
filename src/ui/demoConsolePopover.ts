@@ -244,6 +244,7 @@ ${helpers}
     var byGroup = {};
     for (var i = 0; i < controls.length; i += 1) {
       var c = controls[i];
+      if (c.presentation === 'debug') continue;
       if (!byGroup[c.group]) { byGroup[c.group] = []; groups.push(c.group); }
       byGroup[c.group].push(c);
     }

@@ -55,3 +55,19 @@ export function findTimelineStage(timeline: DelayTimeline, stageId: string): Del
   return harnessDrivenStages(timeline).find((stage) => stage.id === stageId)
     ?? timeline.stages.find((stage) => stage.id === stageId);
 }
+
+/**
+ * Workspace evaluation time for a provider stage. A following clock-only stage
+ * supplies the scenario's planning instant; the provider event keeps its own
+ * observation time.
+ */
+export function evaluationInstantForProviderStage(
+  timeline: DelayTimeline,
+  stage: DelayStage,
+  thenStageId: string | undefined,
+): string | undefined {
+  if (!thenStageId) return stage.at;
+  const next = findTimelineStage(timeline, thenStageId);
+  if (next && isClockOnlyStage(next) && next.planningNow) return next.planningNow;
+  return stage.at;
+}

@@ -37,9 +37,10 @@
       "kind": "PROVIDER_EVENT",
       "variant": "TIMELINE_PROVIDER_STAGE",
       "stageId": "zg053_impossible",
+      "thenStageId": "overnight_narita_necessary",
       "group": "Jordan",
       "label": "D3 — Connection impossible",
-      "description": "Progressive delay stage: baseline connection is impossible.",
+      "description": "Progressive delay stage: baseline connection is impossible. Also sets the configured evaluation clock so same-night departures are no longer boardable.",
       "order": 40
     },
     {
@@ -50,6 +51,7 @@
       "group": "Jordan",
       "label": "Overnight — Advance scenario clock",
       "description": "Advances the workspace evaluation clock only. Overnight / boardability must emerge from timing.",
+      "presentation": "debug",
       "order": 50
     }
   ]

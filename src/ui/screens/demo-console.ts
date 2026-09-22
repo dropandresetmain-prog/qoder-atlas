@@ -72,10 +72,10 @@ export function renderDemoConsole(view: DemoConsoleView): string {
     <h2>Demo readiness</h2>
     <p class="dc-note">Runs the existing read-only readiness preflight. Does not provision or mutate world state.</p>
     <div class="dc-row">
-      <button type="button" data-demo-console="preflight" data-test="demo-console-preflight-btn">Run preflight</button>
+      <button type="button" data-demo-console="preflight" data-test="demo-console-preflight-btn">Check demo readiness</button>
     </div>
     <p class="dc-status" data-demo-console-status="preflight" role="status" aria-live="polite"></p>
-    <details data-test="demo-console-preflight-detail"><summary>Detailed checks</summary><pre data-demo-console-detail="preflight"></pre></details>
+    <details data-test="demo-console-preflight-detail"><summary>Details</summary><pre data-demo-console-detail="preflight"></pre></details>
   </section>
 
   ${groups.map((group) => `

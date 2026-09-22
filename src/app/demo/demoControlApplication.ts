@@ -18,6 +18,7 @@ import { runCaseEscalation } from '../target/caseEscalation.ts';
 import { recordEvidence, recordSource } from '../../persistence/postgres/commands/knowledgeCommands.ts';
 import { loadDisclosedDisruptionEvent } from './providerDisruptionEventSource.ts';
 import {
+  evaluationInstantForProviderStage,
   findTimelineStage,
   isClockOnlyStage,
   isProviderEventStage,
@@ -238,13 +239,18 @@ async function applyTimelineProviderStage(
     return { ok: false, code: 'AGGREGATE_MISSING', message: `Aggregate head missing for service ${serviceId}` };
   }
 
-  const at = (stage.at ?? new Date().toISOString()) as Instant;
-  const evidence = await recordStageEvidence(deps, stage, serviceId, at);
+  const eventAt = (stage.at ?? new Date().toISOString()) as Instant;
+  const evaluationNow = (evaluationInstantForProviderStage(catalog.timeline, stage, control.thenStageId) ?? eventAt) as Instant;
+  const evidence = await recordStageEvidence(deps, stage, serviceId, eventAt);
   if (!evidence.ok) {
     return { ok: false, code: 'EVIDENCE_FAILED', message: evidence.message };
   }
   const evidenceId = evidence.evidenceId;
-  await deps.evaluationClock.advanceTo(at);
+  await deps.evaluationClock.advanceTo(evaluationNow);
+  if (evaluationNow !== eventAt) {
+    await new PgReassessmentWorker(deps.pool, { actorId: deps.actorPrincipalId })
+      .enqueueDue(evaluationNow, deps.workspaceId);
+  }
 
   const commandCtx = {
     workspaceId: deps.workspaceId,
@@ -255,7 +261,7 @@ async function applyTimelineProviderStage(
   const ingress = await acceptProviderShapedDemoEvent(commandCtx, {
     providerId: 'configured-progressive-delay',
     providerEventId: stage.eventId!,
-    receivedAt: at,
+    receivedAt: eventAt,
     disclosedAsSimulatedDemoInput: true,
     payload: {
       subjectKind: 'TRANSPORT_SERVICE',

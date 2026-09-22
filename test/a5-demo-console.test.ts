@@ -10,6 +10,7 @@ import {
   findDemoControl,
   loadDemoControlCatalog,
 } from '../src/app/demo/demoControlCatalog.ts';
+import { evaluationInstantForProviderStage, loadTimeline } from '../src/app/demo/progressiveDelayTimeline.ts';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CONTROLS = join(ROOT, 'data/ait-demo-input-pack/demo-controls.json');
@@ -53,6 +54,20 @@ test('demo console catalog lists configured controls without scenario branching'
   assert.ok(overnight);
   assert.equal(overnight!.kind, 'EVALUATION_CLOCK_ADVANCE');
   assert.equal(overnight!.variant, 'TIMELINE_CLOCK_STAGE');
+  assert.equal(overnight!.presentation, 'debug');
+
+  const d3 = findDemoControl(catalog, 'zg053_impossible');
+  assert.ok(d3);
+  assert.equal(d3!.thenStageId, 'overnight_narita_necessary');
+  assert.equal(d3!.presentation, undefined);
+  const timeline = loadTimeline(TIMELINE);
+  const d3Stage = timeline.stages.find((stage) => stage.id === 'zg053_impossible');
+  assert.ok(d3Stage);
+  assert.equal(
+    evaluationInstantForProviderStage(timeline, d3Stage!, d3!.thenStageId),
+    '2026-09-29T21:30:00+09:00',
+  );
+  assert.equal(d3Stage!.at, '2026-09-29T12:00:00+09:00');
 
   assert.equal(findDemoControl(catalog, 'does-not-exist'), undefined);
 });

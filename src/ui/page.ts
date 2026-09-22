@@ -274,9 +274,9 @@ function renderDemoConsoleControl(): string {
       <div data-demo-console-controls data-test="demo-console-pop-controls"><p class="dc-note">Loading controls…</p></div>
       <section class="dc-utility" data-test="demo-console-pop-preflight">
         <h3>Demo readiness</h3>
-        <button type="button" data-demo-console="preflight" data-test="demo-console-pop-preflight-btn">Run preflight</button>
+        <button type="button" data-demo-console="preflight" data-test="demo-console-pop-preflight-btn">Check demo readiness</button>
         <p class="dc-status" data-demo-console-status="preflight" role="status" aria-live="polite"></p>
-        <details data-test="demo-console-pop-preflight-detail"><summary>Detailed checks</summary><pre data-demo-console-detail="preflight"></pre></details>
+        <details data-test="demo-console-pop-preflight-detail"><summary>Details</summary><pre data-demo-console-detail="preflight"></pre></details>
       </section>
       <section class="dc-utility dc-reset-section" data-test="demo-console-pop-reset">
         <h3>Demo state</h3>
