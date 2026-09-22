@@ -296,3 +296,41 @@ test('the standalone /demo/control fallback link is gone from the top bar, but t
     assert.equal(await page.locator('[data-test="demo-console-pop-preflight-btn"]').count(), 1);
   });
 });
+
+test('survives the shell runtime region-patching the topbar (e.g. after a decision-count change): the toggle still opens the popover and controls still load', async (t) => {
+  await withPage(t, async (page, log) => {
+    // Prove the widget is *usable* first (matches production sequence: apply
+    // -> a poll patches shell-topbar because content changed elsewhere).
+    await page.locator('[data-test="demo-console-toggle"]').click();
+    await page.locator('[data-test="demo-console-pop-trigger-airline-disruption-configured"]').waitFor({ state: 'visible' });
+    await page.locator('[data-test="demo-console-toggle"]').click(); // close
+
+    // Simulate the shell runtime's replaceRegion() swapping the whole
+    // shell-topbar DOM for a byte-identical clone (same as a real poll that
+    // finds the region's server-rendered HTML unchanged in shape but a new
+    // node instance) -- this is what silently orphaned a cached toggle/pop/
+    // overlay reference before the fix.
+    await page.evaluate(() => {
+      const live = document.querySelector('[data-poll-region="shell-topbar"]');
+      if (!live) throw new Error('shell-topbar region not found');
+      const clone = live.cloneNode(true) as HTMLElement;
+      live.replaceWith(clone);
+    });
+
+    const toggleAfterPatch = page.locator('[data-test="demo-console-toggle"]');
+    assert.equal(await toggleAfterPatch.count(), 1, 'toggle still present after the region patch');
+    await toggleAfterPatch.click();
+    await assert.doesNotReject(
+      page.locator('[data-test="demo-console-pop"]').waitFor({ state: 'visible', timeout: 2000 }),
+      'popover still opens on the patched toggle',
+    );
+    // The fresh (cloned) popover has no data-dc-loaded marker, so it must
+    // refetch rather than staying stuck on stale/empty content.
+    await page.locator('[data-test="demo-console-pop-trigger-airline-disruption-configured"]').waitFor({ state: 'visible', timeout: 2000 });
+
+    await page.locator('[data-test="demo-console-pop-trigger-airline-disruption-configured"]').click();
+    await page.clock.runFor(5500);
+    await page.locator('[data-test="demo-console-overlay"]').getByText(/Applied\.|Triggering/).waitFor({ timeout: 2000 });
+    assert.deepEqual(log.apply, ['airline-disruption-configured'], 'the trigger reached the backend even through the patched DOM');
+  });
+});

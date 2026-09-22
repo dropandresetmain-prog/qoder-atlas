@@ -111,13 +111,20 @@ export function renderDemoConsolePopoverScript(): string {
 ${constants}
 ${helpers}
 
-  var toggle = document.querySelector('[data-demo-console-toggle]');
-  var pop = document.querySelector('[data-demo-console-pop]');
-  var overlay = document.querySelector('[data-demo-console-overlay]');
-  if (!toggle || !pop || !overlay) return;
+  // The shell runtime may region-patch the shell-topbar poll region (e.g.
+  // when the decision count changes) and replace this widget's DOM
+  // wholesale. A one-time querySelector cached in a variable would then
+  // point at a detached node with no listeners. So: never cache toggle/pop/
+  // overlay elements -- resolve them fresh on every use, and drive every
+  // interaction through document-level delegation (document itself is
+  // never replaced). Loaded-state lives on the popover node itself
+  // (its data-dc-loaded attribute), not in a module variable, so a freshly
+  // swapped-in (unloaded) popover self-heals by refetching on next open.
+  function getToggle() { return document.querySelector('[data-demo-console-toggle]'); }
+  function getPop() { return document.querySelector('[data-demo-console-pop]'); }
+  function getOverlay() { return document.querySelector('[data-demo-console-overlay]'); }
+  function getControlsBox() { var pop = getPop(); return pop ? pop.querySelector('[data-demo-console-controls]') : null; }
 
-  var controlsBox = pop.querySelector('[data-demo-console-controls]');
-  var loadState = 'idle'; // idle | loading | loaded | error
   var pending = null; // PendingState
   var tickTimer = null;
   var clearTimer = null;
@@ -129,63 +136,108 @@ ${helpers}
   }
 
   function currentDelay() {
-    var checked = pop.querySelector('input[name="dc-delay"]:checked');
+    var pop = getPop();
+    var checked = pop ? pop.querySelector('input[name="dc-delay"]:checked') : null;
     return parseTriggerDelay(checked ? checked.value : null);
   }
 
   // ── popover open/close ────────────────────────────────────────────────
   function openPopover() {
+    var pop = getPop();
+    var toggle = getToggle();
+    if (!pop || !toggle) return;
     pop.hidden = false;
     toggle.setAttribute('aria-expanded', 'true');
-    if (loadState === 'idle') loadControls();
+    if (pop.getAttribute('data-dc-loaded') !== '1') loadControls();
     renderPendingIntoPopover();
   }
   function closePopover() {
-    pop.hidden = true;
-    toggle.setAttribute('aria-expanded', 'false');
+    var pop = getPop();
+    var toggle = getToggle();
+    if (pop) pop.hidden = true;
+    if (toggle) toggle.setAttribute('aria-expanded', 'false');
   }
   function togglePopover() {
+    var pop = getPop();
+    if (!pop) return;
     if (pop.hidden) openPopover(); else closePopover();
   }
-  toggle.addEventListener('click', function (event) {
-    event.preventDefault();
-    togglePopover();
-  });
+
   document.addEventListener('click', function (event) {
-    if (pop.hidden) return;
-    if (pop.contains(event.target) || toggle.contains(event.target)) return;
-    closePopover();
+    var target = event.target;
+    var toggle = getToggle();
+    var pop = getPop();
+    var overlay = getOverlay();
+    if (toggle && toggle.contains(target)) {
+      event.preventDefault();
+      togglePopover();
+      return;
+    }
+    if (pop && !pop.hidden) {
+      if (pop.contains(target)) {
+        var trigger = target.closest ? target.closest('[data-demo-console="trigger"]') : null;
+        if (trigger) {
+          beginTrigger(trigger.getAttribute('data-control-id'), trigger.getAttribute('data-control-label') || trigger.textContent || '');
+          return;
+        }
+        var preflightBtn = target.closest ? target.closest('[data-demo-console="preflight"]') : null;
+        if (preflightBtn) {
+          runPreflight(preflightBtn);
+          return;
+        }
+        return; // other clicks inside the popover (radios, etc.) are not outside-clicks
+      }
+      closePopover();
+    }
+    if (overlay && !overlay.hidden) {
+      var cancelBtn = target.closest ? target.closest('[data-demo-console-overlay-cancel]') : null;
+      if (cancelBtn && pending && pending.phase === 'counting') {
+        stopTicking();
+        pending = cancelCountdown(pending);
+        renderOverlay();
+        renderPendingIntoPopover();
+      }
+    }
   });
   document.addEventListener('keydown', function (event) {
-    if (event.key === 'Escape' && !pop.hidden) {
+    var pop = getPop();
+    if (event.key === 'Escape' && pop && !pop.hidden) {
       closePopover();
-      toggle.focus();
+      var toggle = getToggle();
+      if (toggle) toggle.focus();
     }
   });
 
   // ── control catalog (data-driven; same GET the standalone page uses) ───
   function loadControls() {
-    loadState = 'loading';
-    controlsBox.innerHTML = '<p class="dc-note">Loading controls…</p>';
+    var box = getControlsBox();
+    var pop = getPop();
+    if (!box) return;
+    box.innerHTML = '<p class="dc-note">Loading controls…</p>';
     fetch('/api/v2/demo/controls', { headers: { accept: 'application/json' } })
       .then(function (res) { return res.json().then(function (body) { return { ok: res.ok, body: body }; }); })
       .then(function (r) {
+        var freshBox = getControlsBox();
+        var freshPop = getPop();
+        if (!freshBox) return;
         if (!r.ok) {
-          loadState = 'error';
-          controlsBox.innerHTML = '<p class="dc-note dc-status is-err">' + escapeHtml((r.body && r.body.message) || 'Controls unavailable.') + '</p>';
+          freshBox.innerHTML = '<p class="dc-note dc-status is-err">' + escapeHtml((r.body && r.body.message) || 'Controls unavailable.') + '</p>';
           return;
         }
-        loadState = 'loaded';
+        if (freshPop) freshPop.setAttribute('data-dc-loaded', '1');
         renderControls(r.body.controls || []);
       })
       .catch(function (err) {
-        loadState = 'error';
-        controlsBox.innerHTML = '<p class="dc-note dc-status is-err">' + escapeHtml(err && err.message ? err.message : 'Controls unavailable.') + '</p>';
+        var freshBox = getControlsBox();
+        if (freshBox) freshBox.innerHTML = '<p class="dc-note dc-status is-err">' + escapeHtml(err && err.message ? err.message : 'Controls unavailable.') + '</p>';
       });
+    void pop;
   }
   function renderControls(controls) {
+    var box = getControlsBox();
+    if (!box) return;
     if (controls.length === 0) {
-      controlsBox.innerHTML = '<p class="dc-note">No demo controls are configured.</p>';
+      box.innerHTML = '<p class="dc-note">No demo controls are configured.</p>';
       return;
     }
     var groups = [];
@@ -207,18 +259,21 @@ ${helpers}
       }
       html += '</section>';
     }
-    controlsBox.innerHTML = html;
+    box.innerHTML = html;
     applyPendingDisabledState();
   }
 
   // ── trigger delay + countdown ───────────────────────────────────────────
   function applyPendingDisabledState() {
+    var pop = getPop();
+    if (!pop) return;
     var triggers = pop.querySelectorAll('[data-demo-console="trigger"]');
     var busy = pending !== null;
     for (var i = 0; i < triggers.length; i += 1) triggers[i].disabled = busy;
   }
   function renderPendingIntoPopover() {
-    var note = pop.querySelector('[data-demo-console-pending-note]');
+    var pop = getPop();
+    var note = pop ? pop.querySelector('[data-demo-console-pending-note]') : null;
     if (!note) return;
     if (pending && (pending.phase === 'counting' || pending.phase === 'triggering')) {
       note.hidden = false;
@@ -230,14 +285,11 @@ ${helpers}
     applyPendingDisabledState();
   }
 
-  function overlayEls() {
-    return {
-      text: overlay.querySelector('[data-demo-console-overlay-text]'),
-      cancel: overlay.querySelector('[data-demo-console-overlay-cancel]'),
-    };
-  }
   function renderOverlay() {
-    var els = overlayEls();
+    var overlay = getOverlay();
+    if (!overlay) return;
+    var text = overlay.querySelector('[data-demo-console-overlay-text]');
+    var cancel = overlay.querySelector('[data-demo-console-overlay-cancel]');
     if (!pending) {
       overlay.hidden = true;
       return;
@@ -245,15 +297,15 @@ ${helpers}
     overlay.hidden = false;
     var name = countdownDisplayLabel(pending.label);
     if (pending.phase === 'counting') {
-      els.text.textContent = name + ' in ' + pending.secondsLeft + '…';
-      if (els.cancel) els.cancel.hidden = false;
+      if (text) text.textContent = name + ' in ' + pending.secondsLeft + '…';
+      if (cancel) cancel.hidden = false;
     } else if (pending.phase === 'triggering') {
-      els.text.textContent = 'Triggering ' + name + '…';
-      if (els.cancel) els.cancel.hidden = true;
+      if (text) text.textContent = 'Triggering ' + name + '…';
+      if (cancel) cancel.hidden = true;
     } else if (pending.phase === 'done') {
-      els.text.textContent = (pending.ok ? '' : 'Failed: ') + (pending.message || (pending.ok ? 'Applied.' : 'The trigger failed.'));
+      if (text) text.textContent = (pending.ok ? '' : 'Failed: ') + (pending.message || (pending.ok ? 'Applied.' : 'The trigger failed.'));
       overlay.className = 'dc-overlay ' + (pending.ok ? 'is-ok' : 'is-err');
-      if (els.cancel) els.cancel.hidden = true;
+      if (cancel) cancel.hidden = true;
     }
     if (pending.phase !== 'done') overlay.className = 'dc-overlay';
   }
@@ -319,32 +371,15 @@ ${helpers}
     }
   }
 
-  pop.addEventListener('click', function (event) {
-    var trigger = event.target && event.target.closest ? event.target.closest('[data-demo-console="trigger"]') : null;
-    if (trigger) {
-      beginTrigger(trigger.getAttribute('data-control-id'), trigger.getAttribute('data-control-label') || trigger.textContent || '');
-      return;
-    }
-    var preflightBtn = event.target && event.target.closest ? event.target.closest('[data-demo-console="preflight"]') : null;
-    if (preflightBtn) {
-      runPreflight(preflightBtn);
-    }
-  });
-
-  overlay.addEventListener('click', function (event) {
-    var cancelBtn = event.target && event.target.closest ? event.target.closest('[data-demo-console-overlay-cancel]') : null;
-    if (!cancelBtn) return;
-    if (!pending || pending.phase !== 'counting') return;
-    stopTicking();
-    pending = cancelCountdown(pending);
-    renderOverlay();
-    renderPendingIntoPopover();
-  });
+  // (Trigger/preflight/cancel clicks are handled by the single delegated
+  // document click listener above, so they keep working after a region
+  // patch replaces this widget's DOM.)
 
   // ── preflight (concise status in the popover, no delay applies here) ───
   function runPreflight(btn) {
-    var status = pop.querySelector('[data-demo-console-status="preflight"]');
-    var detail = pop.querySelector('[data-demo-console-detail="preflight"]');
+    var pop = getPop();
+    var status = pop ? pop.querySelector('[data-demo-console-status="preflight"]') : null;
+    var detail = pop ? pop.querySelector('[data-demo-console-detail="preflight"]') : null;
     btn.disabled = true;
     if (status) { status.textContent = 'Running…'; status.className = 'dc-status'; }
     fetch('/api/v2/demo/preflight', { method: 'POST', headers: { accept: 'application/json' } })
