@@ -140,6 +140,26 @@ export interface TransportServiceRow {
   actual_arrival?: string | null;
   /** Canonical IANA time zone of the arrival place, where available. */
   destination_time_zone?: string | null;
+  /** Provider service designator when a linked external record supplies one. */
+  service_code?: string | null;
+}
+
+/** Explain a failed arrival-readiness check from the evaluator's own minutes. */
+function readinessShortfall(
+  steps: readonly { facts: Record<string, string | number | boolean | null> }[] | undefined,
+  currentAt: string,
+): string | undefined {
+  for (const step of steps ?? []) {
+    const available = step.facts.availableMinutes;
+    const required = step.facts.requiredMinutes;
+    if (typeof available !== 'number' || typeof required !== 'number') continue;
+    const scheduled = step.facts.scheduledArrival;
+    if (typeof scheduled === 'string' && scheduled !== currentAt) continue;
+    const shortfall = required - available;
+    if (shortfall <= 0) continue;
+    return `${available} minutes available before the commitment, ${required} minutes required, ${shortfall} minutes short`;
+  }
+  return undefined;
 }
 
 function transportModeLabel(mode: string): string {
@@ -255,6 +275,12 @@ export interface FocusedCaseGraphEnrichmentInput {
   changedTransportServiceRefs?: ReadonlySet<string>;
   /** A completed supplier replacement, distinct from a schedule deterioration. */
   reprotectedTransportServiceRefs?: ReadonlySet<string>;
+  /**
+   * Published arrival of the single original service this change displaced.
+   * Used as the before-time on a reprotected booking whose own published
+   * arrival already equals the replacement schedule.
+   */
+  displacedPublishedArrival?: string;
 }
 
 /** Output: additional nodes and edges to append to the case's ldg. */
@@ -430,7 +456,11 @@ export function projectFocusedCaseGraphEnrichment(
         ref = `SERVICE_BOOKING:${serviceId}`;
         transportService = serviceById.get(serviceId);
         if (transportService) {
-          label = `${transportService.operator} ${transportModeLabel(transportService.mode)}`;
+          const rawCode = transportService.service_code?.trim();
+          const code = rawCode && !/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(rawCode) ? rawCode : undefined;
+          label = [transportService.operator, code, transportModeLabel(transportService.mode)]
+            .filter((part) => part && part.length > 0)
+            .join(' ');
           if (transportService.origin_place_name && transportService.destination_place_name) {
             detail = `${transportService.origin_place_name} → ${transportService.destination_place_name}`;
           }
@@ -507,27 +537,31 @@ export function projectFocusedCaseGraphEnrichment(
       if (item.kind === 'TRANSPORT' && transportService && currentAt && timingImplicated) {
           const timingRef = `TIMING:${item.id}:ARRIVAL`;
           timingRefByJourneyItem.set(item.id, timingRef);
+          const reprotected = input.reprotectedTransportServiceRefs?.has(item.selectedServiceId!) === true;
+          const displaced = reprotected ? input.displacedPublishedArrival : undefined;
+          const ownPublished = transportService.published_arrival ?? undefined;
+          const priorAt = displaced && displaced !== currentAt ? displaced : ownPublished;
+          const readiness = readinessShortfall(input.causalPath, currentAt);
           pushNode({
             ref: timingRef,
             kind: 'TIMING',
             label: 'Arrival timing',
-            // CHANGED when the published baseline differs. When an evaluator
-            // implicates arrival without a published-vs-current delta, the node
+            // CHANGED when a baseline arrival differs. When an evaluator
+            // implicates arrival without a before/after delta, the node
             // is AFFECTED (watch) — not FAILED — so programme readiness failures
             // do not paint a healthy schedule as a definitive timing failure.
             // Relationship edges carry FAILED when the link itself is broken.
-            semanticState: transportService.published_arrival !== null && currentAt !== transportService.published_arrival
-              ? 'CHANGED'
-              : 'AFFECTED',
+            semanticState: priorAt !== undefined && priorAt !== currentAt ? 'CHANGED' : 'AFFECTED',
             authority: 'AUTHORITATIVE',
             caseRef: input.caseId,
             // The service remains the visual home of TRANSPORT_SERVICE; the
             // timing node is the visual home of a causal JOURNEY_ITEM when it
             // exists. This keeps every canonical ref one-to-one.
             subjectRefs: [itemSubjectRef],
+            ...(readiness ? { detail: readiness } : {}),
             timing: {
               currentAt,
-              ...(transportService.published_arrival ? { publishedAt: transportService.published_arrival } : {}),
+              ...(priorAt ? { publishedAt: priorAt } : {}),
               ...(transportService.destination_time_zone ? { timeZone: transportService.destination_time_zone } : {}),
             },
           });

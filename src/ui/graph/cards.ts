@@ -36,18 +36,30 @@ export function nodeClass(ctx: CardContext): string {
   ].filter(Boolean).join(' ');
 }
 
+function formatTimingInstant(instant: string, timeZone: string | undefined): string {
+  const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZoneName: 'short', timeZone: timeZone ?? 'UTC' };
+  try { return new Intl.DateTimeFormat('en-GB', options).format(new Date(instant)); }
+  catch { return new Intl.DateTimeFormat('en-GB', { ...options, timeZone: 'UTC' }).format(new Date(instant)); }
+}
+
+/** Before → after when a published baseline differs; otherwise the current instant. */
+export function timingText(timing: { currentAt: string; publishedAt?: string; timeZone?: string } | undefined): string {
+  if (!timing) return '';
+  const current = formatTimingInstant(timing.currentAt, timing.timeZone);
+  if (timing.publishedAt && timing.publishedAt !== timing.currentAt) {
+    return `${formatTimingInstant(timing.publishedAt, timing.timeZone)} → ${current}`;
+  }
+  return current;
+}
+
 export function nodeInnerHtml(ctx: CardContext): string {
   const { presentationNode: node, isChecking } = ctx;
   const toneClass = TONE_CLASS[node.indicator.tone];
   const glyph = SEMANTIC_GLYPHS[node.indicator.glyph];
   const timing = node.timing;
-  const formatTime = (instant: string): string => {
-    const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZoneName: 'short', timeZone: timing?.timeZone ?? 'UTC' };
-    try { return new Intl.DateTimeFormat('en-GB', options).format(new Date(instant)); }
-    catch { return new Intl.DateTimeFormat('en-GB', { ...options, timeZone: 'UTC' }).format(new Date(instant)); }
-  };
-  const detail = timing
-    ? `<p class="fg-detail"><time datetime="${esc(timing.currentAt)}">${esc(formatTime(timing.currentAt))}</time>${timing.publishedAt && timing.publishedAt !== timing.currentAt ? `<br><span>Published: ${esc(formatTime(timing.publishedAt))}</span>` : ''}</p>`
+  const timingLine = timingText(timing);
+  const detail = timingLine
+    ? `<p class="fg-detail"><time datetime="${esc(timing!.currentAt)}">${esc(timingLine)}</time></p>${node.secondaryLabel ? `<p class="fg-detail">${esc(node.secondaryLabel)}</p>` : ''}`
     : node.secondaryLabel
     ? `<p class="fg-detail">${esc(node.secondaryLabel)}</p>`
     : '';
@@ -68,6 +80,7 @@ export function nodeAttrs(ctx: CardContext): Record<string, string> {
     'data-focus': node.focusRole,
     'data-evaluation': node.evaluationState,
     title: node.secondaryLabel ? `${node.label} — ${node.secondaryLabel}` : node.label,
+    ...(timingText(node.timing) ? { 'data-timing-text': timingText(node.timing) } : {}),
     role: 'button',
     tabindex: '0',
     'aria-label': `${node.label} — ${node.indicator.label}${node.timing ? ` — ${node.timing.currentAt}` : ''}`,

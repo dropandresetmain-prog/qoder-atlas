@@ -145,7 +145,9 @@ function proposalHtml(candidate: PlanningCandidateView | undefined, options?: Pr
 
   const checks = p.programmeChecks ?? [];
   const primaryChecks = checks.filter((c) => c.verdict !== 'PASS');
-  primaryChecks.push(...checks.filter((c) => c.verdict === 'PASS').slice(0, Math.max(0, 3 - primaryChecks.length)));
+  if (options?.parts !== 'commitments') {
+    primaryChecks.push(...checks.filter((c) => c.verdict === 'PASS').slice(0, Math.max(0, 3 - primaryChecks.length)));
+  }
   const remainingChecks = checks.filter((c) => !primaryChecks.includes(c));
   const check = (c: typeof checks[number], wrapTiming: boolean): string => {
     const timingLine = c.availableMinutes === undefined && c.requiredMinutes === undefined ? '' :
@@ -160,7 +162,7 @@ function proposalHtml(candidate: PlanningCandidateView | undefined, options?: Pr
   };
   const commitmentsHeading = options?.parts === 'commitments' ? '' : '<h4>Programme commitments</h4>';
   const commitmentsHtml = `${checks.length ? `<div class="cw-block">${commitmentsHeading}<div class="cw-itinerary">${primaryChecks.map((c) => check(c, !!options?.timingDisclosure)).join('')}</div>
-    ${remainingChecks.length ? details(`programme-checks-${candidate?.candidateKey ?? 'option'}`, `${remainingChecks.length} more commitment checks`, `<div class="cw-itinerary">${remainingChecks.map((c) => check(c, false)).join('')}</div>`) : ''}</div>` : ''}
+    ${remainingChecks.length ? details(`programme-checks-${candidate?.candidateKey ?? 'option'}`, options?.parts === 'commitments' ? 'View all trip checks' : `${remainingChecks.length} more commitment checks`, `<div class="cw-itinerary">${remainingChecks.map((c) => check(c, false)).join('')}</div>`) : ''}</div>` : ''}
     ${p.blockers.length ? `<div class="cw-block" data-test="proposal-conditions"><h4>Conditions still identified in this proposal</h4>${list(p.blockers.map((b) => `${b.verdict === 'FAIL' ? 'Failed' : 'Unconfirmed'} — ${CASE_REASON_SENTENCE[b.reasonCode] ?? 'a recorded check remains unresolved; see Technical details'}.`))}</div>` : ''}`;
   if (options?.parts === 'commitments') return commitmentsHtml;
   return `${itineraryHtml}${commitmentsHtml}`;
@@ -186,17 +188,16 @@ function conditionsList(view: RecoveryCaseView, m: CaseWorkspaceModel, candidate
  * One short sentence: only strategy.projectedSummary and the candidate's
  * PASS programme checks feed it. Never claims the trip is recovered.
  */
-function recommendationVerdict(strategy: RecoveryStrategyView, candidate: PlanningCandidateView | undefined): string {
+function recommendationVerdict(strategy: RecoveryStrategyView): string {
   const { pass, fail, unknown, total } = strategy.projectedSummary;
   const checksPart = total === 0
     ? 'No projected checks were recorded'
     : fail === 0 && unknown === 0
       ? `All ${total} projected checks pass`
       : `${pass} of ${total} projected checks pass`;
-  const passing = (candidate?.proposal?.programmeChecks ?? []).filter((c) => c.verdict === 'PASS');
-  const first = passing[0];
-  const keepsPart = first
-    ? ` · keeps ${truncateForGlance(decisionText(first.label, 'a programme commitment'))}${passing.length > 1 ? ` and ${passing.length - 1} more` : ''}`
+  const repaired = strategy.resolves.filter((person) => person.currentVerdict !== 'PASS' && person.projectedVerdict === 'PASS');
+  const keepsPart = repaired[0]
+    ? ` · restores ${truncateForGlance(decisionText(repaired[0].personLabel, 'the affected traveller'))}${repaired.length > 1 ? ` and ${repaired.length - 1} more` : ''}`
     : '';
   return `${checksPart}${keepsPart}.`;
 }
@@ -206,7 +207,13 @@ function truncateForGlance(text: string, max = 40): string {
   return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
 }
 
-function glanceChangesCell(candidate: PlanningCandidateView | undefined): string {
+function glanceChangesCell(strategy: RecoveryStrategyView, candidate: PlanningCandidateView | undefined): string {
+  const moved = strategy.changes.filter((change) => change.effectKind === 'CHANGE_PROGRAMME_ITEM_TIME' || change.proposedWindow);
+  if (moved.length > 0) {
+    const first = changeSummary(moved[0]!);
+    const more = moved.length > 1 ? `<span class="v5-glance-sub">+${moved.length - 1} more</span>` : '';
+    return `${e(first)}${more}`;
+  }
   const p = candidate?.proposal;
   const flight = p?.flights[0];
   if (flight) {
@@ -220,12 +227,12 @@ function glanceChangesCell(candidate: PlanningCandidateView | undefined): string
   return 'Not supplied';
 }
 
-function glanceProtectsCell(candidate: PlanningCandidateView | undefined): string {
-  const passing = (candidate?.proposal?.programmeChecks ?? []).filter((c) => c.verdict === 'PASS');
-  const first = passing[0];
-  if (!first) return 'No commitments recorded';
-  const more = passing.length > 1 ? `<span class="v5-glance-sub">+${passing.length - 1} more</span>` : '';
-  return `${e(decisionText(first.label, 'Programme commitment'))}${more}`;
+function glanceProtectsCell(strategy: RecoveryStrategyView): string {
+  const repaired = strategy.resolves.filter((person) => person.currentVerdict !== 'PASS' && person.projectedVerdict === 'PASS');
+  if (repaired.length === 0) return 'No failing outcome recorded';
+  const names = repaired.slice(0, 2).map((person) => decisionText(person.personLabel, 'Traveller')).join(', ');
+  const more = repaired.length > 2 ? `<span class="v5-glance-sub">+${repaired.length - 2} more</span>` : '';
+  return `${e(names)}${more}`;
 }
 
 function glanceCostsCell(candidate: PlanningCandidateView | undefined): string {
@@ -241,8 +248,8 @@ function glanceBlockedByCell(strategy: RecoveryStrategyView): string {
 
 function recommendationGlanceHtml(strategy: RecoveryStrategyView, candidate: PlanningCandidateView | undefined): string {
   return `<dl class="v5-rec-glance">
-    <div class="v5-glance-cell"><dt>Changes</dt><dd>${glanceChangesCell(candidate)}</dd></div>
-    <div class="v5-glance-cell"><dt>Protects</dt><dd>${glanceProtectsCell(candidate)}</dd></div>
+    <div class="v5-glance-cell"><dt>Changes</dt><dd>${glanceChangesCell(strategy, candidate)}</dd></div>
+    <div class="v5-glance-cell"><dt>Protects</dt><dd>${glanceProtectsCell(strategy)}</dd></div>
     <div class="v5-glance-cell"><dt>Costs</dt><dd>${glanceCostsCell(candidate)}</dd></div>
     <div class="v5-glance-cell"><dt>Blocked by</dt><dd>${glanceBlockedByCell(strategy)}</dd></div>
   </dl>`;
@@ -266,7 +273,7 @@ function recommendationHtml(view: RecoveryCaseView): string {
     <div class="v5-rec-head">
       <p class="cw-kicker">Proposed — not yet applied</p>
       <h3>${e(decisionTitle(strategy))}</h3>
-      <p class="v5-rec-verdict">${e(recommendationVerdict(strategy, candidate))}</p>
+      <p class="v5-rec-verdict">${e(recommendationVerdict(strategy))}</p>
     </div>
     ${recommendationGlanceHtml(strategy, candidate)}
     <section class="v5-rec-step" data-step="1"><h4>What changes</h4>${proposalHtml(candidate, { parts: 'itinerary' })}</section>

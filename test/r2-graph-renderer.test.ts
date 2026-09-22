@@ -78,8 +78,7 @@ test('arrival cards format supplied instants and historical workflow omission do
   const scene = buildGraphScene({ ldg: original, role: 'original' });
   assert.equal(JSON.stringify(original), before);
   assert.equal(scene.nodes.some((node) => node.ref === 'workflow'), false);
-  assert.match(scene.nodes[0]!.html, /16:00/);
-  assert.match(scene.nodes[0]!.html, /Published:.*14:00/);
+  assert.match(scene.nodes[0]!.html, /14:00 GMT\+8 → 1 May, 16:00/);
   assert.match(scene.nodes[0]!.html, /datetime="2031-05-01T08:00:00.000Z"/);
 });
 
@@ -190,6 +189,21 @@ test('PENDING_REASSESSMENT node shows checking badge while semantic tone unchang
   assert.ok(html.includes('sem-ok'), 'Should have ok tone class');
   // Should have data-evaluation attribute
   assert.ok(html.includes('data-evaluation="pending-reassessment"'));
+});
+
+test('pending reassessment of an unknown node reads Rechecking', () => {
+  const html = renderFocusedCaseGraph({
+    ldg: makeLdg({
+      nodes: [{
+        ref: 'A', kind: 'SERVICE_BOOKING', label: 'Booking A', semanticState: 'UNKNOWN',
+        authority: 'AUTHORITATIVE', evaluation: 'PENDING_REASSESSMENT',
+      }],
+      edges: [],
+    }),
+    caseStatus: 'OPEN',
+  });
+  assert.ok(html.includes('Rechecking'));
+  assert.equal(html.includes('Unknown / unconfirmed'), false);
 });
 
 test('alert-tone edge has no pulse class, ok-tone has pulse', () => {

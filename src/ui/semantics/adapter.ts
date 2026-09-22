@@ -109,7 +109,10 @@ export function presentDependencyGraph(input: unknown, focus: PresentationFocus 
       const entity = mapped(ENTITIES, node.kind);
       return {
         ref: node.ref, entityKind: node.kind, entityLabel: entity.label,
-        semanticState: node.semanticState, indicator: presentGraphState(node.semanticState),
+        semanticState: node.semanticState,
+        indicator: node.evaluation === 'PENDING_REASSESSMENT' && node.semanticState === 'UNKNOWN'
+          ? indicator('Rechecking', 'active', 'active')
+          : presentGraphState(node.semanticState),
         truthMode: mapped(AUTHORITY, node.authority),
         changeState: changedRefs.has(node.ref) ? 'marked' : 'not-marked',
         focusRole: primaryRefs.has(node.ref) ? 'primary' : causalRefs.has(node.ref) ? 'causal' : 'context',

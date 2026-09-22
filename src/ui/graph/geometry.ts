@@ -162,7 +162,13 @@ export function diagonalCurve(
 }
 
 /** Independent branches distributed across the parent's bottom surface, into the child's top. */
-export function bottomCurve(source: Box, target: Box, branchIndex: number, branchCount: number): EdgeGeometry {
+export function bottomCurve(
+  source: Box,
+  target: Box,
+  branchIndex: number,
+  branchCount: number,
+  obstacles: readonly Box[] = [],
+): EdgeGeometry {
   const fraction = (branchIndex + 1) / (branchCount + 1);
   const sx = source.x + source.w * fraction;
   const sy = source.y + source.h;
@@ -170,6 +176,8 @@ export function bottomCurve(source: Box, target: Box, branchIndex: number, branc
   const ty = target.y;
   const dy = Math.max(1, ty - sy);
   const handle = Math.max(16, Math.min(72, dy * 0.46));
+  const bypass = bypassPath(source, target, sx, sy, tx, ty, obstacles);
+  if (bypass) return { route: 'bottom', ...bypass };
   return {
     route: 'bottom',
     d: `M${r1(sx)} ${r1(sy)} C${r1(sx)} ${r1(sy + handle)},${r1(tx)} ${r1(ty - handle)},${r1(tx)} ${r1(ty)}`,
@@ -178,7 +186,13 @@ export function bottomCurve(source: Box, target: Box, branchIndex: number, branc
 }
 
 /** Source's top surface up into the bottom of a target that sits above it. */
-export function topCurve(source: Box, target: Box, branchIndex: number, branchCount: number): EdgeGeometry {
+export function topCurve(
+  source: Box,
+  target: Box,
+  branchIndex: number,
+  branchCount: number,
+  obstacles: readonly Box[] = [],
+): EdgeGeometry {
   const fraction = (branchIndex + 1) / (branchCount + 1);
   const sx = source.x + source.w * fraction;
   const sy = source.y;
@@ -186,6 +200,8 @@ export function topCurve(source: Box, target: Box, branchIndex: number, branchCo
   const ty = target.y + target.h;
   const dy = Math.max(1, sy - ty);
   const handle = Math.max(16, Math.min(72, dy * 0.46));
+  const bypass = bypassPath(source, target, sx, sy, tx, ty, obstacles);
+  if (bypass) return { route: 'top', ...bypass };
   return {
     route: 'top',
     d: `M${r1(sx)} ${r1(sy)} C${r1(sx)} ${r1(sy - handle)},${r1(tx)} ${r1(ty + handle)},${r1(tx)} ${r1(ty)}`,
@@ -222,6 +238,6 @@ export function routeEdge(
     return sideCurve(source, target, sourceFraction, targetFraction, obstacles);
   }
   return target.y >= source.y + source.h - 4
-    ? bottomCurve(source, target, branchIndex, branchCount)
-    : topCurve(source, target, branchIndex, branchCount);
+    ? bottomCurve(source, target, branchIndex, branchCount, obstacles)
+    : topCurve(source, target, branchIndex, branchCount, obstacles);
 }

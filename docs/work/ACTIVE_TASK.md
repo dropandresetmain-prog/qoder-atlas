@@ -15,6 +15,7 @@
 - [x] CP4 — Sarah product path. `b1SarahWorldRecovery.pgtest.ts` 1 PASS / 0 FAIL. Reprotection now runs because pending reassessments are claimable when the scenario clock is behind wall time. Planning evidence fits after the candidate jsonb cap moved to 1 MiB. Recommended domain PROGRAMME. Basis: 0 regressions, 1 improvement, blast radius 3. No declared cost on that candidate, so cost did not break the tie. Approved that recommendation, executed, reassessment PASS, case RESOLVED.
 - [x] QC-P1 — known-zero programme economics and nearest-swap tiebreak. Focused: comparator, coordinator generality, FX context, operator cost presentation. 41 PASS / 0 FAIL. PostgreSQL three-run repeatability not yet run. SHA `e35214e`.
 - [x] QC-P4a — D3 demo control sets the configured overnight evaluation clock; compact popover hides `presentation: debug`. Catalog tests 6 PASS / 0 FAIL. Physical Jordan recommendation not yet re-run.
+- [x] QC-P5 — graph labels, before/after arrival, readiness shortfall, Rechecking while unknown is pending, dimmed nodes stay selectable, vertical edges can step around cards, recommendation glance protects the people who move from failing to passing. Focused graph tests 45 PASS / 0 FAIL. Operator UI convergence PASS. Four pre-existing `r4-f1-ui-language` assertions still fail on HEAD (resolved lead copy, compared-cost sentence, cancellation exposure sentence, no-plan title). Physical browser QC not yet run.
 - [ ] CP5 — Jordan full vertical
 - [ ] CP6 — same-world Sarah + Jordan product proof
 - [ ] Final gates
@@ -56,7 +57,11 @@ Jordan D3 demo control now applies the provider stage at its own observation tim
 
 Completed traces agree on the remaining Jordan gap. `a5JordanD3Planning.pgtest.ts` plans at D3 noon (`stage.at`) and does not advance to 21:30. It passes because the harness provisions a sandbox passport, a Singapore intended visit, and a temporary `NORTHSTAR_RECOVERY_RESEARCH_CONFIG` before `planCaseDetailed`. Normal boot composes hotel research only when that config file is set. The AiT materializer does not create a passport from nationality, and the research schema binds workspace UUIDs, so a static file does not survive reset. A clock-only click after the first plan does not replan: progression allows one attempt per settled assessment, and the connection/overnight evaluators do not mint a new basis when only `now` moves. Next Jordan work is generic reset-time provisioning plus research configuration resolved from canonical rows, not another clock control.
 
-Still open on this pass: staged Sarah progression, three fresh-world Sarah repeats, graph/read-model truth, recommendation blast-radius presentation, activity feed, remaining hero copy, reset profiling, physical browser QC.
+Graph/read-model: a reprotection’s arrival card uses the original service’s published arrival as the before-time when that baseline differs from the replacement. The inspector shows that range plus the evaluator’s available/required/shortfall minutes. A pending reassessment on an UNKNOWN node reads Rechecking; a current UNKNOWN stays Unknown. Flight cards include a linked service designator when it is not a UUID.
+
+Recommendation glance: Changes prefers the programme window the option moves. Protects names the people whose verdict moves from not-passing to passing, not the first programme check that already passed. Passing commitment checks stay behind “View all trip checks”.
+
+Still open on this pass: staged Sarah progression, three fresh-world Sarah repeats, Jordan research composition from canonical passport/visit/stay, activity feed, remaining hero copy, reset profiling, physical browser QC.
 
 Do not reopen the hotel penalty amount or the graph colour rule. The comparator change above is the founder-QC economics fix; it does not reopen RC-6.
 

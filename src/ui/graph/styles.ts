@@ -256,10 +256,12 @@ export const FOCUSED_GRAPH_CSS = `
 .fg-pulse-dot.sem-watch { fill: var(--fg-amber); }
 
 /* ================= view / selection dimming ================= */
-.fg-node.fg-viewdim { opacity: 0.14; filter: saturate(0.3); }
+.fg-node.fg-viewdim { opacity: 0.42; filter: saturate(0.55); pointer-events: auto; }
+.fg-node.fg-viewdim:hover { opacity: 0.92; z-index: 28; }
 .fg-edge.fg-viewdim { opacity: 0.11; }
 .fg-pulse-dot.fg-viewdim { opacity: 0.08; }
-.fg-node.fg-dimmed { opacity: 0.14; filter: saturate(0.3); }
+.fg-node.fg-dimmed { opacity: 0.42; filter: saturate(0.55); pointer-events: auto; }
+.fg-node.fg-dimmed:hover { opacity: 0.92; z-index: 28; }
 .fg-edge.fg-dimmed { opacity: 0.11; }
 .fg-pulse-dot.fg-dimmed { opacity: 0.08; }
 .fg-node.fg-highlighted { box-shadow: 0 0 0 4px rgba(23, 52, 95, 0.09), 0 10px 22px rgba(18, 38, 68, 0.1); z-index: 27; }

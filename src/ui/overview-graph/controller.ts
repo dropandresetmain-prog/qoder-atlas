@@ -18,8 +18,21 @@ export const OVERVIEW_GRAPH_SCRIPT = `
     var p = text.split(' ').map(Number);
     return p.length === 4 && p.every(isFinite) && p[2] > 0 && p[3] > 0 ? { x: p[0], y: p[1], w: p[2], h: p[3] } : null;
   }
+  function alignPulses(canvas) {
+    var edges = Array.prototype.slice.call(canvas.querySelectorAll('.og-edge'));
+    Array.prototype.forEach.call(canvas.querySelectorAll('.og-pulse'), function (p) {
+      var mp = p.querySelector('mpath');
+      var href = mp && mp.getAttribute('href');
+      var edge = href ? edges.find(function (e) { return e.id === href.replace(/^#/, ''); }) : null;
+      if (!edge || edge.getAttribute('data-live') !== 'true') { p.remove(); return; }
+      p.classList.remove('og-h-green', 'og-h-amber', 'og-h-red');
+      var health = edge.getAttribute('data-health');
+      if (health) p.classList.add('og-h-' + health);
+      p.classList.toggle('og-dim', edge.classList.contains('og-dim'));
+    });
+  }
   function init(canvas) {
-    if (canvas.__ogInit) return;
+    if (canvas.__ogInit) { alignPulses(canvas); return; }
     var viewport = canvas.querySelector('.og-viewport'), world = canvas.querySelector('.og-world');
     if (!viewport || !world) return;
     canvas.__ogInit = true;

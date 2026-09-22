@@ -246,7 +246,9 @@ export const INTERACTIONS_SCRIPT = String.raw`
     // must never become executable markup when a node is selected.
     this.inspectorType.textContent = node.entityLabel || '';
     this.inspectorTitle.textContent = node.label || '';
-    this.inspectorDetail.textContent = node.secondaryLabel || 'No additional detail';
+    var timingText = node.attrs && node.attrs['data-timing-text'];
+    var detail = [timingText, node.secondaryLabel].filter(Boolean).join(' · ');
+    this.inspectorDetail.textContent = detail || 'No additional detail';
     this.inspectorState.textContent = node.stateLabel || 'State unavailable';
     this.inspector.hidden = false;
   };

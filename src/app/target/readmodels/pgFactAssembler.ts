@@ -56,7 +56,7 @@ function isoNow(at?: string): string {
 }
 
 const CHANGE_SIGNAL_LABELS: Readonly<Record<string, string>> = {
-  TRANSPORT_SERVICE_CANCELLED_WITH_REPROTECTION: 'Booking replaced by supplier',
+  TRANSPORT_SERVICE_CANCELLED_WITH_REPROTECTION: 'Airline rebooked flight',
   TRANSPORT_SCHEDULE_OBSERVED: 'Transport schedule observed',
   TRIP_PURPOSE_CHANGED: 'Trip purpose changed',
 };
@@ -809,11 +809,21 @@ async function loadRecoveryCaseFactsInner(
   // Transport service rows referenced by TRANSPORT items.
   const serviceIds = journeyItems.rows.filter((i) => i.kind === 'TRANSPORT' && i.selected_service_id).map((i) => i.selected_service_id!);
   const transportServices = serviceIds.length > 0
-    ? await client.query<{ id: string; mode: string; operator: string; origin_place_id: string; destination_place_id: string; origin_place_name: string | null; destination_place_name: string | null; published_departure: Date | null; published_arrival: Date | null; estimated_arrival: Date | null; actual_arrival: Date | null; destination_time_zone: string | null }>(
+    ? await client.query<{ id: string; mode: string; operator: string; origin_place_id: string; destination_place_id: string; origin_place_name: string | null; destination_place_name: string | null; published_departure: Date | null; published_arrival: Date | null; estimated_arrival: Date | null; actual_arrival: Date | null; destination_time_zone: string | null; service_code: string | null }>(
         `SELECT ts.id, ts.mode, ts.operator, ts.origin_place_id, ts.destination_place_id,
                 po.name AS origin_place_name, pd.name AS destination_place_name,
                 ts.published_departure, ts.published_arrival, ts.estimated_arrival,
-                ts.actual_arrival, pd.time_zone AS destination_time_zone
+                ts.actual_arrival, pd.time_zone AS destination_time_zone,
+                (SELECT split_part(er.external_id, '@', 1)
+                   FROM external_record_links erl
+                   JOIN external_records er
+                     ON er.workspace_id = erl.workspace_id AND er.id = erl.external_record_id
+                  WHERE erl.workspace_id = ts.workspace_id
+                    AND erl.canonical_subject_kind = 'TRANSPORT_SERVICE'
+                    AND erl.canonical_subject_id = ts.id
+                    AND erl.superseded_at IS NULL
+                  ORDER BY er.observed_at DESC NULLS LAST
+                  LIMIT 1) AS service_code
            FROM transport_services ts
            LEFT JOIN places po ON po.workspace_id = ts.workspace_id AND po.id = ts.origin_place_id
            LEFT JOIN places pd ON pd.workspace_id = ts.workspace_id AND pd.id = ts.destination_place_id
@@ -874,6 +884,24 @@ async function loadRecoveryCaseFactsInner(
         [workspaceId, causeRow.id, [...new Set(serviceIds)]],
       )
     : { rows: [] };
+
+  const displacedArrivals = causeRow?.change_type === 'TRANSPORT_SERVICE_CANCELLED_WITH_REPROTECTION'
+    ? await client.query<{ published_arrival: Date | null }>(
+        `SELECT ts.published_arrival
+           FROM signal_subjects ss
+           JOIN transport_services ts
+             ON ts.workspace_id = ss.workspace_id AND ts.id = ss.subject_id
+          WHERE ss.workspace_id = $1
+            AND ss.change_signal_id = $2
+            AND ss.subject_kind = 'TRANSPORT_SERVICE'
+            AND ss.role = 'ORIGINAL_SERVICE'`,
+        [workspaceId, causeRow.id],
+      )
+    : { rows: [] };
+  const displacedTimes = [...new Set(displacedArrivals.rows
+    .map((row) => row.published_arrival?.toISOString())
+    .filter((value): value is string => value !== undefined))];
+  const displacedPublishedArrival = displacedTimes.length === 1 ? displacedTimes[0] : undefined;
 
   // Traveller display names for the journeys (for human labels).
   const travellerIds = journeys.rows.map((j) => j.traveller_id);
@@ -1074,6 +1102,7 @@ async function loadRecoveryCaseFactsInner(
       estimated_arrival: s.estimated_arrival?.toISOString() ?? null,
       actual_arrival: s.actual_arrival?.toISOString() ?? null,
       destination_time_zone: s.destination_time_zone,
+      service_code: s.service_code,
     })),
     transportBookingFacts: transportBookingFacts.rows.map((fact): TransportBookingFact => ({
       journeyId: fact.journey_id,
@@ -1095,6 +1124,7 @@ async function loadRecoveryCaseFactsInner(
     changedTransportServiceRefs: new Set(changedTransportServiceRefs.rows.map((fact) => fact.subject_id)),
     ...(causeRow?.change_type === 'TRANSPORT_SERVICE_CANCELLED_WITH_REPROTECTION' ? {
       reprotectedTransportServiceRefs: new Set(changedTransportServiceRefs.rows.map((fact) => fact.subject_id)),
+      ...(displacedPublishedArrival ? { displacedPublishedArrival } : {}),
     } : {}),
   });
 

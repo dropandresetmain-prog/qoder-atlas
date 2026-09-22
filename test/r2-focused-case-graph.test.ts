@@ -715,3 +715,49 @@ test('shared-flight cohort: a schedule change marks the service changed, and rep
   });
   assert.equal(reprotected.nodes.filter((node) => node.ref === 'SERVICE_BOOKING:service-shared' && node.semanticState === 'RECOVERED').length, 1);
 });
+
+test('reprotected arrival shows the displaced baseline and the readiness shortfall', () => {
+  const currentAt = '2026-10-01T02:30:00.000Z';
+  const priorAt = '2026-09-30T12:30:00.000Z';
+  const result = projectFocusedCaseGraphEnrichment({
+    caseSubjects: [{ subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' }],
+    journeys: [{ id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null }],
+    journeyItems: [{ id: 'item-1', journey_id: 'journey-1', kind: 'TRANSPORT', order_key: '001', lifecycle_status: 'PLANNED', intended_window_start: null, intended_window_end: null, selectedServiceId: 'service-new' }],
+    transportServices: [{
+      id: 'service-new', mode: 'AIR', operator: 'ID', origin_place_id: 'origin', destination_place_id: 'destination',
+      origin_place_name: 'Jakarta', destination_place_name: 'Singapore',
+      published_departure: null, published_arrival: currentAt, service_code: 'ID7153',
+    }],
+    participations: [],
+    programmeItems: [],
+    objectives: [],
+    assessmentViews: new Map(),
+    travellerLabelsByJourney: new Map([['journey-1', 'Traveller']]),
+    caseId: 'case-1',
+    reprotectedTransportServiceRefs: new Set(['service-new']),
+    displacedPublishedArrival: priorAt,
+    causalPath: [{
+      subjectRef: 'JOURNEY:journey-1',
+      causeSubjectRef: 'JOURNEY_ITEM:item-1',
+      dimension: 'programme_participation',
+      reasonCode: 'insufficient_arrival_readiness',
+      evaluatorId: 'programme-arrival',
+      relatedSubjectRefs: ['JOURNEY_ITEM:item-1', 'TRANSPORT_SERVICE:service-new'],
+      facts: {
+        scheduledArrival: currentAt,
+        availableMinutes: 60,
+        requiredMinutes: 150,
+      },
+    }],
+  });
+  const booking = result.nodes.find((node) => node.ref === 'SERVICE_BOOKING:service-new');
+  const timing = result.nodes.find((node) => node.ref === 'TIMING:item-1:ARRIVAL');
+  assert.equal(booking?.label, 'ID ID7153 flight');
+  assert.equal(booking?.detail, 'Jakarta → Singapore');
+  assert.equal(timing?.semanticState, 'CHANGED');
+  assert.equal(timing?.timing?.publishedAt, priorAt);
+  assert.equal(timing?.timing?.currentAt, currentAt);
+  assert.match(timing?.detail ?? '', /60 minutes available/);
+  assert.match(timing?.detail ?? '', /150 minutes required/);
+  assert.match(timing?.detail ?? '', /90 minutes short/);
+});
