@@ -6,7 +6,7 @@
 - Worktree: `C:\Dev\qoder-atlas-a5-hero-e2e-closure`
 - Branch: `fix/a5-hero-e2e-closure`
 - Starting SHA: `7d4b1f5e3525294ab0585d08ae40d49e7ba3da24`
-- Current HEAD: `b4295a0` (pushed)
+- Current HEAD: `7720880`
 - Founder acceptance draft: see [Draft final PASS report](c52bb9ad-8869-4508-a0f2-78cba2173681) — clone IDs in JSON are mid-run; post-acceptance Reset left `ns_demo_cl_90dbd69cb03742ea`
 
 ## Mission
@@ -34,10 +34,20 @@ Founder URL: `http://127.0.0.1:8787/`
 Active clone (after hung-server restart, pristine TEMPLATE clone): `ns_demo_cl_f267d541469946d9`
 Workspace: `b96791c7-189f-4a59-ae30-b7cb5e6068b4`
 
+## Sarah disruption stall vs server truth (2026-09-22)
+
+Founder Sarah disruption **appeared stalled** in the UI/session, but the **server log** showed **drain + plan completed** through to **`AWAITING_AUTHORITY`**. This was **not** a DB clash with parallel agent probe scripts: normal dev is `node src/main.ts` (**no watch reload**).
+
+Root causes of the “stall” feel:
+1. Demo Console apply holds the HTTP request up to ~**62.5s** (2.5s intentional pause + up to **60s** `wakeEvaluation` drain); the popover stays on Triggering until the response returns.
+2. After plan completes, the case sits at **`AWAITING_AUTHORITY`** until operator **Approve** — execution idle by design, not a hung worker.
+
+**Product Reset** restored Sarah to **READY / VIABLE**. Apply still does not take the workspace operation lease (**Park** overlap with Reset).
+
 ## Post-acceptance triage (Park / Accept — not recording-blocking)
 
-- Overview `summary.ready=0` with READY population: **Park** — `summary` is case-queue counts; use `populationSummary` ([Overview summary ready bug](f3f85a0c-ae60-4689-925b-12240088341b)).
+- Overview `summary.ready=0` with READY population: **Clarified** — `summary` is case-queue counts; use `populationSummary` (comment + unit assert).
 - Gates: anti-hardcoding CLEAN, boundary CLEAN, focused a5 units 13/13 ([Anti-hardcoding + unit gates](cbb9902f-971c-49bd-97ee-78bb61745b8a)).
 - Reset lease-before-swap race: **Park** for sequential founder Reset; hold mutex later ([Branch diff risk review](bf71f0ac-d1f5-461d-8a0a-a428f42ae3f2)).
 - Wall-time authority under CONTROLLED: **Accept Risk** for demo execute; document split later (same review).
-- Jordan D1 UNKNOWN with CURRENT: **Investigate/Act** — not lag; overallVerdict/overview clock seam ([Jordan D1 UNKNOWN status](9d04b7e4-d448-4770-b699-471f9b2714ed)); fix in flight without touching live recording server.
+- Jordan D1 overview clock: **Done** (`7720880`) — overview HTTP passes `evaluationClock.now()` into facts. Residual: `overallVerdict=UNKNOWN` with `CURRENT` still possible; case route still passes `undefined` for `at` (**Park**). Founder process restart required to load the handler.
