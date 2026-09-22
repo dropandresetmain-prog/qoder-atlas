@@ -308,7 +308,9 @@ export async function handleTargetProductHttp(
 
     if (req.method === 'GET' && pathname === '/api/v2/operator/overview') {
       const sinceCursor = parseSinceCursor(url);
-      const facts = await loadOperatorOverviewFacts(ctx.app.pool, ctx.app.workspaceId, undefined, sinceCursor);
+      const clock = ctx.app.runtimeHooks?.evaluationClock
+        ?? await createWorkspaceEvaluationClock(ctx.app.pool, ctx.app.workspaceId);
+      const facts = await loadOperatorOverviewFacts(ctx.app.pool, ctx.app.workspaceId, clock.now(), sinceCursor);
       const view = projectOperatorOverview(facts);
       if (url.searchParams.get('format') === 'html') {
         // The shell's own chrome, not a second one: brand, event context and
