@@ -6,7 +6,8 @@
 - Worktree: `C:\Dev\qoder-atlas-a5-hero-e2e-closure`
 - Branch: `fix/a5-hero-e2e-closure`
 - Starting SHA: `7d4b1f5e3525294ab0585d08ae40d49e7ba3da24`
-- Current HEAD: `6208786` (+ local script HTML path fix pending)
+- Current HEAD: `b4295a0` (pushed)
+- Founder acceptance draft: see [Draft final PASS report](c52bb9ad-8869-4508-a0f2-78cba2173681) — clone IDs in JSON are mid-run; post-acceptance Reset left `ns_demo_cl_90dbd69cb03742ea`
 
 ## Mission
 
