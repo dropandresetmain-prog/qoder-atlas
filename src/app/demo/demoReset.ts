@@ -34,6 +34,7 @@ import type { Pool } from '../../persistence/postgres/pool.ts';
 import type { PgUnitOfWork } from '../../persistence/postgres/pgUnitOfWork.ts';
 import { datasetDirectoryFromEnv } from './datasetLoader.ts';
 import { provisionConfiguredDataset } from './provisionDataset.ts';
+import { provisionDatasetSandboxInputsIfEnabled } from './sandboxExecutionInputs.ts';
 import { runBaselineEvaluation } from './baselineEvaluation.ts';
 import { provisionWorkspaceAuthority } from '../target/workspaceAuthority.ts';
 import { tryAcquireWorkspaceOperationLease } from '../target/workspaceOperationLease.ts';
@@ -252,6 +253,19 @@ async function runReset(params: DemoResetParams, env: NodeJS.ProcessEnv): Promis
     const actorPrincipalId = `northstar-boot:${workspaceId}`;
     const provisioning = await provisionConfiguredDataset({ pool, workspaceId, actorPrincipalId, env });
     mark('provisionDataset');
+    const datasetDirectory = datasetDirectoryFromEnv(env);
+    if (datasetDirectory && provisioning.status !== 'NOT_CONFIGURED') {
+      await provisionDatasetSandboxInputsIfEnabled({
+        pool,
+        uow: params.uow,
+        workspaceId,
+        actorPrincipalId,
+        datasetDirectory,
+        datasetKey: provisioning.datasetKey,
+        env,
+      });
+      mark('sandboxInputs');
+    }
     const baseline = await runBaselineEvaluation({ pool, workspaceId, actorPrincipalId });
     mark('baselineEvaluation');
     const authority = await provisionWorkspaceAuthority({

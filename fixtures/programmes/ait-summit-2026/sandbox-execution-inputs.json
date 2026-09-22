@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "sandbox": {
+    "environment": "sandbox",
+    "marker": "synthetic-sandbox-inputs"
+  },
+  "travellers": [
+    {
+      "sourceRef": "SOURCE_TRAVELLER_DRAFT:ait-draft-09",
+      "bookingIdentity": {
+        "gender": "MALE",
+        "contactEmail": "jordan.hale@pacificrim.test",
+        "nationality": "SG"
+      },
+      "passport": {
+        "credentialId": "6f1c0a2e-7b44-4c1a-9d3e-2a8b5c6d7e01",
+        "versionId": "6f1c0a2e-7b44-4c1a-8d3e-2a8b5c6d7e02",
+        "syntheticDocumentMarker": "NORTHSTAR-SYNTHETIC-NOT-VALID-FOR-TRAVEL-ait-draft-09",
+        "issuerCountry": "SG",
+        "issueDate": "2020-01-01",
+        "expiryDate": "2030-01-01",
+        "issuerStatus": "VALID",
+        "physicallyAvailable": true,
+        "observedAt": "2026-09-21T01:40:00.000Z"
+      }
+    }
+  ],
+  "budgets": []
+}

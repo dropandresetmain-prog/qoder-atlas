@@ -17,6 +17,7 @@ import { join } from 'node:path';
 import { loadConfig, mergeEnvWithDotenvFiles, type AppConfig } from '../config/config.ts';
 import { composeTargetEndpoints, type TargetEndpoints } from './target/composeTargetEndpoints.ts';
 import { provisionConfiguredDataset } from './demo/provisionDataset.ts';
+import { provisionDatasetSandboxInputsIfEnabled } from './demo/sandboxExecutionInputs.ts';
 import { datasetDirectoryFromEnv } from './demo/datasetLoader.ts';
 import { runBaselineEvaluation } from './demo/baselineEvaluation.ts';
 import { captureWorld } from '../persistence/postgres/world/pgCurrentState.ts';
@@ -152,6 +153,21 @@ export async function composeTargetBoot(
       `[atlas] dataset ${provisioning.datasetKey} already provisioned ` +
         `content=${provisioning.contentHash.slice(0, 16)} — reusing existing state`,
     );
+  }
+  const datasetDirectory = datasetDirectoryFromEnv(resolved);
+  if (datasetDirectory && provisioning.status !== 'NOT_CONFIGURED') {
+    const sandboxInputs = await provisionDatasetSandboxInputsIfEnabled({
+      pool: endpoints.app.pool,
+      uow: () => endpoints.app.unitOfWork(),
+      workspaceId: config.workspaceId,
+      actorPrincipalId,
+      datasetDirectory,
+      datasetKey: provisioning.datasetKey,
+      env: resolved,
+    });
+    if (sandboxInputs === 'PROVISIONED') {
+      console.log('[atlas] synthetic sandbox execution inputs provisioned');
+    }
   }
 
   // Baseline assessments come from the real evaluator, and only for subjects

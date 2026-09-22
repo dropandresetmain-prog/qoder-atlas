@@ -3,11 +3,15 @@
  *
  * This boundary accepts only caller-authored values. Source references are
  * resolved through the dataset's external identity map, and every write is
- * preceded by complete validation and conflict checks. It is intentionally
- * not part of demo boot/reset composition.
+ * preceded by complete validation and conflict checks. Boot and demo reset
+ * call `provisionDatasetSandboxInputsIfEnabled` only when the process has
+ * opted in with `NORTHSTAR_SYNTHETIC_SANDBOX_INPUTS=1` and the dataset
+ * directory contains `sandbox-execution-inputs.json`.
  */
 import { z } from 'zod';
 import { createHash } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { ExactMoneySchema } from '../../domain/v2/shared/money.ts';
 import { ProtectedDataRefSchema, type ProtectedDataRef } from '../../domain/v2/shared/identity.ts';
 import { resolveSourceSubjects, SOURCE_RECORD_TYPES } from './externalIdentity.ts';
@@ -525,4 +529,63 @@ export async function provisionSandboxExecutionInputs(params: SandboxProvisionPa
     passportsCreated,
     passportsReused: passportPlans.filter((item) => item.credentialAction === 'reuse').length,
   };
+}
+
+const SANDBOX_INPUTS_FILE = 'sandbox-execution-inputs.json';
+
+function syntheticDocumentKey(env: Record<string, string | undefined>, workspaceId: string): { key: Uint8Array; keyId: string } {
+  const encoded = env.NORTHSTAR_SANDBOX_DOCUMENT_KEY?.trim();
+  if (encoded) {
+    const key = Buffer.from(encoded, 'base64');
+    const keyId = env.NORTHSTAR_SANDBOX_DOCUMENT_KEY_ID?.trim();
+    if (key.length !== 32 || !keyId) {
+      throw new SandboxExecutionInputError('DOCUMENT_KEY_REQUIRED', 'NORTHSTAR_SANDBOX_DOCUMENT_KEY must be 32 bytes of base64 and NORTHSTAR_SANDBOX_DOCUMENT_KEY_ID must be set');
+    }
+    return { key, keyId };
+  }
+  return {
+    key: createHash('sha256').update(`northstar:synthetic-sandbox-document:${workspaceId}`, 'utf8').digest(),
+    keyId: 'synthetic-sandbox-document',
+  };
+}
+
+/**
+ * Opt-in dataset passport/budget provisioning. Absent marker, absent file,
+ * or a non-sandbox process does nothing. A present file is applied through
+ * the same validation as an explicit provision call.
+ */
+export async function provisionDatasetSandboxInputsIfEnabled(params: {
+  pool: Pool;
+  uow: () => UnitOfWork;
+  workspaceId: string;
+  actorPrincipalId: string;
+  datasetDirectory: string;
+  datasetKey: string;
+  env?: NodeJS.ProcessEnv;
+}): Promise<'SKIPPED' | 'PROVISIONED'> {
+  const env = params.env ?? process.env;
+  if (env.ATLAS_ENV !== 'sandbox' || env.NORTHSTAR_SYNTHETIC_SANDBOX_INPUTS !== '1') return 'SKIPPED';
+  const file = join(params.datasetDirectory, SANDBOX_INPUTS_FILE);
+  if (!existsSync(file)) return 'SKIPPED';
+  const providerKind = `demo-dataset:${params.datasetKey}`;
+  const connections = await params.pool.query<{ id: string }>(
+    `SELECT id FROM external_connections WHERE workspace_id = $1 AND provider_kind = $2`,
+    [params.workspaceId, providerKind],
+  );
+  if (connections.rowCount !== 1) {
+    throw new SandboxExecutionInputError('UNKNOWN_CONNECTION', `sandbox inputs expected one ${providerKind} connection`);
+  }
+  const document = syntheticDocumentKey(env, params.workspaceId);
+  await provisionSandboxExecutionInputs({
+    db: params.pool,
+    uow: params.uow,
+    workspaceId: params.workspaceId,
+    actorPrincipalId: params.actorPrincipalId,
+    connectionId: connections.rows[0]!.id,
+    input: JSON.parse(readFileSync(file, 'utf8')),
+    env,
+    documentKey: document.key,
+    documentKeyId: document.keyId,
+  });
+  return 'PROVISIONED';
 }

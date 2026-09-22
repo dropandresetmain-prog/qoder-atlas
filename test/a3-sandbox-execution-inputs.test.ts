@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   assertSyntheticSandboxEnvironment,
   parseSandboxExecutionInputs,
+  provisionDatasetSandboxInputsIfEnabled,
   SandboxExecutionInputError,
 } from '../src/app/demo/sandboxExecutionInputs.ts';
 
@@ -55,4 +56,27 @@ test('passport input requires explicit synthetic fields and rejects document cus
   assert.deepEqual(parseSandboxExecutionInputs({ ...valid, travellers: [{ ...valid.travellers[0], passport }] }).travellers[0]!.passport, passport);
   assert.throws(() => parseSandboxExecutionInputs({ ...valid, travellers: [{ ...valid.travellers[0], passport: { ...passport, documentKey: 'secret' } }] }), /strict schema/);
   assert.throws(() => parseSandboxExecutionInputs({ ...valid, travellers: [{ ...valid.travellers[0], passport: { ...passport, issueDate: '2040-01-01', expiryDate: '2030-01-01' } }] }), (error: unknown) => error instanceof SandboxExecutionInputError && error.code === 'INVALID_INPUT');
+});
+
+test('dataset sandbox inputs stay off unless the process opts in', async () => {
+  const skipped = await provisionDatasetSandboxInputsIfEnabled({
+    pool: {} as never,
+    uow: () => { throw new Error('not called'); },
+    workspaceId: '00000000-0000-4000-8000-000000000001',
+    actorPrincipalId: 'actor',
+    datasetDirectory: 'fixtures/programmes/ait-summit-2026',
+    datasetKey: 'ait-summit-2026',
+    env: { ATLAS_ENV: 'sandbox' },
+  });
+  assert.equal(skipped, 'SKIPPED');
+  const missingFile = await provisionDatasetSandboxInputsIfEnabled({
+    pool: {} as never,
+    uow: () => { throw new Error('not called'); },
+    workspaceId: '00000000-0000-4000-8000-000000000001',
+    actorPrincipalId: 'actor',
+    datasetDirectory: 'fixtures/programmes/does-not-exist',
+    datasetKey: 'does-not-exist',
+    env: { ATLAS_ENV: 'sandbox', NORTHSTAR_SYNTHETIC_SANDBOX_INPUTS: '1' },
+  });
+  assert.equal(missingFile, 'SKIPPED');
 });
