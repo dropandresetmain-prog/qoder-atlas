@@ -216,10 +216,10 @@ export async function composeTargetBoot(
   // coverage (approver: authorize; runtime executor: dispatch). Idempotent;
   // never a decision or an approval. See workspaceAuthority.ts for the
   // coverage-at-provisioning limit it reports.
-  // Clone boot already provisioned authority on the template.
-  const authority = demoSession
-    ? { status: 'ALREADY_PROVISIONED' as const, coverageCount: 0, uncoveredSubjectCount: 0, principals: { operator: 'template', executor: 'template' } }
-    : await provisionWorkspaceAuthority({
+  // Clone boot already ran authority on the template, but re-run idempotently
+  // so coverage stays complete if the template was built before subjects existed
+  // or operator subject env differs from the founder's runtime.
+  const authority = await provisionWorkspaceAuthority({
       pool: endpoints.app.pool,
       uow: () => endpoints.app.unitOfWork(),
       workspaceId: config.workspaceId,
@@ -471,7 +471,40 @@ export async function composeTargetBoot(
   endpoints.app.runtimeHooks = {
     executorPrincipalId,
     ...(intelligence ? { intelligence } : {}),
-    afterApproval: async () => { await execution.runNow(); await externalExecution?.runNow(); },
+    afterApproval: async () => {
+      // Approvals under CONTROLLED clocks need the same coerce→drain→execute
+      // path as wakeEvaluation: M6 enqueues with wall next_run_at, and a single
+      // execution pass often DEFERs until assessments are CURRENT again.
+      const now = evaluationNow();
+      await endpoints.app.pool.query(
+        `UPDATE scheduled_reassessments
+            SET next_run_at = $2::timestamptz,
+                updated_at = $2::timestamptz
+          WHERE workspace_id = $1
+            AND state <> 'DONE'
+            AND next_run_at > $2::timestamptz`,
+        [config.workspaceId, now],
+      );
+      await endpoints.app.reassessmentWorker.enqueueDue(now, config.workspaceId);
+      await endpoints.app.reassessmentWorker.drainAvailable(now, pipeline, {
+        workspaceId: config.workspaceId,
+        maxItems: 200,
+        maxMs: 60_000,
+      });
+      await execution.runNow();
+      await externalExecution?.runNow();
+      // Second pass: first internal mutation invalidates assessments; drain +
+      // execute again so the dependent programme intent is not left EXECUTING
+      // until the next idle poll.
+      await endpoints.app.reassessmentWorker.drainAvailable(evaluationNow(), pipeline, {
+        workspaceId: config.workspaceId,
+        maxItems: 200,
+        maxMs: 60_000,
+      });
+      await execution.runNow();
+      await externalExecution?.runNow();
+      await lifecycle.runNow();
+    },
     ...(externalCapabilityStatements.length > 0 ? { externalCapabilities: externalCapabilityStatements } : {}),
     afterExecution: () => lifecycle.runNow(),
     // After demo reset deletes workspace rows (including the durable clock),

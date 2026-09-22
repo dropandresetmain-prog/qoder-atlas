@@ -703,15 +703,21 @@ export async function evaluateStoredExecutionGate(
   }
 
   const principalIds = new Set([params.principalId, ...bundle.approvals.map((approval) => approval.approverPrincipalId)]);
+  // Authority grants/approvals are operational infrastructure: issued_at and
+  // approvedAt are wall-stamped at provisioning/approval. A CONTROLLED
+  // evaluation clock can sit earlier than those wall instants (demo disrupt
+  // clocks often do), which must not make live grants look "not yet issued".
+  // Assessment currentness above still uses params.now (scenario time).
+  const authorityNow = new Date().toISOString();
   const grants = (await Promise.all(
-    [...principalIds].sort().map((principalId) => loadGrantsForPrincipal(pool, params.workspaceId, principalId, params.now)),
+    [...principalIds].sort().map((principalId) => loadGrantsForPrincipal(pool, params.workspaceId, principalId, authorityNow)),
   )).flat();
   const requestedAmount = intent.costAmount && intent.costCurrency
     ? { amount: intent.costAmount, currency: intent.costCurrency } : undefined;
   const auth: AuthorizeResult = evaluateConsequentialAuthorization({
     assessmentView: assessmentView as AssessmentView, envelopeInput, envelope: bundle.envelope,
     decision: bundle.decision, approvals: bundle.approvals, revocations: bundle.revocations,
-    grants, requiredActionKind: DISPATCH_ACTION_KIND, principalId: params.principalId, now: params.now,
+    grants, requiredActionKind: DISPATCH_ACTION_KIND, principalId: params.principalId, now: authorityNow,
     requiredAuthorityScopes: requiredScopes,
     ...(requestedAmount ? { requestedAmount } : {}),
   });

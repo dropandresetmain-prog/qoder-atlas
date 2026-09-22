@@ -234,6 +234,17 @@ async function runReset(params: DemoResetParams, env: NodeJS.ProcessEnv): Promis
     }
     const cloneReset = await resetOntoPristineClone({ env });
     mark('cloneHandover');
+    // Idempotent authority refresh on the pristine clone (covers subjects that
+    // may have been uncovered when the frozen template was first built).
+    const authority = await provisionWorkspaceAuthority({
+      pool: params.pool,
+      uow: params.uow,
+      workspaceId,
+      actorPrincipalId: `northstar-boot:${workspaceId}`,
+      now: (params.now ?? (() => new Date().toISOString()))(),
+      operatorAuthSubject: env.NORTHSTAR_OPERATOR_AUTH_SUBJECT?.trim() || undefined,
+    });
+    mark('workspaceAuthority');
     return {
       status: 'RESET',
       workspaceId,
@@ -241,7 +252,7 @@ async function runReset(params: DemoResetParams, env: NodeJS.ProcessEnv): Promis
       deletedRows: 0,
       provisioning: cloneReset.provisioning,
       baselineEvaluated: 0,
-      authority: cloneReset.authority,
+      authority: authority.status,
       timingsMs: { ...timingsMs, ...cloneReset.timingsMs },
     };
   }

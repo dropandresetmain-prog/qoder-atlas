@@ -211,6 +211,20 @@ async function applyConfiguredAirlineRebooking(
       message: ingress.error.message ?? 'Provider disruption ingress failed.',
     };
   }
+  // Ingress/scheduling may stamp next_run_at with wall time. Under a CONTROLLED
+  // evaluation clock those rows look "not due yet" forever, so coerce pending
+  // work onto the evaluation instant before drain.
+  await deps.pool.query(
+    `UPDATE scheduled_reassessments
+        SET next_run_at = $2::timestamptz,
+            updated_at = $2::timestamptz
+      WHERE workspace_id = $1
+        AND state <> 'DONE'
+        AND next_run_at > $2::timestamptz`,
+    [deps.workspaceId, evaluationNow],
+  );
+  await new PgReassessmentWorker(deps.pool, { actorId: deps.actorPrincipalId })
+    .enqueueDue(evaluationNow, deps.workspaceId);
   let drained: unknown;
   let escalation: unknown;
   if (deps.driveLifecycle) {
