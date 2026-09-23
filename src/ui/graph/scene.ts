@@ -53,6 +53,8 @@ export interface SceneEdge {
   readonly source: string;
   readonly target: string;
   readonly focus: string;
+  /** Presentation truth: proposed edges stay hidden until the proposed node is selected. */
+  readonly truth: 'current' | 'proposed';
   readonly pulse: ScenePulse | null;
 }
 
@@ -135,7 +137,6 @@ export function buildGraphScene(input: BuildSceneInput): GraphScene {
   });
   const nodeByRef = new Map(graph.nodes.map((n) => [n.ref, n]));
   const causalSet = new Set(causalRefs);
-  const footprintSet = new Set([...causalRefs, ...recoveryRefs, ...dependencyRefs, ...ownerRefs]);
   const edgeByKey = new Map(graph.edges.map((e) => [e.renderKey, e]));
 
   const nodes: SceneNode[] = layout.nodes.flatMap((ln) => {
@@ -174,8 +175,10 @@ export function buildGraphScene(input: BuildSceneInput): GraphScene {
     const pulse = pulseSpec
       ? { dur: pulseSpec.dur, begin: `-${(stableUnit(le.renderKey) * 2.2).toFixed(2)}s` }
       : null;
-    const cls = ['fg-edge', TONE_CLASS[tone], pulse ? 'fg-pulse' : ''].filter(Boolean).join(' ');
-    return [{ key: le.renderKey, d: le.d, cls, tone, source: le.sourceRef, target: le.targetRef, focus: pe.focusRole, pulse }];
+    const truth = pe.truthMode === 'proposed' ? 'proposed' as const : 'current' as const;
+    const cls = ['fg-edge', TONE_CLASS[tone], pulse ? 'fg-pulse' : '', truth === 'proposed' ? 'fg-proposal-edge' : '']
+      .filter(Boolean).join(' ');
+    return [{ key: le.renderKey, d: le.d, cls, tone, source: le.sourceRef, target: le.targetRef, focus: pe.focusRole, truth, pulse }];
   });
 
   const rectOf = (n: SceneNode): SceneRect => ({ x1: n.x, y1: n.y, x2: n.x + n.w, y2: n.y + n.h });
@@ -184,21 +187,19 @@ export function buildGraphScene(input: BuildSceneInput): GraphScene {
     : { x1: 0, y1: 0, x2: 800, y2: 400 };
 
   const hasPath = focusedGraph !== undefined && causalRefs.some((r) => nodeByRef.has(r));
-  const footprintPresent = [...footprintSet].filter((r) => nodeByRef.has(r));
-  // Frame the principal disruption/recovery story (causal + recovery + owner).
-  // Dependency context stays in keepNodes (not dimmed) but does not inflate the
-  // default camera into a deep zoom-out.
-  const frameSet = new Set([...causalRefs, ...recoveryRefs, ...ownerRefs]);
-  const frameNodes = nodes.filter((n) => frameSet.has(n.ref));
+  // Default Disruption Path: mainline + proposed recovery only. Owner / stay /
+  // programme stay visible but faded until the operator clicks them.
+  const pathKeep = new Set([...causalRefs, ...recoveryRefs].filter((r) => nodeByRef.has(r)));
+  const frameNodes = nodes.filter((n) => pathKeep.has(n.ref));
   const pathRect = frameNodes.length > 0
     ? unionRect(frameNodes.map(rectOf), 36)
     : allRect;
   const pathView: SceneView | undefined = hasPath
     ? {
         rect: pathRect,
-        keepNodes: footprintPresent,
+        keepNodes: [...pathKeep],
         keepEdges: edges
-          .filter((e) => footprintSet.has(e.source) && footprintSet.has(e.target))
+          .filter((e) => pathKeep.has(e.source) && pathKeep.has(e.target))
           .map((e) => e.key),
       }
     : undefined;

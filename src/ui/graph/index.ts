@@ -42,9 +42,9 @@ const VIEW_LABELS = { path: 'Disruption Path', trip: 'Trip Overview', prog: 'Pro
 
 function stageHtml(scene: GraphScene): string {
   const paths = scene.edges.map((e) =>
-    `<path class="${esc(e.cls)}" d="${e.d}" data-edge-key="${esc(e.key)}" data-source="${esc(e.source)}" data-target="${esc(e.target)}" data-focus="${e.focus}" data-tone="${e.tone}" fill="none"/>`).join('\n');
+    `<path class="${esc(e.cls)}" d="${e.d}" data-edge-key="${esc(e.key)}" data-source="${esc(e.source)}" data-target="${esc(e.target)}" data-focus="${e.focus}" data-tone="${e.tone}" data-truth="${e.truth}" fill="none"/>`).join('\n');
   const pulses = scene.edges.filter((e) => e.pulse).map((e) =>
-    `<circle class="fg-pulse-dot sem-${e.tone}" r="3" data-pulse-for="${esc(e.key)}"><animateMotion dur="${e.pulse!.dur}" begin="${e.pulse!.begin}" repeatCount="indefinite" path="${e.d}"/></circle>`).join('\n');
+    `<circle class="fg-pulse-dot sem-${e.tone}${e.truth === 'proposed' ? ' fg-proposal-edge' : ''}" r="3" data-pulse-for="${esc(e.key)}" data-truth="${e.truth}"><animateMotion dur="${e.pulse!.dur}" begin="${e.pulse!.begin}" repeatCount="indefinite" path="${e.d}"/></circle>`).join('\n');
   const svg = `<svg class="fg-edges" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
 <g class="fg-edge-layer">${paths}</g>
 <g class="fg-pulses">${pulses}</g>

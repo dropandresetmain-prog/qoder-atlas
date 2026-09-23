@@ -158,12 +158,13 @@ export function projectFocusedGraph(
   if (firstBreakpointRef) placeExplanationRef(firstBreakpointRef);
 
   // FAILED authoritative connection endpoints stay on the causal spine.
-  // PROPOSED replacements that occupy the same MUST_HAPPEN_BEFORE slot are recovery.
+  // PROPOSED replacements that continue from the same Arrival are recovery only.
   if (firstArrivalRef) {
     for (const edge of ldg.edges) {
-      if (edge.fromRef === firstArrivalRef && edge.semanticState === 'FAILED' && edge.kind === 'MUST_HAPPEN_BEFORE') {
-        placeExplanationRef(edge.toRef);
-      }
+      if (edge.fromRef !== firstArrivalRef || edge.kind !== 'MUST_HAPPEN_BEFORE') continue;
+      const target = nodeByRef.get(edge.toRef);
+      if (edge.semanticState === 'FAILED') placeExplanationRef(edge.toRef);
+      else if (isProposed(target)) claim(edge.toRef, 'recovery');
     }
   }
 

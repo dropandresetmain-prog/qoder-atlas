@@ -6,11 +6,11 @@
  * ROLE in the graph (focal breakpoint / secondary alert on the spine / recovery
  * branch / normal spine / small context), never from what the node is about.
  *
- * With a causal spine:
- * - causal refs take monotonically increasing columns on the dominant row
- * - owner context sits ABOVE the focal breakpoint (never on the spine)
- * - proposed recovery branches RIGHT of the breakpoint on a recovery band
- * - dependency context stacks BELOW its nearest causal/recovery anchor
+ * With a causal spine (Sarah-style composition):
+ * - causal refs form ONE dominant horizontal mainline (including a FAILED
+ *   original onward booking when the connection is broken)
+ * - a single bottom band holds owner (left), stay/programme context (middle),
+ *   and proposed recovery (right, under the current onward booking)
  *
  * Without a spine: longest-path ranking.
  */
@@ -71,10 +71,9 @@ export const SIZES: Record<SizeClass, { readonly w: number; readonly h: number }
 };
 
 const SPINE_GAP = 46;
-const BAND_GAP = 52;
+const BAND_GAP = 40;
 const BAND_ROW_GAP = 18;
 const CTX_GAP = 14;
-const OWNER_GAP = 28;
 const COLUMN_GAP = 56;
 const ROW_GAP = 22;
 const PADDING = 36;
@@ -150,121 +149,112 @@ function computeCausalSpineLayout(
   const causalColumn = new Map<string, number>();
   causalRefs.forEach((ref, i) => causalColumn.set(ref, i));
 
-  // Seed columns from causal + (later) recovery so context attaches to the right branch.
+  // Seed columns from causal so context attaches to the right branch.
   const seedColumn = new Map(causalColumn);
   const placed = new Map<string, LayoutNode>();
 
-  // --- Causal spine (dominant row) ---
+  // --- Row 0: causal mainline only (original failed onward stays here) ---
+  const recoveryRefs = (options.recoveryNodeRefs ?? [])
+    .filter((ref) => recoverySet.has(ref))
+    .sort((a, b) => a.localeCompare(b));
   const spineNodes = causalRefs.map((ref) => {
     const node = nodeByRef.get(ref)!;
     return { ref, sizeClass: sizeClassFor(node, 'causal', ref === options.focalRef) };
   });
-  const maxSpineH = Math.max(...spineNodes.map((s) => SIZES[s.sizeClass].h));
-  // Leave room above for owner context.
-  const ownerBandH = ownerSet.size > 0 ? SIZES.small.h + OWNER_GAP : 0;
-  const centerY = PADDING + ownerBandH + maxSpineH / 2;
+  const spineTop = PADDING;
   let cursorX = PADDING;
   spineNodes.forEach((s, i) => {
     const { w, h } = SIZES[s.sizeClass];
     placed.set(s.ref, {
-      ref: s.ref, column: i, row: 0, x: cursorX, y: centerY - h / 2, width: w, height: h, sizeClass: s.sizeClass,
+      ref: s.ref, column: i, row: 0, x: cursorX, y: spineTop, width: w, height: h, sizeClass: s.sizeClass,
     });
     cursorX += w + SPINE_GAP;
   });
-  const spineRight = cursorX - SPINE_GAP;
-  const spineBottom = Math.max(...[...placed.values()].map((n) => n.y + n.height));
+  const spineRight = Math.max(PADDING, cursorX - SPINE_GAP);
+  const spineBottom = placed.size > 0
+    ? Math.max(...[...placed.values()].map((n) => n.y + n.height))
+    : PADDING;
 
-  // --- Owner context ABOVE focal (or first causal) ---
   const focalRef = options.focalRef && placed.has(options.focalRef)
     ? options.focalRef
     : causalRefs[0];
-  const ownerAnchor = placed.get(focalRef!)!;
-  const ownerRefs = [...ownerSet].sort((a, b) => a.localeCompare(b));
-  ownerRefs.forEach((ref, i) => {
-    const { w, h } = SIZES.small;
-    const x = ownerAnchor.x + (ownerAnchor.width - w) / 2;
-    const y = PADDING + i * (h + BAND_ROW_GAP);
-    placed.set(ref, { ref, column: ownerAnchor.column, row: -1 - i, x, y, width: w, height: h, sizeClass: 'small' });
-  });
+  // Prefer the last causal booking (current onward) as the right-side anchor for recovery.
+  const onwardRef = [...causalRefs].reverse().find((ref) => nodeByRef.get(ref)?.entityKind === 'SERVICE_BOOKING');
+  const recoveryAnchor = (onwardRef ? placed.get(onwardRef) : undefined)
+    ?? [...causalRefs].map((ref) => placed.get(ref)).filter(Boolean).at(-1)
+    ?? placed.get(focalRef!)
+    ?? [...placed.values()].at(-1)!;
 
-  // --- Recovery branch: right of breakpoint / spine, slightly below spine ---
-  const recoveryRefs = (options.recoveryNodeRefs ?? [])
-    .filter((ref) => recoverySet.has(ref))
-    .sort((a, b) => a.localeCompare(b));
-  // Prefer attaching under/after the focal; fall back to last causal.
-  const recoveryAnchor = placed.get(focalRef!) ?? [...placed.values()].at(-1)!;
-  let recoveryX = Math.max(recoveryAnchor.x + recoveryAnchor.width + SPINE_GAP, spineRight + SPINE_GAP);
-  const recoveryY = spineBottom + BAND_GAP;
-  recoveryRefs.forEach((ref, i) => {
+  const nodeColumn = nearestAnchorColumn([...causalRefs, ...recoveryRefs], adjacency, seedColumn);
+  for (const node of graph.nodes) if (!nodeColumn.has(node.ref)) nodeColumn.set(node.ref, 0);
+
+  // --- Row 1 only: owner (left) · stay/programme (middle) · proposed (right under onward) ---
+  const ownerRefs = (options.ownerContextNodeRefs ?? []).filter((ref) => ownerSet.has(ref));
+  const dependencyRefs = (options.dependencyContextNodeRefs ?? [])
+    .filter((ref) => dependencySet.has(ref))
+    .sort((a, b) => (nodeColumn.get(a)! - nodeColumn.get(b)!) || a.localeCompare(b));
+  const leftoverRefs = graph.nodes
+    .map((n) => n.ref)
+    .filter((ref) => !placed.has(ref) && !ownerSet.has(ref) && !recoverySet.has(ref) && !dependencySet.has(ref) && !causalRefs.includes(ref))
+    .sort((a, b) => (nodeColumn.get(a)! - nodeColumn.get(b)!) || a.localeCompare(b));
+
+  const bandTop = spineBottom + BAND_GAP;
+  const { w: smallW, h: smallH } = SIZES.small;
+
+  // Left cluster: owners, starting at the left padding.
+  let leftX = PADDING;
+  for (const ref of ownerRefs) {
+    if (placed.has(ref)) continue;
+    placed.set(ref, {
+      ref, column: 0, row: 1, x: leftX, y: bandTop,
+      width: smallW, height: smallH, sizeClass: 'small',
+    });
+    leftX += smallW + CTX_GAP;
+  }
+
+  // Right cluster: proposed recovery under / aligned with the current onward booking.
+  let rightEdge = Math.max(spineRight, recoveryAnchor.x + recoveryAnchor.width);
+  for (let i = recoveryRefs.length - 1; i >= 0; i--) {
+    const ref = recoveryRefs[i]!;
+    if (placed.has(ref)) continue;
     const node = nodeByRef.get(ref)!;
     const sizeClass = sizeClassFor(node, 'recovery', false);
     const { w, h } = SIZES[sizeClass];
-    const col = recoveryAnchor.column + 1 + i;
+    const x = Math.max(recoveryAnchor.x, rightEdge - w);
     placed.set(ref, {
-      ref, column: col, row: 1, x: recoveryX, y: recoveryY, width: w, height: h, sizeClass,
+      ref, column: causalRefs.length, row: 1, x, y: bandTop,
+      width: w, height: h, sizeClass,
     });
-    seedColumn.set(ref, col);
-    recoveryX += w + SPINE_GAP;
-  });
-
-  // Nearest column among causal + recovery for remaining context.
-  const placedSeedRefs = [...causalRefs, ...recoveryRefs];
-  const nodeColumn = nearestAnchorColumn(placedSeedRefs, adjacency, seedColumn);
-  for (const node of graph.nodes) if (!nodeColumn.has(node.ref)) nodeColumn.set(node.ref, 0);
-
-  // --- Dependency context: stack below nearest causal/recovery anchor ---
-  const depRefs = [
-    ...(options.dependencyContextNodeRefs ?? []).filter((ref) => dependencySet.has(ref)),
-    // Any leftover non-role nodes hang as small context too.
-    ...graph.nodes
-      .map((n) => n.ref)
-      .filter((ref) => !placed.has(ref) && !ownerSet.has(ref) && !recoverySet.has(ref) && !dependencySet.has(ref) && !causalRefs.includes(ref)),
-  ].sort((a, b) => (nodeColumn.get(a)! - nodeColumn.get(b)!) || a.localeCompare(b));
-
-  const recoveryBottom = recoveryRefs.length > 0
-    ? Math.max(...recoveryRefs.map((ref) => {
-      const n = placed.get(ref)!;
-      return n.y + n.height;
-    }))
-    : spineBottom;
-  const depTop = recoveryBottom + BAND_GAP;
-  const rowCursors: number[] = [];
-  const { w: cw, h: ch } = SIZES.small;
-  const limitRight = Math.max(spineRight, recoveryX) + 80;
-
-  for (const ref of depRefs) {
-    if (placed.has(ref)) continue;
-    const col = nodeColumn.get(ref) ?? 0;
-    // Prefer a placed causal/recovery node at that column; else focal.
-    const anchor = placed.get(causalRefs[col]!)
-      ?? placed.get(recoveryRefs[Math.max(0, col - causalRefs.length)]!)
-      ?? recoveryAnchor;
-    const desiredX = anchor.x;
-    let r = 0;
-    for (;;) {
-      const cur = rowCursors[r] ?? PADDING;
-      const x = Math.max(cur, desiredX);
-      if (x + cw <= limitRight || r >= 5) {
-        rowCursors[r] = x + cw + CTX_GAP;
-        placed.set(ref, {
-          ref, column: col, row: 2 + r, x,
-          y: depTop + r * (ch + BAND_ROW_GAP),
-          width: cw, height: ch, sizeClass: 'small',
-        });
-        break;
-      }
-      r++;
-    }
+    seedColumn.set(ref, causalRefs.length);
+    rightEdge = x - CTX_GAP;
   }
 
-  // Ensure every graph node is placed (defensive).
+  // Middle cluster: stay + programme between owner and recovery, one row.
+  const middleLeft = leftX + (ownerRefs.length > 0 ? CTX_GAP : 0);
+  const middleRight = rightEdge - (recoveryRefs.length > 0 ? CTX_GAP : 0);
+  const middleRefs = [...dependencyRefs, ...leftoverRefs].filter((ref) => !placed.has(ref));
+  const middleNeed = middleRefs.length * smallW + Math.max(0, middleRefs.length - 1) * CTX_GAP;
+  const middleSpan = Math.max(0, middleRight - middleLeft);
+  let midX = middleLeft + Math.max(0, (middleSpan - middleNeed) / 2);
+  // If the gap is too tight, pack from middleLeft and allow extending toward recovery.
+  if (middleNeed > middleSpan) midX = middleLeft;
+  for (const ref of middleRefs) {
+    placed.set(ref, {
+      ref, column: nodeColumn.get(ref) ?? 1, row: 1, x: midX,
+      y: bandTop,
+      width: smallW, height: smallH, sizeClass: 'small',
+    });
+    midX += smallW + CTX_GAP;
+  }
+
+  // Ensure every graph node is placed (defensive) — still on the bottom band.
   for (const node of graph.nodes) {
     if (placed.has(node.ref)) continue;
-    const { w, h } = SIZES.small;
     placed.set(node.ref, {
-      ref: node.ref, column: 0, row: 9, x: PADDING, y: depTop + 6 * (h + BAND_ROW_GAP),
-      width: w, height: h, sizeClass: 'small',
+      ref: node.ref, column: 0, row: 1, x: midX, y: bandTop,
+      width: smallW, height: smallH, sizeClass: 'small',
     });
+    midX += smallW + CTX_GAP;
   }
 
   return finish(graph, graph.nodes.map((n) => placed.get(n.ref)!));

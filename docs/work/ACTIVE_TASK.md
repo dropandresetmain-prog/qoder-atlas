@@ -191,7 +191,14 @@
   - Deterministic hierarchical layout; stay labels use canonical place name when known.
   - Evidence: `docs/work/cp5-evidence/cp5-1-d3-graph-scene-dump.txt`,
     `docs/work/cp5-evidence/cp5-1-d3-case-graph-1560x1000.png`.
-  - **CP5 not closed for founder** until visual QC accepts the graph. Do **not** begin CP6.
+  - **Founder override + visual accept (2026-09-23):** Current keeps canonical FAILED
+    onward on the mainline (red); proposed branches from Arrival as recovery under the
+    onward column. Stay/programme use solid AUTHORITATIVE edges to the current booking;
+    confirmed stay reservations paint HEALTHY. Default Disruption Path: mainline +
+    proposed sharp, dashed Arrival→proposed always visible, owner/stay/programme faded
+    until click. Post-execution Narita / replacement-stay solid edges: Park for Later.
+  - **CP5.1 founder visual QC: APPROVED.** Uncommitted working-tree presentation fixes
+    still need a commit before CP6. Do **not** begin CP6 until that commit lands.
 - [ ] CP6 — protected sandbox execution → RESOLVED + sanitized recordings + REPLAY proof
 
 ## Parked

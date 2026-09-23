@@ -583,26 +583,46 @@ describe('A5 Jordan D3 planning (composed REPLAY transport research)', () => {
     assert.equal(previewNode.semanticState, 'PROPOSED');
     assert.ok(previewNode.label.startsWith(binding.itinerary.operator), previewNode.label);
     assert.match(previewNode.detail ?? '', / → .*Proposed replacement/, 'route named from canonical places');
-    assert.equal(previewView.ldg.nodes.some((node) => node.ref === `SERVICE_BOOKING:${canonicalOnward}`), false, 'no stale canonical onward card');
+    const canonicalOnwardRef = `SERVICE_BOOKING:${canonicalOnward}`;
+    const canonicalOnwardNode = previewView.ldg.nodes.find((node) => node.ref === canonicalOnwardRef);
+    assert.ok(canonicalOnwardNode, 'canonical FAILED onward remains on Current');
+    assert.equal(canonicalOnwardNode.authority, 'AUTHORITATIVE');
+    assert.equal(canonicalOnwardNode.semanticState, 'FAILED');
     assert.equal(await canonicalSelection(), canonicalOnward, 'the preview never mutates canonical selection');
     const spine = previewView.focusedGraph;
     assert.ok(spine);
     assert.equal(previewView.causalPath.length, 1, 'the failure chain itself is unchanged: one broken connection');
-    assert.ok(spine.causalNodeRefs.includes(previewRef), 'arrival → proposed onward on the spine');
+    assert.ok(spine.causalNodeRefs.includes(canonicalOnwardRef), 'canonical onward stays on the causal mainline');
+    assert.ok(spine.recoveryNodeRefs?.includes(previewRef), 'proposed onward is recovery, not causal');
+    assert.equal(spine.causalNodeRefs.includes(previewRef), false, 'proposed is not on the causal spine');
     const stayItem = await pool.query<{ id: string }>(
       `SELECT id FROM journey_items WHERE workspace_id = $1 AND journey_id = $2 AND kind = 'STAY'`,
       [workspaceId, journeyId],
     );
     assert.equal(stayItem.rowCount, 1);
     const stayRef = `TRANSFER_STAY:${stayItem.rows[0]!.id}`;
-    assert.ok(spine.causalNodeRefs.includes(stayRef), `stay on the spine: ${JSON.stringify(spine.causalNodeRefs)}`);
-    assert.ok(spine.causalEdgeIds.some((id) => id.endsWith(`:${stayRef}`)), 'the stay is connected, not floating');
+    assert.ok(
+      spine.dependencyContextNodeRefs?.includes(stayRef) || spine.causalNodeRefs.includes(stayRef),
+      `stay visible as dependency or causal context: ${JSON.stringify(spine)}`,
+    );
+    assert.ok(
+      previewView.ldg.edges.some((edge) => edge.toRef === stayRef && edge.authority === 'AUTHORITATIVE'),
+      'stay connects on an authoritative (solid) edge',
+    );
     const commitments = previewView.ldg.nodes.filter((node) => node.kind === 'PROGRAMME_COMMITMENT');
     assert.ok(commitments.length > 0);
     for (const commitment of commitments) {
-      assert.ok(spine.causalNodeRefs.includes(commitment.ref), `dependent commitment on the spine: ${commitment.ref}`);
-      assert.ok(spine.causalEdgeIds.some((id) => id.startsWith('MUST_HAPPEN_BEFORE:TIMING:') && id.endsWith(`:${commitment.ref}`)),
-        `arrival → ${commitment.ref}`);
+      assert.ok(
+        spine.dependencyContextNodeRefs?.includes(commitment.ref) || spine.causalNodeRefs.includes(commitment.ref),
+        `dependent commitment visible: ${commitment.ref}`,
+      );
+      assert.ok(
+        previewView.ldg.edges.some((edge) =>
+          edge.toRef === commitment.ref
+          && edge.fromRef.startsWith('TIMING:')
+          && edge.authority === 'AUTHORITATIVE'),
+        `arrival → ${commitment.ref} on an authoritative edge`,
+      );
     }
     // The immutable Original is captured without the preview.
     const originalMode = projectRecoveryCase((await loadRecoveryCaseFacts(pool, workspaceId, caseId, d3.at, undefined, {

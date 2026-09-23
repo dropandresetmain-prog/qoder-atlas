@@ -231,6 +231,7 @@ export const INTERACTIONS_SCRIPT = String.raw`
     for (key in this.edgeEls) toggle(this.edgeEls[key], 'fg-dimmed', false);
     for (key in this.pulseEls) toggle(this.pulseEls[key], 'fg-dimmed', false);
     this.selected = null;
+    this.applyDim();
     this.renderInspector(null);
     this.remember();
   };
@@ -269,11 +270,18 @@ export const INTERACTIONS_SCRIPT = String.raw`
         connected[e.getAttribute('data-target')] = true;
       }
     }
-    for (var r in this.nodeEls) if (!connected[r]) toggle(this.nodeEls[r], 'fg-dimmed', true);
+    // Selection overrides path-view fade: selected neighbourhood is full strength.
+    for (var r in this.nodeEls) {
+      var keep = !!connected[r];
+      toggle(this.nodeEls[r], 'fg-viewdim', !keep);
+      toggle(this.nodeEls[r], 'fg-dimmed', !keep);
+    }
     for (key in this.edgeEls) {
       e = this.edgeEls[key];
       var touches = e.getAttribute('data-source') === ref || e.getAttribute('data-target') === ref;
+      toggle(e, 'fg-viewdim', !touches);
       toggle(e, 'fg-dimmed', !touches);
+      toggle(this.pulseEls[key], 'fg-viewdim', !touches);
       toggle(this.pulseEls[key], 'fg-dimmed', !touches);
     }
     this.renderInspector(ref);
@@ -424,6 +432,7 @@ export const INTERACTIONS_SCRIPT = String.raw`
       setAttr(el, 'data-target', e.target);
       setAttr(el, 'data-focus', e.focus);
       setAttr(el, 'data-tone', e.tone);
+      setAttr(el, 'data-truth', e.truth || 'current');
     }
     var dot = this.pulseEls[e.key];
     if (!e.pulse) {
@@ -440,7 +449,11 @@ export const INTERACTIONS_SCRIPT = String.raw`
       pulses.appendChild(dot);
       this.pulseEls[e.key] = dot;
     }
-    setAttr(dot, 'class', 'fg-pulse-dot sem-' + e.tone + (dot.classList.contains('fg-viewdim') ? ' fg-viewdim' : '') + (dot.classList.contains('fg-dimmed') ? ' fg-dimmed' : ''));
+    setAttr(dot, 'class', 'fg-pulse-dot sem-' + e.tone
+      + (e.truth === 'proposed' ? ' fg-proposal-edge' : '')
+      + (dot.classList.contains('fg-viewdim') ? ' fg-viewdim' : '')
+      + (dot.classList.contains('fg-dimmed') ? ' fg-dimmed' : ''));
+    setAttr(dot, 'data-truth', e.truth || 'current');
     var a = dot.querySelector('animateMotion');
     if (a.getAttribute('dur') !== e.pulse.dur) a.setAttribute('dur', e.pulse.dur);
     if (a.getAttribute('begin') === null) a.setAttribute('begin', e.pulse.begin);

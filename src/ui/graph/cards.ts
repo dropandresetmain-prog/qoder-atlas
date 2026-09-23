@@ -77,6 +77,7 @@ export function nodeAttrs(ctx: CardContext): Record<string, string> {
     'data-state': node.semanticState,
     'data-kind': node.entityKind,
     'data-tone': node.indicator.tone,
+    'data-truth': node.truthMode,
     'data-focus': node.focusRole,
     'data-evaluation': node.evaluationState,
     title: node.secondaryLabel ? `${node.label} — ${node.secondaryLabel}` : node.label,

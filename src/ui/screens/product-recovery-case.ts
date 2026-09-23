@@ -109,6 +109,7 @@ function cancelStayNoteHtml(strategy: RecoveryStrategyView): string {
  * stay's own property/place label (matched positionally against the
  * candidate's proposed stays) so distinct hotel lines read as "Hotel" rather
  * than a generic bucket name; unavailable falls back to a generic name.
+ * Check-in → check-out dates are appended when the proposal supplies them.
  * Never hardcodes a specific property, city or supplier.
  */
 function costLineLabel(
@@ -120,7 +121,9 @@ function costLineLabel(
     const stay = candidate?.proposal?.stays[hotelSeen.count];
     hotelSeen.count += 1;
     const label = stay ? decisionText(stay.propertyLabel ?? stay.placeLabel, '') : '';
-    return label || 'Additional hotel stay';
+    const base = label || 'Additional hotel stay';
+    if (!stay?.start || !stay?.end) return base;
+    return `${base} · ${decisionTime(stay.start, stay.timeZone)} → ${decisionTime(stay.end, stay.timeZone)}`;
   }
   if (line.kind.code === 'SELECT_OFFER') return decisionText(line.kind.label, 'Replacement flight');
   return decisionText(line.kind.label, 'Spend');

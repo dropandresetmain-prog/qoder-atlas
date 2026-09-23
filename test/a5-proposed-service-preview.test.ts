@@ -7,7 +7,7 @@
  *   1. before any proposal the canonical service is shown (no regression);
  *   2. once the recommended strategy has a bound proposed service, that service
  *      is previewed — PROPOSED, labelled from its itinerary, no invented code;
- *   3. no stale canonical card lingers beside the preview;
+ *   3. the canonical FAILED onward stays on the mainline beside the preview;
  *   4. once execution starts / canonical selection changes, the preview stops
  *      and the booked canonical service is shown from authoritative state.
  * Canonical selection is an input only; nothing here can mutate it.
@@ -106,31 +106,38 @@ test('CP4 preview 2: the recommended proposed service is previewed as PROPOSED f
   assert.equal(preview.label, 'Carrier B flight');
   assert.equal(preview.detail, 'Hub City → Destination City · Proposed replacement · not booked yet');
   assert.doesNotMatch(preview.detail ?? '', /unreachable/i, 'the canonical broken-connection verdict is not transplanted');
-  assert.ok(preview.subjectRefs?.includes('JOURNEY_ITEM:item-on'), 'the item explanation maps onto the preview');
-  // Arrival → proposed onward: the relationship is shown, as a proposed one.
+  assert.equal(preview.subjectRefs?.includes('JOURNEY_ITEM:item-on'), false, 'journey-item subject stays on the canonical card');
+  // Arrival → proposed onward: recovery branch.
   const connection = result.edges.find((edge) => edge.id === `MUST_HAPPEN_BEFORE:${TIMING}:SERVICE_BOOKING:${proposedRow.id}`);
   assert.ok(connection, 'arrival timing connects to the proposed onward service');
   assert.equal(connection.semanticState, 'PROPOSED');
   assert.equal(connection.authority, 'PROPOSED');
   const reliesOn = result.edges.find((edge) => edge.id === `RELIES_ON:JOURNEY:journey-1:SERVICE_BOOKING:${proposedRow.id}`);
   assert.equal(reliesOn?.authority, 'PROPOSED', 'the traveller does not yet rely on an unbooked service');
-  const onwardToStay = result.edges.find((edge) => edge.id === `MUST_HAPPEN_BEFORE:SERVICE_BOOKING:${proposedRow.id}:TRANSFER_STAY:item-stay`);
-  assert.equal(onwardToStay?.authority, 'PROPOSED');
+  // Stay / programme sequence stays on the canonical onward booking.
+  const onwardToStay = result.edges.find((edge) => edge.id === `MUST_HAPPEN_BEFORE:SERVICE_BOOKING:svc-old:TRANSFER_STAY:item-stay`);
+  assert.equal(onwardToStay?.authority, 'AUTHORITATIVE');
+  assert.equal(result.edges.some((edge) => edge.id.includes(proposedRow.id) && edge.id.includes('item-stay')), false);
   // The canonical inbound leg is untouched.
   assert.equal(result.nodes.find((node) => node.ref === 'SERVICE_BOOKING:svc-in')?.authority, 'AUTHORITATIVE');
   assert.equal(result.nodes.find((node) => node.ref === TIMING)?.authority, 'AUTHORITATIVE');
 });
 
-test('CP4 preview 3: no stale canonical onward card lingers beside the proposal', () => {
+test('CP4 preview 3: canonical FAILED onward remains on the mainline beside the proposal', () => {
   const result = projectFocusedCaseGraphEnrichment({
     ...baseInput(),
     proposedServiceByJourneyItem: new Map([['item-on', proposedRow.id]]),
     proposedTransportServices: [proposedRow],
   });
-  const mentionsOld = (ref: string) => ref.includes('svc-old');
-  assert.equal(result.nodes.some((node) => mentionsOld(node.ref) || (node.subjectRefs ?? []).some(mentionsOld)), false);
-  assert.equal(result.edges.some((edge) => mentionsOld(edge.fromRef) || mentionsOld(edge.toRef)), false);
-  assert.equal(result.nodes.filter((node) => node.kind === 'SERVICE_BOOKING').length, 2, 'inbound + one onward card');
+  const old = result.nodes.find((node) => node.ref === 'SERVICE_BOOKING:svc-old');
+  assert.ok(old, 'canonical onward card remains visible');
+  assert.equal(old.authority, 'AUTHORITATIVE');
+  assert.equal(old.semanticState, 'FAILED');
+  const canonicalConnection = result.edges.find((edge) => edge.id === `MUST_HAPPEN_BEFORE:${TIMING}:SERVICE_BOOKING:svc-old`);
+  assert.equal(canonicalConnection?.semanticState, 'FAILED');
+  assert.equal(canonicalConnection?.authority, 'AUTHORITATIVE');
+  assert.ok(result.nodes.find((node) => node.ref === `SERVICE_BOOKING:${proposedRow.id}`), 'proposed card also present');
+  assert.equal(result.nodes.filter((node) => node.kind === 'SERVICE_BOOKING').length, 3, 'inbound + canonical onward + proposed');
 });
 
 test('CP4 preview 4: after execution the booked canonical service is shown and the preview is gone', () => {

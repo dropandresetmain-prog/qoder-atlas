@@ -275,6 +275,40 @@ test('Disruption Path frames supplied causal nodes while retaining context nodes
   assert.deepEqual(scene.views.path.keepNodes, ['A', 'B']);
 });
 
+test('Disruption Path keeps proposed recovery sharp; owner and deps stay faded', () => {
+  const ldg = makeLdg({
+    nodes: [
+      { ref: 'IN', kind: 'SERVICE_BOOKING', label: 'Inbound', semanticState: 'CHANGED', authority: 'AUTHORITATIVE' },
+      { ref: 'ARR', kind: 'TIMING', label: 'Arrival', semanticState: 'CHANGED', authority: 'AUTHORITATIVE' },
+      { ref: 'ON', kind: 'SERVICE_BOOKING', label: 'Onward', semanticState: 'FAILED', authority: 'AUTHORITATIVE' },
+      { ref: 'REC', kind: 'SERVICE_BOOKING', label: 'Proposed', semanticState: 'PROPOSED', authority: 'PROPOSED' },
+      { ref: 'OWN', kind: 'TRAVELLER', label: 'Traveller', semanticState: 'FAILED', authority: 'AUTHORITATIVE' },
+      { ref: 'STAY', kind: 'TRANSFER_STAY', label: 'Stay', semanticState: 'HEALTHY', authority: 'AUTHORITATIVE' },
+    ],
+    edges: [
+      { id: 'e1', fromRef: 'IN', toRef: 'ARR', kind: 'MUST_HAPPEN_BEFORE', authority: 'AUTHORITATIVE' },
+      { id: 'e2', fromRef: 'ARR', toRef: 'ON', kind: 'MUST_HAPPEN_BEFORE', authority: 'AUTHORITATIVE', semanticState: 'FAILED' },
+      { id: 'e3', fromRef: 'ARR', toRef: 'REC', kind: 'MUST_HAPPEN_BEFORE', authority: 'PROPOSED', semanticState: 'PROPOSED' },
+      { id: 'e4', fromRef: 'OWN', toRef: 'STAY', kind: 'RELIES_ON', authority: 'AUTHORITATIVE' },
+    ],
+  });
+  const focusedGraph: FocusedGraphView = {
+    causalNodeRefs: ['IN', 'ARR', 'ON'],
+    causalEdgeIds: ['e1', 'e2'],
+    recoveryNodeRefs: ['REC'],
+    ownerContextNodeRefs: ['OWN'],
+    dependencyContextNodeRefs: ['STAY'],
+    unmappedCausalSteps: [],
+  };
+  const html = renderFocusedCaseGraph({ ldg, focusedGraph, caseStatus: 'AWAITING_AUTHORITY' });
+  const scene = JSON.parse(html.match(/<script type="application\/json" class="fg-scene">([\s\S]*?)<\/script>/)![1]!);
+  assert.deepEqual([...scene.views.path.keepNodes].sort(), ['ARR', 'IN', 'ON', 'REC']);
+  assert.ok(scene.views.path.keepEdges.includes('e3'), 'Arrival → proposed stays in the path keep set');
+  assert.ok(html.includes('fg-proposal-edge'), 'proposed edge is dashed');
+  assert.ok(!html.includes('.fg-edge.fg-proposal-edge,\n.fg-pulse-dot.fg-proposal-edge { opacity: 0; }'),
+    'proposed edges are not hidden until click');
+});
+
 test('trip view uses the accepted Trip Overview label', () => {
   const html = renderFocusedCaseGraph({ ldg: makeLdg(), caseStatus: 'OPEN' });
   assert.ok(html.includes('data-view="trip">Trip Overview</button>'));

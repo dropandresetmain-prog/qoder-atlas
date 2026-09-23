@@ -299,7 +299,7 @@ test('CP4: composed stay card maps its own journey item, and a previewed onward 
   assert.ok(focused.dependencyContextNodeRefs.includes('TRANSFER_STAY:stay'), 'stay is dependency context');
   assert.equal(focused.causalNodeRefs.includes('SERVICE_BOOKING:transport-service:p'), false, 'proposed is not causal');
   assert.equal(focused.causalNodeRefs.includes('TRANSFER_STAY:stay'), false, 'stay is not causal');
-  assert.equal(focused.causalNodeRefs.some((ref) => ref === 'SERVICE_BOOKING:svc-on'), false, 'no stale canonical onward');
+  assert.ok(focused.causalNodeRefs.includes('SERVICE_BOOKING:svc-on'), 'canonical FAILED onward stays on the mainline');
   assert.deepEqual(focused.ownerContextNodeRefs, ['JOURNEY:j']);
 });
 

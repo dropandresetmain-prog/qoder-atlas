@@ -249,6 +249,13 @@ export const FOCUSED_GRAPH_CSS = `
 .fg-edge.sem-neutral { stroke: var(--fg-grey-line); }
 .fg-edge[data-focus="causal"] { stroke-width: 2.5; }
 .fg-edge[data-focus="context"].sem-neutral { stroke: #c7d0dc; stroke-width: 1.5; stroke-dasharray: 6 7; }
+/* Proposed recovery edges: always visible as dashed (Arrival → proposed flight). */
+.fg-edge.fg-proposal-edge {
+  stroke-dasharray: 6 7;
+  stroke-width: 2;
+}
+.fg-edge.fg-proposal-edge.fg-viewdim,
+.fg-pulse-dot.fg-proposal-edge.fg-viewdim { opacity: 0.11; }
 
 /* Travelling dots: presentation only. GREEN normal, AMBER slower (durations set per edge). */
 .fg-pulse-dot { transition: opacity 0.18s ease; }

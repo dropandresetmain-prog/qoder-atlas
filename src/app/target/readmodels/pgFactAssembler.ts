@@ -925,6 +925,39 @@ async function loadRecoveryCaseFactsInner(
       )
     : { rows: [] };
 
+  const stayItemIds = journeyItems.rows.filter((i) => i.kind === 'STAY').map((i) => i.id);
+  const stayBookingFacts = journeys.rows.length > 0 && stayItemIds.length > 0
+    ? await client.query<{
+        journey_item_id: string;
+        line_count: number;
+        line_status: string | null;
+        reservation_status: string | null;
+        observed_at: Date | null;
+      }>(
+        `SELECT ji.id AS journey_item_id,
+                count(DISTINCT rl.id)::int AS line_count,
+                CASE WHEN count(DISTINCT rl.id) = 1 THEN max(rl.observed_status) END AS line_status,
+                CASE WHEN count(DISTINCT r.id) = 1 THEN max(r.observed_status) END AS reservation_status,
+                CASE WHEN count(DISTINCT rl.id) = 1 THEN max(rl.observed_status_at) END AS observed_at
+           FROM journey_items ji
+           JOIN journeys j ON j.workspace_id = ji.workspace_id AND j.id = ji.journey_id
+           JOIN reservation_allocations ra
+             ON ra.workspace_id = ji.workspace_id
+            AND ra.journey_item_id = ji.id
+            AND ra.traveller_id = j.traveller_id
+           JOIN reservation_lines rl
+             ON rl.workspace_id = ra.workspace_id AND rl.id = ra.line_id
+           JOIN reservations r
+             ON r.workspace_id = rl.workspace_id AND r.id = rl.reservation_id
+           JOIN stay_line_details sld
+             ON sld.workspace_id = rl.workspace_id AND sld.line_id = rl.id
+          WHERE ji.workspace_id = $1
+            AND ji.id = ANY($2::uuid[])
+          GROUP BY ji.id`,
+        [workspaceId, stayItemIds],
+      )
+    : { rows: [] };
+
   const changedTransportServiceRefs = causeRow?.completed_at !== null && causeRow
     ? await client.query<{ subject_id: string }>(
         `SELECT DISTINCT cr.subject_id
@@ -1228,6 +1261,13 @@ async function loadRecoveryCaseFactsInner(
     transportBookingFacts: transportBookingFacts.rows.map((fact): TransportBookingFact => ({
       journeyId: fact.journey_id,
       serviceId: fact.service_id,
+      lineCount: fact.line_count,
+      lineStatus: fact.line_status,
+      reservationStatus: fact.reservation_status,
+      observedAt: fact.observed_at?.toISOString() ?? null,
+    })),
+    stayBookingFacts: stayBookingFacts.rows.map((fact) => ({
+      journeyItemId: fact.journey_item_id,
       lineCount: fact.line_count,
       lineStatus: fact.line_status,
       reservationStatus: fact.reservation_status,
