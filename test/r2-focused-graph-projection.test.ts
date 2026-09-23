@@ -105,8 +105,9 @@ test('R2: causalPath maps onto visible node refs in evaluator order', () => {
   const ldg = graph(programmeNodes, programmeEdges);
   const focused = projectFocusedGraph(ldg, programmePath);
   assert.ok(focused);
-  // First breakpoint subject leads; its related subject joins; then the next step.
-  assert.deepEqual(focused.causalNodeRefs, ['TIMING:t1', 'JOURNEY:j1', 'PROGRAMME_ITEM:p1']);
+  // First breakpoint subject leads; traveller is owner context; then the next step.
+  assert.deepEqual(focused.causalNodeRefs, ['TIMING:t1', 'PROGRAMME_ITEM:p1']);
+  assert.deepEqual(focused.ownerContextNodeRefs, ['JOURNEY:j1']);
 });
 
 test('R2: causal edges are the producer-owned ids connecting the causal node set', () => {
@@ -114,8 +115,9 @@ test('R2: causal edges are the producer-owned ids connecting the causal node set
   const focused = projectFocusedGraph(ldg, programmePath);
   assert.ok(focused);
   // Both endpoints on the causal set -> included; stable FIG-1 ids, not positions.
-  assert.ok(focused.causalEdgeIds.includes('RELIES_ON:JOURNEY:j1:TIMING:t1'));
   assert.ok(focused.causalEdgeIds.includes('MUST_HAPPEN_BEFORE:TIMING:t1:PROGRAMME_ITEM:p1'));
+  // Traveller is owner context, so traveller↔timing is not a causal edge.
+  assert.ok(!focused.causalEdgeIds.includes('RELIES_ON:JOURNEY:j1:TIMING:t1'));
   // The case<->disruption edge is NOT on the causal node set, so it is excluded.
   assert.ok(!focused.causalEdgeIds.includes('AFFECTED_BY:JOURNEY:j1:sig:s1'));
 });
@@ -138,7 +140,8 @@ test('A1: persisted cause maps to an explicit presentation subject while affecte
     subjectRef: 'JOURNEY:j1', causeSubjectRef: 'JOURNEY_ITEM:item-1', dimension: 'connection_feasibility', reasonCode: 'connection_impossible', evaluatorId: 'm6.connection', facts: {}, relatedSubjectRefs: [],
   }]);
   assert.equal(focused?.firstBreakpoint?.nodeRef, 'TIMING:item-1:ARRIVAL');
-  assert.deepEqual(focused?.causalNodeRefs, ['TIMING:item-1:ARRIVAL', 'JOURNEY:j1']);
+  assert.deepEqual(focused?.causalNodeRefs, ['TIMING:item-1:ARRIVAL']);
+  assert.deepEqual(focused?.ownerContextNodeRefs, ['JOURNEY:j1']);
 });
 
 test('A1: a third presentation mapping cannot restore an ambiguous canonical subject', () => {
@@ -170,9 +173,9 @@ test('A1: an evidenced arrival precedes the commitment it prevents, with the tra
     causeSubjectRef: 'PROGRAMME_ITEM:p1',
   }]);
   assert.equal(focused?.firstBreakpoint?.nodeRef, 'TIMING:arrival');
-  // The traveller (the step's own affected subject) stays on the causal spine
-  // even though arrival timing leads as the breakpoint.
-  assert.deepEqual(focused?.causalNodeRefs, ['sig:s1', 'SERVICE_BOOKING:inbound', 'TIMING:arrival', 'PROGRAMME_ITEM:p1', 'JOURNEY:j1']);
+  // Traveller owns the disruption but is not a journey step on the causal spine.
+  assert.deepEqual(focused?.causalNodeRefs, ['sig:s1', 'SERVICE_BOOKING:inbound', 'TIMING:arrival', 'PROGRAMME_ITEM:p1']);
+  assert.deepEqual(focused?.ownerContextNodeRefs, ['JOURNEY:j1']);
   assert.ok(focused?.causalEdgeIds.includes('arrival-break'));
 });
 
@@ -221,27 +224,31 @@ const dependencyContext: CausalPathStep[] = [
   step('JOURNEY:j', 'overnight_accommodation', 'overnight_not_required_for_gap', ['JOURNEY_ITEM:stay', 'JOURNEY_ITEM:other']),
 ];
 
-test('CP4: evaluator-declared dependents of an arrival breakpoint join the spine; unrelated ones do not', () => {
+test('CP4: evaluator-declared dependents join dependency context; unrelated ones do not', () => {
   const ldg = graph(breakpointNodes, breakpointEdges);
   const without = projectFocusedGraph(ldg, [connectionBroken]);
   // The failure chain alone never reaches the stay or the commitment (the
   // "floating" D3 shape before CP4).
   assert.equal(without?.causalNodeRefs.includes('TRANSFER_STAY:stay'), false);
   assert.equal(without?.causalNodeRefs.includes('PROGRAMME_ITEM:required'), false);
+  assert.equal(without?.dependencyContextNodeRefs?.includes('TRANSFER_STAY:stay'), false);
 
   const focused = projectFocusedGraph(ldg, [connectionBroken], dependencyContext);
   assert.ok(focused);
   // The failure chain itself is unchanged and still leads.
   assert.equal(focused.firstBreakpoint?.nodeRef, 'TIMING:in');
-  assert.deepEqual(focused.causalNodeRefs.slice(0, without!.causalNodeRefs.length), without!.causalNodeRefs);
-  // Dependents follow, in explanation order.
-  assert.deepEqual(focused.causalNodeRefs.slice(without!.causalNodeRefs.length), ['TRANSFER_STAY:stay', 'PROGRAMME_ITEM:required']);
-  assert.equal(focused.causalNodeRefs.includes('PROGRAMME_ITEM:unrelated'), false, 'unrelated programme stays off the spine');
+  assert.deepEqual(focused.causalNodeRefs, without!.causalNodeRefs);
+  assert.ok(!focused.causalNodeRefs.includes('JOURNEY:j'), 'traveller is not on the causal spine');
+  assert.deepEqual(focused.ownerContextNodeRefs, ['JOURNEY:j']);
+  // Dependents are dependency context — not causal-path membership.
+  assert.deepEqual(focused.dependencyContextNodeRefs, ['TRANSFER_STAY:stay', 'PROGRAMME_ITEM:required']);
+  assert.equal(focused.causalNodeRefs.includes('PROGRAMME_ITEM:unrelated'), false, 'unrelated programme stays off');
+  assert.equal(focused.dependencyContextNodeRefs.includes('PROGRAMME_ITEM:unrelated'), false);
   assert.equal(focused.causalNodeRefs.includes('SERVICE_BOOKING:other'), false, 'one hop only: a dependent never anchors');
-  // The stay and the commitment are connected into the story, not floating.
-  for (const id of ['on-stay', 'j-stay', 'arrival-required', 'j-required', 'arrival-on']) {
-    assert.ok(focused.causalEdgeIds.includes(id), `causal edge ${id}`);
-  }
+  // Causal edges stay on the failure chain; context edges are not masquerading as causal.
+  assert.ok(focused.causalEdgeIds.includes('arrival-on'));
+  assert.equal(focused.causalEdgeIds.includes('on-stay'), false);
+  assert.equal(focused.causalEdgeIds.includes('arrival-required'), false);
   assert.equal(focused.causalEdgeIds.includes('j-unrelated'), false);
   assert.deepEqual(focused.unmappedCausalSteps, []);
 });
@@ -284,20 +291,16 @@ test('CP4: composed stay card maps its own journey item, and a previewed onward 
   }]);
   assert.ok(misaligned?.causalNodeRefs.includes('TRANSFER_STAY:stay'));
 
-  // Broken connection + stay dependency: arrival → proposed onward → stay.
+  // Broken connection + stay dependency: arrival causal; proposed recovery; stay context.
   const focused = projectFocusedGraph(ldg, [{ ...connectionBroken, facts: { gapMinutes: -60, upstreamArrival: inboundArrival } }], dependencyContext);
   assert.ok(focused);
   assert.equal(focused.firstBreakpoint?.nodeRef, 'TIMING:in:ARRIVAL');
-  assert.ok(focused.causalNodeRefs.includes('SERVICE_BOOKING:transport-service:p'), 'proposed onward on the spine');
-  assert.ok(focused.causalNodeRefs.includes('TRANSFER_STAY:stay'), 'stay on the spine');
+  assert.ok(focused.recoveryNodeRefs.includes('SERVICE_BOOKING:transport-service:p'), 'proposed onward is recovery, not cause');
+  assert.ok(focused.dependencyContextNodeRefs.includes('TRANSFER_STAY:stay'), 'stay is dependency context');
+  assert.equal(focused.causalNodeRefs.includes('SERVICE_BOOKING:transport-service:p'), false, 'proposed is not causal');
+  assert.equal(focused.causalNodeRefs.includes('TRANSFER_STAY:stay'), false, 'stay is not causal');
   assert.equal(focused.causalNodeRefs.some((ref) => ref === 'SERVICE_BOOKING:svc-on'), false, 'no stale canonical onward');
-  for (const id of [
-    'MUST_HAPPEN_BEFORE:TIMING:in:ARRIVAL:SERVICE_BOOKING:transport-service:p',
-    'MUST_HAPPEN_BEFORE:SERVICE_BOOKING:transport-service:p:TRANSFER_STAY:stay',
-    'RELIES_ON:JOURNEY:j:TRANSFER_STAY:stay',
-  ]) {
-    assert.ok(focused.causalEdgeIds.includes(id), `causal edge ${id}`);
-  }
+  assert.deepEqual(focused.ownerContextNodeRefs, ['JOURNEY:j']);
 });
 
 test('R2: a causal step with no visible node is an explicit honest gap', () => {
@@ -369,7 +372,8 @@ test('R2: projectRecoveryCase spreads focusedGraph only when a causal path exist
   const withPath = projectRecoveryCase({ ...baseFacts, causalPath: programmePath });
   assert.ok(withPath.focusedGraph);
   assert.equal(withPath.focusedGraph?.firstBreakpoint?.nodeRef, 'TIMING:t1');
-  assert.deepEqual(withPath.focusedGraph?.causalNodeRefs, ['TIMING:t1', 'JOURNEY:j1', 'PROGRAMME_ITEM:p1']);
+  assert.deepEqual(withPath.focusedGraph?.causalNodeRefs, ['TIMING:t1', 'PROGRAMME_ITEM:p1']);
+  assert.deepEqual(withPath.focusedGraph?.ownerContextNodeRefs, ['JOURNEY:j1']);
   // The causal path itself is still carried verbatim for the Case workspace.
   assert.equal(withPath.causalPath.length, 2);
   // Current authoritative state is untouched.

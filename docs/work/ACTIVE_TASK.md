@@ -181,6 +181,17 @@
 - [x] CP5 — Chromium D1/D2/D3 browser acceptance on `jordan-corpus-2026-09-23`
   - Evidence: `docs/work/cp5-evidence/` (healthy → D1 CHECKING → D2 AT_RISK → D3 DISRUPTED → Path A).
   - Fix: Overview blast membership no longer paints CURRENT `UNKNOWN` as red UNRESOLVED (D1 false-red).
+  - Initially marked accepted at `19a1350` (`CP5_BROWSER_PASS`).
+  - **Founder visual QC immediately reopened** D3 Case-graph presentation (one horizontal row;
+    traveller inserted as a journey step; dependency context masquerading as causal).
+- [x] CP5.1 — hierarchical Case-graph semantic roles + layout (presentation only; planning frozen)
+  - `FocusedGraphView` distinguishes causal / recovery / dependency-context / owner-context refs.
+  - Traveller is owner context (`Trip disrupted` when FAILED); never the causal bridge.
+  - Non-failing dependency context no longer appends into `causalNodeRefs`.
+  - Deterministic hierarchical layout; stay labels use canonical place name when known.
+  - Evidence: `docs/work/cp5-evidence/cp5-1-d3-graph-scene-dump.txt`,
+    `docs/work/cp5-evidence/cp5-1-d3-case-graph-1560x1000.png`.
+  - **CP5 not closed for founder** until visual QC accepts the graph. Do **not** begin CP6.
 - [ ] CP6 — protected sandbox execution → RESOLVED + sanitized recordings + REPLAY proof
 
 ## Parked

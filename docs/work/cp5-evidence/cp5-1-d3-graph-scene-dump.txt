@@ -1,0 +1,90 @@
+case=8028fdf8-d4e5-5ce5-8a55-956aba493502 scenes=2
+=== scene 0 role=current 984x672 focal=TIMING:da02c0dd-9a7d-5f8b-992a-04a46d3b9b8d:ARRIVAL defaultView=path
+uniqueY≈5 width=984 height=672
+{"ref":"JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e","entity":"Traveller","label":"Jordan Hale","state":"Trip disrupted","x":501,"y":36,"w":152,"h":104,"cls":"fg-node sem-alert fg-size-small fg-context"}
+{"ref":"TIMING:da02c0dd-9a7d-5f8b-992a-04a46d3b9b8d:ARRIVAL","entity":"Timing","label":"Arrival timing","state":"Changed","x":464,"y":168,"w":226,"h":136,"cls":"fg-node sem-watch fg-size-focal fg-focal fg-causal"}
+{"ref":"CHANGE_SIGNAL:bb7e2150-c89d-5464-bdd3-b3faad0e49e1","entity":"Disruption","label":"Transport schedule observed","secondary":"Provider event · received 29 Sep 03:00 UTC","state":"Changed","x":36,"y":178,"w":168,"h":116,"cls":"fg-node sem-watch fg-size-normal fg-causal"}
+{"ref":"SERVICE_BOOKING:e3ba04a8-e305-524d-bf84-4f268d078b92","entity":"Service / booking","label":"ZG ZG023 flight","secondary":"Los Angeles International → Tokyo Narita · Booking line confirmed · observed 24 Aug 02:00 UTC","state":"Changed","x":250,"y":178,"w":168,"h":116,"cls":"fg-node sem-watch fg-size-normal fg-causal"}
+{"ref":"SERVICE_BOOKING:transport-service:be7696eebb5fbaf509fa334e62a79dc7","entity":"Service / booking","label":"TR flight","secondary":"Tokyo Narita → Singapore Changi Airport · Proposed replacement · not booked yet","state":"Proposed","x":736,"y":356,"w":184,"h":124,"cls":"fg-node sem-watch fg-size-secondary fg-context"}
+{"ref":"PROGRAMME_ITEM:944bd358-c1ed-5fce-8c08-db52bfb421c4","entity":"Programme commitment","label":"Hackathon and Seedup Awards: Winners Announced","secondary":"2 Oct 16:55 → 17:15 GMT+8","state":"Healthy","x":464,"y":532,"w":152,"h":104,"cls":"fg-node sem-ok fg-size-small fg-context"}
+{"ref":"PROGRAMME_ITEM:c7a6cbc0-3d52-554e-8834-896749a409ec","entity":"Programme commitment","label":"Bootcamp - Agentic Travel Hackathon Finals Showcase (Opening Cocktails)","secondary":"30 Sept 20:45 → 21:05 GMT+8","state":"Healthy","x":630,"y":532,"w":152,"h":104,"cls":"fg-node sem-ok fg-size-small fg-context"}
+{"ref":"TRANSFER_STAY:01cca790-e659-56d2-b02d-b42bcf0baa96","entity":"Transfer / stay","label":"Stay · lyf Bugis Singapore","secondary":"29 Sept 15:00 → 3 Oct 11:00 GMT+8","state":"Unknown / unconfirmed","x":796,"y":532,"w":152,"h":104,"cls":"fg-node sem-neutral fg-size-small fg-context"}
+edges=12
+{"key":"AFFECTED_BY:JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e:CHANGE_SIGNAL:bb7e2150-c89d-5464-bdd3-b3faad0e49e1","s":"JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e","t":"CHANGE_SIGNAL:bb7e2150-c89d-5464-bdd3-b3faad0e49e1","focus":"context","tone":"neutral"}
+{"key":"AFFECTED_BY:CHANGE_SIGNAL:bb7e2150-c89d-5464-bdd3-b3faad0e49e1:SERVICE_BOOKING:e3ba04a8-e305-524d-bf84-4f268d078b92","s":"CHANGE_SIGNAL:bb7e2150-c89d-5464-bdd3-b3faad0e49e1","t":"SERVICE_BOOKING:e3ba04a8-e305-524d-bf84-4f268d078b92","focus":"causal","tone":"watch"}
+{"key":"MUST_HAPPEN_BEFORE:SERVICE_BOOKING:e3ba04a8-e305-524d-bf84-4f268d078b92:TIMING:da02c0dd-9a7d-5f8b-992a-04a46d3b9b8d:ARRIVAL","s":"SERVICE_BOOKING:e3ba04a8-e305-524d-bf84-4f268d078b92","t":"TIMING:da02c0dd-9a7d-5f8b-992a-04a46d3b9b8d:ARRIVAL","focus":"causal","tone":"neutral"}
+{"key":"MUST_HAPPEN_BEFORE:SERVICE_BOOKING:transport-service:be7696eebb5fbaf509fa334e62a79dc7:TRANSFER_STAY:01cca790-e659-56d2-b02d-b42bcf0baa96","s":"SERVICE_BOOKING:transport-service:be7696eebb5fbaf509fa334e62a79dc7","t":"TRANSFER_STAY:01cca790-e659-56d2-b02d-b42bcf0baa96","focus":"context","tone":"neutral"}
+{"key":"RELIES_ON:JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e:SERVICE_BOOKING:e3ba04a8-e305-524d-bf84-4f268d078b92","s":"JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e","t":"SERVICE_BOOKING:e3ba04a8-e305-524d-bf84-4f268d078b92","focus":"context","tone":"neutral"}
+{"key":"RELIES_ON:JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e:SERVICE_BOOKING:transport-service:be7696eebb5fbaf509fa334e62a79dc7","s":"JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e","t":"SERVICE_BOOKING:transport-service:be7696eebb5fbaf509fa334e62a79dc7","focus":"context","tone":"neutral"}
+{"key":"RELIES_ON:JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e:TRANSFER_STAY:01cca790-e659-56d2-b02d-b42bcf0baa96","s":"JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e","t":"TRANSFER_STAY:01cca790-e659-56d2-b02d-b42bcf0baa96","focus":"context","tone":"neutral"}
+{"key":"MUST_HAPPEN_BEFORE:TIMING:da02c0dd-9a7d-5f8b-992a-04a46d3b9b8d:ARRIVAL:SERVICE_BOOKING:transport-service:be7696eebb5fbaf509fa334e62a79dc7","s":"TIMING:da02c0dd-9a7d-5f8b-992a-04a46d3b9b8d:ARRIVAL","t":"SERVICE_BOOKING:transport-service:be7696eebb5fbaf509fa334e62a79dc7","focus":"context","tone":"watch"}
+{"key":"PARTICIPATES_IN:JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e:PROGRAMME_ITEM:c7a6cbc0-3d52-554e-8834-896749a409ec","s":"JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e","t":"PROGRAMME_ITEM:c7a6cbc0-3d52-554e-8834-896749a409ec","focus":"context","tone":"neutral"}
+{"key":"MUST_HAPPEN_BEFORE:TIMING:da02c0dd-9a7d-5f8b-992a-04a46d3b9b8d:ARRIVAL:PROGRAMME_ITEM:c7a6cbc0-3d52-554e-8834-896749a409ec","s":"TIMING:da02c0dd-9a7d-5f8b-992a-04a46d3b9b8d:ARRIVAL","t":"PROGRAMME_ITEM:c7a6cbc0-3d52-554e-8834-896749a409ec","focus":"context","tone":"neutral"}
+{"key":"PARTICIPATES_IN:JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e:PROGRAMME_ITEM:944bd358-c1ed-5fce-8c08-db52bfb421c4","s":"JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e","t":"PROGRAMME_ITEM:944bd358-c1ed-5fce-8c08-db52bfb421c4","focus":"context","tone":"neutral"}
+{"key":"MUST_HAPPEN_BEFORE:TIMING:da02c0dd-9a7d-5f8b-992a-04a46d3b9b8d:ARRIVAL:PROGRAMME_ITEM:944bd358-c1ed-5fce-8c08-db52bfb421c4","s":"TIMING:da02c0dd-9a7d-5f8b-992a-04a46d3b9b8d:ARRIVAL","t":"PROGRAMME_ITEM:944bd358-c1ed-5fce-8c08-db52bfb421c4","focus":"context","tone":"neutral"}
+path.keepNodes=["CHANGE_SIGNAL:bb7e2150-c89d-5464-bdd3-b3faad0e49e1","SERVICE_BOOKING:e3ba04a8-e305-524d-bf84-4f268d078b92","TIMING:da02c0dd-9a7d-5f8b-992a-04a46d3b9b8d:ARRIVAL","SERVICE_BOOKING:transport-service:be7696eebb5fbaf509fa334e62a79dc7","PROGRAMME_ITEM:944bd358-c1ed-5fce-8c08-db52bfb421c4","PROGRAMME_ITEM:c7a6cbc0-3d52-554e-8834-896749a409ec","TRANSFER_STAY:01cca790-e659-56d2-b02d-b42bcf0baa96","JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e"]
+path.rect={"x1":12,"y1":12,"x2":972,"y2":660}
+=== scene 1 role=original 984x364 focal=TIMING:da02c0dd-9a7d-5f8b-992a-04a46d3b9b8d:ARRIVAL defaultView=path
+uniqueY≈3 width=984 height=364
+{"ref":"TIMING:da02c0dd-9a7d-5f8b-992a-04a46d3b9b8d:ARRIVAL","entity":"Timing","label":"Arrival timing","state":"Changed","x":464,"y":36,"w":226,"h":136,"cls":"fg-node sem-watch fg-size-focal fg-focal fg-causal"}
+{"ref":"CHANGE_SIGNAL:f2aafcf6-b7fe-5256-ad37-8c92c356155f","entity":"Disruption","label":"Transport schedule observed","secondary":"Provider event · received 28 Sep 22:00 UTC","state":"Changed","x":36,"y":46,"w":168,"h":116,"cls":"fg-node sem-watch fg-size-normal fg-causal"}
+{"ref":"SERVICE_BOOKING:e3ba04a8-e305-524d-bf84-4f268d078b92","entity":"Service / booking","label":"ZG ZG023 flight","secondary":"Los Angeles International → Tokyo Narita · Booking line confirmed · observed 24 Aug 02:00 UTC","state":"Changed","x":250,"y":46,"w":168,"h":116,"cls":"fg-node sem-watch fg-size-normal fg-causal"}
+{"ref":"SERVICE_BOOKING:271f1f6e-2a76-5b12-8260-2ef558d87477","entity":"Service / booking","label":"ZG ZG053 flight","secondary":"Tokyo Narita → Singapore Changi Airport · Booking line confirmed · observed 24 Aug 02:00 UTC","state":"Healthy","x":736,"y":46,"w":168,"h":116,"cls":"fg-node sem-ok fg-size-normal fg-causal"}
+{"ref":"JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e","entity":"Traveller","label":"Jordan Hale","state":"Affected","x":36,"y":224,"w":152,"h":104,"cls":"fg-node sem-watch fg-size-small fg-context"}
+{"ref":"PROGRAMME_ITEM:944bd358-c1ed-5fce-8c08-db52bfb421c4","entity":"Programme commitment","label":"Hackathon and Seedup Awards: Winners Announced","secondary":"2 Oct 16:55 → 17:15 GMT+8","state":"Healthy","x":464,"y":224,"w":152,"h":104,"cls":"fg-node sem-ok fg-size-small fg-context"}
+{"ref":"PROGRAMME_ITEM:c7a6cbc0-3d52-554e-8834-896749a409ec","entity":"Programme commitment","label":"Bootcamp - Agentic Travel Hackathon Finals Showcase (Opening Cocktails)","secondary":"30 Sept 20:45 → 21:05 GMT+8","state":"Healthy","x":630,"y":224,"w":152,"h":104,"cls":"fg-node sem-ok fg-size-small fg-context"}
+{"ref":"TRANSFER_STAY:01cca790-e659-56d2-b02d-b42bcf0baa96","entity":"Transfer / stay","label":"Stay · lyf Bugis Singapore","secondary":"29 Sept 15:00 → 3 Oct 11:00 GMT+8","state":"Unknown / unconfirmed","x":796,"y":224,"w":152,"h":104,"cls":"fg-node sem-neutral fg-size-small fg-context"}
+edges=12
+{"key":"AFFECTED_BY:JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e:CHANGE_SIGNAL:f2aafcf6-b7fe-5256-ad37-8c92c356155f","s":"JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e","t":"CHANGE_SIGNAL:f2aafcf6-b7fe-5256-ad37-8c92c356155f","focus":"context","tone":"neutral"}
+{"key":"AFFECTED_BY:CHANGE_SIGNAL:f2aafcf6-b7fe-5256-ad37-8c92c356155f:SERVICE_BOOKING:e3ba04a8-e305-524d-bf84-4f268d078b92","s":"CHANGE_SIGNAL:f2aafcf6-b7fe-5256-ad37-8c92c356155f","t":"SERVICE_BOOKING:e3ba04a8-e305-524d-bf84-4f268d078b92","focus":"causal","tone":"watch"}
+{"key":"MUST_HAPPEN_BEFORE:SERVICE_BOOKING:e3ba04a8-e305-524d-bf84-4f268d078b92:TIMING:da02c0dd-9a7d-5f8b-992a-04a46d3b9b8d:ARRIVAL","s":"SERVICE_BOOKING:e3ba04a8-e305-524d-bf84-4f268d078b92","t":"TIMING:da02c0dd-9a7d-5f8b-992a-04a46d3b9b8d:ARRIVAL","focus":"causal","tone":"neutral"}
+{"key":"MUST_HAPPEN_BEFORE:SERVICE_BOOKING:271f1f6e-2a76-5b12-8260-2ef558d87477:TRANSFER_STAY:01cca790-e659-56d2-b02d-b42bcf0baa96","s":"SERVICE_BOOKING:271f1f6e-2a76-5b12-8260-2ef558d87477","t":"TRANSFER_STAY:01cca790-e659-56d2-b02d-b42bcf0baa96","focus":"context","tone":"neutral"}
+{"key":"RELIES_ON:JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e:SERVICE_BOOKING:e3ba04a8-e305-524d-bf84-4f268d078b92","s":"JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e","t":"SERVICE_BOOKING:e3ba04a8-e305-524d-bf84-4f268d078b92","focus":"context","tone":"neutral"}
+{"key":"RELIES_ON:JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e:SERVICE_BOOKING:271f1f6e-2a76-5b12-8260-2ef558d87477","s":"JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e","t":"SERVICE_BOOKING:271f1f6e-2a76-5b12-8260-2ef558d87477","focus":"context","tone":"neutral"}
+{"key":"RELIES_ON:JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e:TRANSFER_STAY:01cca790-e659-56d2-b02d-b42bcf0baa96","s":"JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e","t":"TRANSFER_STAY:01cca790-e659-56d2-b02d-b42bcf0baa96","focus":"context","tone":"neutral"}
+{"key":"MUST_HAPPEN_BEFORE:TIMING:da02c0dd-9a7d-5f8b-992a-04a46d3b9b8d:ARRIVAL:SERVICE_BOOKING:271f1f6e-2a76-5b12-8260-2ef558d87477","s":"TIMING:da02c0dd-9a7d-5f8b-992a-04a46d3b9b8d:ARRIVAL","t":"SERVICE_BOOKING:271f1f6e-2a76-5b12-8260-2ef558d87477","focus":"causal","tone":"watch"}
+{"key":"PARTICIPATES_IN:JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e:PROGRAMME_ITEM:c7a6cbc0-3d52-554e-8834-896749a409ec","s":"JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e","t":"PROGRAMME_ITEM:c7a6cbc0-3d52-554e-8834-896749a409ec","focus":"context","tone":"neutral"}
+{"key":"MUST_HAPPEN_BEFORE:TIMING:da02c0dd-9a7d-5f8b-992a-04a46d3b9b8d:ARRIVAL:PROGRAMME_ITEM:c7a6cbc0-3d52-554e-8834-896749a409ec","s":"TIMING:da02c0dd-9a7d-5f8b-992a-04a46d3b9b8d:ARRIVAL","t":"PROGRAMME_ITEM:c7a6cbc0-3d52-554e-8834-896749a409ec","focus":"context","tone":"neutral"}
+{"key":"PARTICIPATES_IN:JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e:PROGRAMME_ITEM:944bd358-c1ed-5fce-8c08-db52bfb421c4","s":"JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e","t":"PROGRAMME_ITEM:944bd358-c1ed-5fce-8c08-db52bfb421c4","focus":"context","tone":"neutral"}
+{"key":"MUST_HAPPEN_BEFORE:TIMING:da02c0dd-9a7d-5f8b-992a-04a46d3b9b8d:ARRIVAL:PROGRAMME_ITEM:944bd358-c1ed-5fce-8c08-db52bfb421c4","s":"TIMING:da02c0dd-9a7d-5f8b-992a-04a46d3b9b8d:ARRIVAL","t":"PROGRAMME_ITEM:944bd358-c1ed-5fce-8c08-db52bfb421c4","focus":"context","tone":"neutral"}
+path.keepNodes=["CHANGE_SIGNAL:f2aafcf6-b7fe-5256-ad37-8c92c356155f","SERVICE_BOOKING:e3ba04a8-e305-524d-bf84-4f268d078b92","TIMING:da02c0dd-9a7d-5f8b-992a-04a46d3b9b8d:ARRIVAL","SERVICE_BOOKING:271f1f6e-2a76-5b12-8260-2ef558d87477"]
+path.rect={"x1":12,"y1":12,"x2":928,"y2":196}
+=== focusedGraph ===
+{
+  "causalNodeRefs": [
+    "CHANGE_SIGNAL:bb7e2150-c89d-5464-bdd3-b3faad0e49e1",
+    "SERVICE_BOOKING:e3ba04a8-e305-524d-bf84-4f268d078b92",
+    "TIMING:da02c0dd-9a7d-5f8b-992a-04a46d3b9b8d:ARRIVAL"
+  ],
+  "causalEdgeIds": [
+    "AFFECTED_BY:CHANGE_SIGNAL:bb7e2150-c89d-5464-bdd3-b3faad0e49e1:SERVICE_BOOKING:e3ba04a8-e305-524d-bf84-4f268d078b92",
+    "MUST_HAPPEN_BEFORE:SERVICE_BOOKING:e3ba04a8-e305-524d-bf84-4f268d078b92:TIMING:da02c0dd-9a7d-5f8b-992a-04a46d3b9b8d:ARRIVAL"
+  ],
+  "recoveryNodeRefs": [
+    "SERVICE_BOOKING:transport-service:be7696eebb5fbaf509fa334e62a79dc7"
+  ],
+  "dependencyContextNodeRefs": [
+    "PROGRAMME_ITEM:944bd358-c1ed-5fce-8c08-db52bfb421c4",
+    "PROGRAMME_ITEM:c7a6cbc0-3d52-554e-8834-896749a409ec",
+    "TRANSFER_STAY:01cca790-e659-56d2-b02d-b42bcf0baa96"
+  ],
+  "ownerContextNodeRefs": [
+    "JOURNEY:5a1e3770-9d60-5a2b-87d6-9d50ce61251e"
+  ],
+  "firstBreakpoint": {
+    "nodeRef": "TIMING:da02c0dd-9a7d-5f8b-992a-04a46d3b9b8d:ARRIVAL",
+    "label": "Arrival timing",
+    "dimension": "connection_feasibility",
+    "reasonCode": "connection_broken"
+  },
+  "unmappedCausalSteps": []
+}
+=== Path summary ===
+{
+  "status": "AWAITING_AUTHORITY",
+  "tripViability": {
+    "label": "Whole-trip viability",
+    "verdict": "FAIL"
+  },
+  "candidates": []
+}

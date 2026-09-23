@@ -64,6 +64,8 @@ export interface JourneyItemRow {
   intended_window_end: string | null;
   /** Canonical endpoint/place zone for STAY windows, when the place is known. */
   timeZone?: string | null;
+  /** Canonical intended place display name for STAY items, when known. */
+  placeName?: string | null;
   /** For TRANSPORT items: the selected transport service id (from transport_item_details). */
   selectedServiceId?: string | null;
 }
@@ -585,7 +587,8 @@ export function projectFocusedCaseGraphEnrichment(
         // TRANSFER_STAY: ref is TRANSFER_STAY:<item_id>.
         kind = 'TRANSFER_STAY';
         ref = `TRANSFER_STAY:${item.id}`;
-        label = 'Stay';
+        const place = item.placeName?.trim();
+        label = place ? `Stay · ${place}` : 'Stay';
         if (item.intended_window_start && item.intended_window_end) {
           detail = formatWindowInTimeZone(item.intended_window_start, item.intended_window_end, item.timeZone);
         }

@@ -117,6 +117,9 @@ export function buildGraphScene(input: BuildSceneInput): GraphScene {
   const ldg: LiveDependencyGraph = { ...input.ldg, nodes: visibleNodes,
     edges: input.ldg.edges.filter((edge) => visibleRefs.has(edge.fromRef) && visibleRefs.has(edge.toRef)) };
   const causalRefs = focusedGraph?.causalNodeRefs ?? [];
+  const recoveryRefs = focusedGraph?.recoveryNodeRefs ?? [];
+  const dependencyRefs = focusedGraph?.dependencyContextNodeRefs ?? [];
+  const ownerRefs = focusedGraph?.ownerContextNodeRefs ?? [];
   const causalEdgeIds = new Set(focusedGraph?.causalEdgeIds ?? []);
   const causalEdgeIndices = ldg.edges
     .map((edge, index) => (causalEdgeIds.has(edge.id) ? index : -1))
@@ -124,9 +127,15 @@ export function buildGraphScene(input: BuildSceneInput): GraphScene {
 
   const graph = presentDependencyGraph(ldg, { causalRefs, causalEdgeIndices });
   const focalRef = focusedGraph?.firstBreakpoint?.nodeRef;
-  const layout = computeLayout(graph, causalRefs, { focalRef });
+  const layout = computeLayout(graph, causalRefs, {
+    focalRef,
+    recoveryNodeRefs: recoveryRefs,
+    dependencyContextNodeRefs: dependencyRefs,
+    ownerContextNodeRefs: ownerRefs,
+  });
   const nodeByRef = new Map(graph.nodes.map((n) => [n.ref, n]));
   const causalSet = new Set(causalRefs);
+  const footprintSet = new Set([...causalRefs, ...recoveryRefs, ...dependencyRefs, ...ownerRefs]);
   const edgeByKey = new Map(graph.edges.map((e) => [e.renderKey, e]));
 
   const nodes: SceneNode[] = layout.nodes.flatMap((ln) => {
@@ -175,15 +184,22 @@ export function buildGraphScene(input: BuildSceneInput): GraphScene {
     : { x1: 0, y1: 0, x2: 800, y2: 400 };
 
   const hasPath = focusedGraph !== undefined && causalRefs.some((r) => nodeByRef.has(r));
-  const causalPresent = causalRefs.filter((r) => nodeByRef.has(r));
-  const causalRect = causalPresent.length > 0
-    ? unionRect(nodes.filter((n) => causalSet.has(n.ref)).map(rectOf), 0)
+  const footprintPresent = [...footprintSet].filter((r) => nodeByRef.has(r));
+  // Frame the principal disruption/recovery story (causal + recovery + owner).
+  // Dependency context stays in keepNodes (not dimmed) but does not inflate the
+  // default camera into a deep zoom-out.
+  const frameSet = new Set([...causalRefs, ...recoveryRefs, ...ownerRefs]);
+  const frameNodes = nodes.filter((n) => frameSet.has(n.ref));
+  const pathRect = frameNodes.length > 0
+    ? unionRect(frameNodes.map(rectOf), 36)
     : allRect;
   const pathView: SceneView | undefined = hasPath
     ? {
-        rect: causalRect,
-        keepNodes: causalPresent,
-        keepEdges: edges.filter((e) => e.focus === 'causal').map((e) => e.key),
+        rect: pathRect,
+        keepNodes: footprintPresent,
+        keepEdges: edges
+          .filter((e) => footprintSet.has(e.source) && footprintSet.has(e.target))
+          .map((e) => e.key),
       }
     : undefined;
 

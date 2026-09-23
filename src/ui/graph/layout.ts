@@ -1,15 +1,18 @@
 /**
- * Deterministic left-to-right graph layout (V5.6 composition).
+ * Deterministic hierarchical graph layout (V5.6 composition + CP5.1 roles).
  *
- * Pure function: graph -> positions + edge geometry. No DOM, no force/physics,
- * no randomness. Card size is derived from the node's ROLE in the graph (focal
- * breakpoint / secondary alert on the spine / normal spine / small context),
- * never from what the node is about.
+ * Pure function: graph + presentation roles -> positions + edge geometry.
+ * No DOM, no force/physics, no randomness. Card size is derived from the node's
+ * ROLE in the graph (focal breakpoint / secondary alert on the spine / recovery
+ * branch / normal spine / small context), never from what the node is about.
  *
- * With a causal spine: causal refs take monotonically increasing columns in
- * backend causal order, vertically centred on one line with tight gaps. Healthy
- * context hangs in a compact band BELOW the spine, each item under the spine
- * column it is attached to. Without a spine: longest-path ranking.
+ * With a causal spine:
+ * - causal refs take monotonically increasing columns on the dominant row
+ * - owner context sits ABOVE the focal breakpoint (never on the spine)
+ * - proposed recovery branches RIGHT of the breakpoint on a recovery band
+ * - dependency context stacks BELOW its nearest causal/recovery anchor
+ *
+ * Without a spine: longest-path ranking.
  */
 import type { PresentationGraph, PresentationNode } from '../semantics/model.ts';
 import { routeEdge, type Box, type EdgeRoute } from './geometry.ts';
@@ -47,10 +50,18 @@ export interface LayoutResult {
   readonly height: number;
 }
 
-export interface LayoutOptions {
+export interface LayoutRoles {
   /** The first breakpoint node ref; gets the focal card size. */
   readonly focalRef?: string | undefined;
+  /** PROPOSED recovery branch (not historical cause). */
+  readonly recoveryNodeRefs?: readonly string[];
+  /** Non-failing dependency context (stay / programme). */
+  readonly dependencyContextNodeRefs?: readonly string[];
+  /** Ownership / affected-party context (typically TRAVELLER). */
+  readonly ownerContextNodeRefs?: readonly string[];
 }
+
+export type LayoutOptions = LayoutRoles;
 
 export const SIZES: Record<SizeClass, { readonly w: number; readonly h: number }> = {
   focal: { w: 226, h: 136 },
@@ -60,16 +71,22 @@ export const SIZES: Record<SizeClass, { readonly w: number; readonly h: number }
 };
 
 const SPINE_GAP = 46;
-const BAND_GAP = 58;
+const BAND_GAP = 52;
 const BAND_ROW_GAP = 18;
 const CTX_GAP = 14;
+const OWNER_GAP = 28;
 const COLUMN_GAP = 56;
 const ROW_GAP = 22;
 const PADDING = 36;
 
-function sizeClassFor(node: PresentationNode, isSpine: boolean, isFocal: boolean): SizeClass {
+function sizeClassFor(
+  node: PresentationNode,
+  role: 'causal' | 'recovery' | 'owner' | 'dependency' | 'other',
+  isFocal: boolean,
+): SizeClass {
   if (isFocal) return 'focal';
-  if (!isSpine) return 'small';
+  if (role === 'recovery') return 'secondary';
+  if (role === 'owner' || role === 'dependency' || role === 'other') return 'small';
   return node.indicator.tone === 'alert' ? 'secondary' : 'normal';
 }
 
@@ -85,6 +102,27 @@ export function computeLayout(
     : computeLongestPathLayout(graph, options);
 }
 
+function nearestAnchorColumn(
+  startRefs: readonly string[],
+  adjacency: Map<string, string[]>,
+  columnOf: Map<string, number>,
+): Map<string, number> {
+  const nodeColumn = new Map<string, number>(columnOf);
+  const queue: string[] = [...startRefs];
+  const visited = new Set(startRefs);
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    const col = nodeColumn.get(current)!;
+    for (const neighbor of adjacency.get(current) ?? []) {
+      if (visited.has(neighbor)) continue;
+      visited.add(neighbor);
+      nodeColumn.set(neighbor, col);
+      queue.push(neighbor);
+    }
+  }
+  return nodeColumn;
+}
+
 function computeCausalSpineLayout(
   graph: PresentationGraph,
   causalRefs: readonly string[],
@@ -98,70 +136,135 @@ function computeCausalSpineLayout(
     adjacency.get(edge.targetRef)?.push(edge.sourceRef);
   }
 
+  const recoverySet = new Set(
+    (options.recoveryNodeRefs ?? []).filter((ref) => nodeByRef.has(ref) && !causalRefs.includes(ref)),
+  );
+  const ownerSet = new Set(
+    (options.ownerContextNodeRefs ?? []).filter((ref) => nodeByRef.has(ref) && !causalRefs.includes(ref) && !recoverySet.has(ref)),
+  );
+  const dependencySet = new Set(
+    (options.dependencyContextNodeRefs ?? [])
+      .filter((ref) => nodeByRef.has(ref) && !causalRefs.includes(ref) && !recoverySet.has(ref) && !ownerSet.has(ref)),
+  );
+
   const causalColumn = new Map<string, number>();
   causalRefs.forEach((ref, i) => causalColumn.set(ref, i));
 
-  // Nearest causal column for every context node (multi-source BFS, undirected).
-  const nodeColumn = new Map<string, number>(causalColumn);
-  const queue: string[] = [...causalRefs];
-  const visited = new Set(causalRefs);
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    const col = nodeColumn.get(current)!;
-    for (const neighbor of adjacency.get(current) ?? []) {
-      if (visited.has(neighbor)) continue;
-      visited.add(neighbor);
-      nodeColumn.set(neighbor, col);
-      queue.push(neighbor);
-    }
-  }
-  for (const node of graph.nodes) if (!nodeColumn.has(node.ref)) nodeColumn.set(node.ref, 0);
+  // Seed columns from causal + (later) recovery so context attaches to the right branch.
+  const seedColumn = new Map(causalColumn);
+  const placed = new Map<string, LayoutNode>();
 
-  // Spine geometry: one centre line, tight gaps.
+  // --- Causal spine (dominant row) ---
   const spineNodes = causalRefs.map((ref) => {
     const node = nodeByRef.get(ref)!;
-    return { ref, sizeClass: sizeClassFor(node, true, ref === options.focalRef) };
+    return { ref, sizeClass: sizeClassFor(node, 'causal', ref === options.focalRef) };
   });
   const maxSpineH = Math.max(...spineNodes.map((s) => SIZES[s.sizeClass].h));
-  const centerY = PADDING + maxSpineH / 2;
-  const placed = new Map<string, LayoutNode>();
+  // Leave room above for owner context.
+  const ownerBandH = ownerSet.size > 0 ? SIZES.small.h + OWNER_GAP : 0;
+  const centerY = PADDING + ownerBandH + maxSpineH / 2;
   let cursorX = PADDING;
   spineNodes.forEach((s, i) => {
     const { w, h } = SIZES[s.sizeClass];
-    placed.set(s.ref, { ref: s.ref, column: i, row: 0, x: cursorX, y: centerY - h / 2, width: w, height: h, sizeClass: s.sizeClass });
+    placed.set(s.ref, {
+      ref: s.ref, column: i, row: 0, x: cursorX, y: centerY - h / 2, width: w, height: h, sizeClass: s.sizeClass,
+    });
     cursorX += w + SPINE_GAP;
   });
   const spineRight = cursorX - SPINE_GAP;
-  const spineBottom = PADDING + maxSpineH;
+  const spineBottom = Math.max(...[...placed.values()].map((n) => n.y + n.height));
 
-  // Context band: compact rows under the spine, each item near its anchor column.
-  const causalSet = new Set(causalRefs);
-  const contextRefs = graph.nodes
-    .filter((n) => !causalSet.has(n.ref))
-    .map((n) => n.ref)
-    .sort((a, b) => (nodeColumn.get(a)! - nodeColumn.get(b)!) || a.localeCompare(b));
+  // --- Owner context ABOVE focal (or first causal) ---
+  const focalRef = options.focalRef && placed.has(options.focalRef)
+    ? options.focalRef
+    : causalRefs[0];
+  const ownerAnchor = placed.get(focalRef!)!;
+  const ownerRefs = [...ownerSet].sort((a, b) => a.localeCompare(b));
+  ownerRefs.forEach((ref, i) => {
+    const { w, h } = SIZES.small;
+    const x = ownerAnchor.x + (ownerAnchor.width - w) / 2;
+    const y = PADDING + i * (h + BAND_ROW_GAP);
+    placed.set(ref, { ref, column: ownerAnchor.column, row: -1 - i, x, y, width: w, height: h, sizeClass: 'small' });
+  });
+
+  // --- Recovery branch: right of breakpoint / spine, slightly below spine ---
+  const recoveryRefs = (options.recoveryNodeRefs ?? [])
+    .filter((ref) => recoverySet.has(ref))
+    .sort((a, b) => a.localeCompare(b));
+  // Prefer attaching under/after the focal; fall back to last causal.
+  const recoveryAnchor = placed.get(focalRef!) ?? [...placed.values()].at(-1)!;
+  let recoveryX = Math.max(recoveryAnchor.x + recoveryAnchor.width + SPINE_GAP, spineRight + SPINE_GAP);
+  const recoveryY = spineBottom + BAND_GAP;
+  recoveryRefs.forEach((ref, i) => {
+    const node = nodeByRef.get(ref)!;
+    const sizeClass = sizeClassFor(node, 'recovery', false);
+    const { w, h } = SIZES[sizeClass];
+    const col = recoveryAnchor.column + 1 + i;
+    placed.set(ref, {
+      ref, column: col, row: 1, x: recoveryX, y: recoveryY, width: w, height: h, sizeClass,
+    });
+    seedColumn.set(ref, col);
+    recoveryX += w + SPINE_GAP;
+  });
+
+  // Nearest column among causal + recovery for remaining context.
+  const placedSeedRefs = [...causalRefs, ...recoveryRefs];
+  const nodeColumn = nearestAnchorColumn(placedSeedRefs, adjacency, seedColumn);
+  for (const node of graph.nodes) if (!nodeColumn.has(node.ref)) nodeColumn.set(node.ref, 0);
+
+  // --- Dependency context: stack below nearest causal/recovery anchor ---
+  const depRefs = [
+    ...(options.dependencyContextNodeRefs ?? []).filter((ref) => dependencySet.has(ref)),
+    // Any leftover non-role nodes hang as small context too.
+    ...graph.nodes
+      .map((n) => n.ref)
+      .filter((ref) => !placed.has(ref) && !ownerSet.has(ref) && !recoverySet.has(ref) && !dependencySet.has(ref) && !causalRefs.includes(ref)),
+  ].sort((a, b) => (nodeColumn.get(a)! - nodeColumn.get(b)!) || a.localeCompare(b));
+
+  const recoveryBottom = recoveryRefs.length > 0
+    ? Math.max(...recoveryRefs.map((ref) => {
+      const n = placed.get(ref)!;
+      return n.y + n.height;
+    }))
+    : spineBottom;
+  const depTop = recoveryBottom + BAND_GAP;
   const rowCursors: number[] = [];
-  const limitRight = spineRight + 24;
   const { w: cw, h: ch } = SIZES.small;
-  for (const ref of contextRefs) {
-    const col = nodeColumn.get(ref)!;
-    const anchor = placed.get(causalRefs[col]!)!;
+  const limitRight = Math.max(spineRight, recoveryX) + 80;
+
+  for (const ref of depRefs) {
+    if (placed.has(ref)) continue;
+    const col = nodeColumn.get(ref) ?? 0;
+    // Prefer a placed causal/recovery node at that column; else focal.
+    const anchor = placed.get(causalRefs[col]!)
+      ?? placed.get(recoveryRefs[Math.max(0, col - causalRefs.length)]!)
+      ?? recoveryAnchor;
     const desiredX = anchor.x;
     let r = 0;
     for (;;) {
       const cur = rowCursors[r] ?? PADDING;
       const x = Math.max(cur, desiredX);
-      if (x + cw <= limitRight || r >= 3) {
+      if (x + cw <= limitRight || r >= 5) {
         rowCursors[r] = x + cw + CTX_GAP;
         placed.set(ref, {
-          ref, column: col, row: 1 + r, x,
-          y: spineBottom + BAND_GAP + r * (ch + BAND_ROW_GAP),
+          ref, column: col, row: 2 + r, x,
+          y: depTop + r * (ch + BAND_ROW_GAP),
           width: cw, height: ch, sizeClass: 'small',
         });
         break;
       }
       r++;
     }
+  }
+
+  // Ensure every graph node is placed (defensive).
+  for (const node of graph.nodes) {
+    if (placed.has(node.ref)) continue;
+    const { w, h } = SIZES.small;
+    placed.set(node.ref, {
+      ref: node.ref, column: 0, row: 9, x: PADDING, y: depTop + 6 * (h + BAND_ROW_GAP),
+      width: w, height: h, sizeClass: 'small',
+    });
   }
 
   return finish(graph, graph.nodes.map((n) => placed.get(n.ref)!));
@@ -194,7 +297,7 @@ function computeLongestPathLayout(graph: PresentationGraph, options: LayoutOptio
   for (const refs of columns.values()) refs.sort();
 
   const nodeByRef = new Map(graph.nodes.map((n) => [n.ref, n]));
-  const sizeOf = (ref: string): SizeClass => sizeClassFor(nodeByRef.get(ref)!, true, ref === options.focalRef);
+  const sizeOf = (ref: string): SizeClass => sizeClassFor(nodeByRef.get(ref)!, 'causal', ref === options.focalRef);
   const sortedCols = [...columns.keys()].sort((a, b) => a - b);
   const colHeights = new Map<number, number>();
   for (const col of sortedCols) {
@@ -240,7 +343,6 @@ function finish(graph: PresentationGraph, nodes: readonly LayoutNode[]): LayoutR
     pending.push({ edge, s, t, vertical: !(t.x >= s.x + s.w + 8), down: t.y >= s.y + s.h - 4 });
   }
 
-  // Distribute anchors when several edges share one source surface.
   const groupOf = (p: Pending): string => `${p.edge.sourceRef}|${p.vertical ? (p.down ? 'b' : 't') : 'r'}`;
   const order = (a: Pending, b: Pending): number =>
     (a.vertical ? a.t.x - b.t.x : a.t.y - b.t.y) || a.edge.renderKey.localeCompare(b.edge.renderKey);
@@ -252,11 +354,6 @@ function finish(graph: PresentationGraph, nodes: readonly LayoutNode[]): LayoutR
   }
   for (const list of groups.values()) list.sort(order);
 
-  // Mirror image: distribute anchors when several edges share one TARGET
-  // surface, so edges converging on the same node don't all land on one
-  // point (e.g. two edges both terminating at a card's left edge). Grouped
-  // by target + which surface of it is hit, ordered by the source position
-  // so the fan-in reads left-to-right/top-to-bottom same as the fan-out does.
   const targetGroupOf = (p: Pending): string => `${p.edge.targetRef}|${p.vertical ? (p.down ? 't' : 'b') : 'l'}`;
   const targetOrder = (a: Pending, b: Pending): number =>
     (a.vertical ? a.s.x - b.s.x : a.s.y - b.s.y) || a.edge.renderKey.localeCompare(b.edge.renderKey);
@@ -277,7 +374,6 @@ function finish(graph: PresentationGraph, nodes: readonly LayoutNode[]): LayoutR
     const targetIndex = targetList.indexOf(p);
     const targetFraction = targetList.length > 1 ? (targetIndex + 1) / (targetList.length + 1) : 0.5;
 
-    // Every other node's box is a potential obstacle for this edge's route.
     const obstacles: Box[] = [];
     for (const [ref, b] of box) {
       if (ref !== p.edge.sourceRef && ref !== p.edge.targetRef) obstacles.push(b);

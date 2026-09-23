@@ -39,8 +39,11 @@ export function disruptedLdg(): LiveDependencyGraph {
 
 export function disruptedFocus(): FocusedGraphView {
   return {
-    causalNodeRefs: ['TRAV:1', 'BOOK:flight', 'TIME:arrival', 'COMM:session', 'COMM:objective'],
-    causalEdgeIds: ['e-t-f', 'e-f-a', 'e-a-s', 'e-s-o'],
+    causalNodeRefs: ['BOOK:flight', 'TIME:arrival', 'COMM:session', 'COMM:objective'],
+    causalEdgeIds: ['e-f-a', 'e-a-s', 'e-s-o'],
+    recoveryNodeRefs: [],
+    dependencyContextNodeRefs: ['STAY:hotel', 'MOVE:transfer', 'COMM:dinner'],
+    ownerContextNodeRefs: ['TRAV:1'],
     unmappedCausalSteps: [],
     firstBreakpoint: { nodeRef: 'TIME:arrival', label: 'Destination arrival', dimension: 'timing', reasonCode: 'LATE' },
   };

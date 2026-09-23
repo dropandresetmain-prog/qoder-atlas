@@ -830,10 +830,25 @@ export const FocusedGraphUnmappedStepSchema = z.strictObject({
 export type FocusedGraphUnmappedStep = z.infer<typeof FocusedGraphUnmappedStepSchema>;
 
 export const FocusedGraphViewSchema = z.strictObject({
-  /** Ordered subset of `ldg` node refs on the causal chain (may be empty). */
+  /** Ordered subset of `ldg` node refs on the true evaluator causal chain (may be empty). */
   causalNodeRefs: z.array(z.string().min(1)).default([]),
   /** Subset of `ldg` edge ids (FIG-1 producer-owned ids) on the causal chain. */
   causalEdgeIds: z.array(z.string().min(1)).default([]),
+  /**
+   * PROPOSED recovery nodes that branch from the breakpoint (e.g. a previewed
+   * replacement flight). Never part of historical cause.
+   */
+  recoveryNodeRefs: z.array(z.string().min(1)).default([]),
+  /**
+   * Non-failing evaluator dependency-context nodes (stay / programme) that
+   * depend on the causal chain. Visible, but not causal-path membership.
+   */
+  dependencyContextNodeRefs: z.array(z.string().min(1)).default([]),
+  /**
+   * Ownership / affected-party context (typically TRAVELLER). Never a journey
+   * step on the causal spine.
+   */
+  ownerContextNodeRefs: z.array(z.string().min(1)).default([]),
   /** `causalPath[0]` mapped to a visible ref, when it is mappable. */
   firstBreakpoint: FocusedGraphFirstBreakpointSchema.optional(),
   /** Causal steps with no visible graph object — explicit, never dropped. */
@@ -884,6 +899,15 @@ export const OriginalGraphSnapshotPayloadSchema = z.strictObject({
   const edgeIds = new Set(payload.ldg.edges.map((e) => e.id));
   for (const ref of payload.focusedGraph?.causalNodeRefs ?? []) {
     if (!refs.has(ref)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: `causal node ref ${ref} is not in the snapshot graph`, path: ['focusedGraph'] });
+  }
+  for (const ref of payload.focusedGraph?.recoveryNodeRefs ?? []) {
+    if (!refs.has(ref)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: `recovery node ref ${ref} is not in the snapshot graph`, path: ['focusedGraph'] });
+  }
+  for (const ref of payload.focusedGraph?.dependencyContextNodeRefs ?? []) {
+    if (!refs.has(ref)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: `dependency-context node ref ${ref} is not in the snapshot graph`, path: ['focusedGraph'] });
+  }
+  for (const ref of payload.focusedGraph?.ownerContextNodeRefs ?? []) {
+    if (!refs.has(ref)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: `owner-context node ref ${ref} is not in the snapshot graph`, path: ['focusedGraph'] });
   }
   for (const id of payload.focusedGraph?.causalEdgeIds ?? []) {
     if (!edgeIds.has(id)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: `causal edge id ${id} is not in the snapshot graph`, path: ['focusedGraph'] });

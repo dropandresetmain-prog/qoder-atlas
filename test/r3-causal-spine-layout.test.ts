@@ -239,3 +239,52 @@ test('causal refs absent from graph are skipped safely', () => {
   assert.equal(nodeB.column, 1);
   assert.ok(nodeA.x < nodeB.x);
 });
+
+test('CP5.1: hierarchical roles — owner above, recovery right of breakpoint, deps below', () => {
+  const ldg = makeLdg({
+    nodes: [
+      { ref: 'SIG', kind: 'DISRUPTION', label: 'Change', semanticState: 'CHANGED', authority: 'AUTHORITATIVE' },
+      { ref: 'IN', kind: 'SERVICE_BOOKING', label: 'Inbound', semanticState: 'CHANGED', authority: 'AUTHORITATIVE' },
+      { ref: 'ARR', kind: 'TIMING', label: 'Arrival', semanticState: 'FAILED', authority: 'AUTHORITATIVE' },
+      { ref: 'OWN', kind: 'TRAVELLER', label: 'Traveller', semanticState: 'FAILED', authority: 'AUTHORITATIVE' },
+      { ref: 'REC', kind: 'SERVICE_BOOKING', label: 'Proposed', semanticState: 'PROPOSED', authority: 'PROPOSED' },
+      { ref: 'STAY', kind: 'TRANSFER_STAY', label: 'Stay', semanticState: 'UNKNOWN', authority: 'AUTHORITATIVE' },
+      { ref: 'PROG', kind: 'PROGRAMME_COMMITMENT', label: 'Session', semanticState: 'HEALTHY', authority: 'AUTHORITATIVE' },
+    ],
+    edges: [
+      { id: 'e1', fromRef: 'SIG', toRef: 'IN', kind: 'AFFECTED_BY', authority: 'AUTHORITATIVE' },
+      { id: 'e2', fromRef: 'IN', toRef: 'ARR', kind: 'MUST_HAPPEN_BEFORE', authority: 'AUTHORITATIVE' },
+      { id: 'e3', fromRef: 'ARR', toRef: 'REC', kind: 'MUST_HAPPEN_BEFORE', authority: 'AUTHORITATIVE' },
+      { id: 'e4', fromRef: 'REC', toRef: 'STAY', kind: 'MUST_HAPPEN_BEFORE', authority: 'AUTHORITATIVE' },
+      { id: 'e5', fromRef: 'ARR', toRef: 'PROG', kind: 'MUST_HAPPEN_BEFORE', authority: 'AUTHORITATIVE' },
+      { id: 'e6', fromRef: 'OWN', toRef: 'SIG', kind: 'AFFECTED_BY', authority: 'AUTHORITATIVE' },
+    ],
+  });
+  const causalRefs = ['SIG', 'IN', 'ARR'];
+  const presentation = presentDependencyGraph(ldg, { causalRefs });
+  const layout = computeLayout(presentation, causalRefs, {
+    focalRef: 'ARR',
+    recoveryNodeRefs: ['REC'],
+    dependencyContextNodeRefs: ['STAY', 'PROG'],
+    ownerContextNodeRefs: ['OWN'],
+  });
+
+  const by = Object.fromEntries(layout.nodes.map((n) => [n.ref, n]));
+  assert.ok(by.OWN.y + by.OWN.height < by.ARR.y, 'owner above focal');
+  assert.ok(by.REC.x > by.ARR.x, 'recovery right of breakpoint');
+  assert.ok(by.REC.y > by.ARR.y, 'recovery below spine');
+  assert.ok(by.STAY.y > by.REC.y, 'stay below recovery');
+  assert.ok(by.PROG.y > by.ARR.y, 'programme below spine');
+  // Not one horizontal row.
+  const ys = new Set(layout.nodes.map((n) => Math.round(n.y)));
+  assert.ok(ys.size >= 3, `expected multi-row layout, got y-set size ${ys.size}`);
+  // No card overlaps (axis-aligned).
+  for (let i = 0; i < layout.nodes.length; i++) {
+    for (let j = i + 1; j < layout.nodes.length; j++) {
+      const a = layout.nodes[i]!;
+      const b = layout.nodes[j]!;
+      const overlap = a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+      assert.equal(overlap, false, `overlap ${a.ref} vs ${b.ref}`);
+    }
+  }
+});

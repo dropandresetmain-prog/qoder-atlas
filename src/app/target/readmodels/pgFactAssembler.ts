@@ -845,9 +845,9 @@ async function loadRecoveryCaseFactsInner(
 
   // Journey item rows for those journeys.
   const journeyItems = journeys.rows.length > 0
-    ? await client.query<{ id: string; journey_id: string; kind: 'TRANSPORT' | 'STAY' | 'ENGAGEMENT' | 'RESOURCE_USE'; order_key: string; lifecycle_status: string; intended_window_start: string | null; intended_window_end: string | null; selected_service_id: string | null; stay_time_zone: string | null }>(
+    ? await client.query<{ id: string; journey_id: string; kind: 'TRANSPORT' | 'STAY' | 'ENGAGEMENT' | 'RESOURCE_USE'; order_key: string; lifecycle_status: string; intended_window_start: string | null; intended_window_end: string | null; selected_service_id: string | null; stay_time_zone: string | null; stay_place_name: string | null }>(
         `SELECT ji.id, ji.journey_id, ji.kind, ji.order_key, ji.lifecycle_status, ji.intended_window_start, ji.intended_window_end,
-                tid.selected_service_id, stay_place.time_zone AS stay_time_zone
+                tid.selected_service_id, stay_place.time_zone AS stay_time_zone, stay_place.name AS stay_place_name
            FROM journey_items ji
            LEFT JOIN transport_item_details tid ON tid.workspace_id = ji.workspace_id AND tid.journey_item_id = ji.id
            LEFT JOIN stay_item_details sid ON sid.workspace_id = ji.workspace_id AND sid.journey_item_id = ji.id
@@ -1128,6 +1128,7 @@ async function loadRecoveryCaseFactsInner(
     intended_window_start: i.intended_window_start,
     intended_window_end: i.intended_window_end,
     timeZone: i.stay_time_zone,
+    placeName: i.stay_place_name,
     selectedServiceId: i.selected_service_id,
   }));
 
