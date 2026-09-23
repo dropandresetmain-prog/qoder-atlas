@@ -1,0 +1,275 @@
+﻿{
+    "corpusId":  "jordan-corpus-2026-09-23",
+    "status":  "CANONICAL",
+    "scenario":  "Jordan / s2 missed connection",
+    "createdAt":  "2026-09-23T11:32:26.7864392Z",
+    "gitSha":  "fc28ea6e61e74f74b590791ca672a974e6190f56",
+    "workspaceIdentity":  "jordan-cleanroom-ait-demo",
+    "dataset":  {
+                    "contentHash":  "3100085d97378037",
+                    "path":  "fixtures/programmes/ait-summit-2026"
+                },
+    "providerModes":  {
+                          "adapterModeAtCapture":  "RECORD",
+                          "isolated":  true,
+                          "atlasEnv":  "sandbox"
+                      },
+    "recordingSchema":  "RecordingSchema (contracts/envelope.ts)",
+    "baselineBookingId":  "-hCa0gm5w",
+    "baselineBookedTotal":  {
+                                "currency":  "USD",
+                                "amount":  "954.16"
+                            },
+    "replayProof": {
+        "status": "PASS",
+        "provedAt": "2026-09-23T12:00:00Z",
+        "workspaceIdentity": "jordan-cleanroom-ait-demo",
+        "stages": {
+            "baseline": "ATTACHED bookingId=-hCa0gm5w bookedTotal=USD 954.16",
+            "D1": "viable / green",
+            "D2": "at-risk / amber",
+            "D3": "disrupted / red + recovery planning",
+            "planning": "AWAITING_AUTHORITY Path A RECOMMENDED|VIABLE; Path B REJECTED_DETERMINISTIC (original_stay_late_arrival_survival_unknown)"
+        },
+        "uncapturedTransactional": [
+            "atlas select/pay/ticket",
+            "nuitee book (baseline used booking_lookup; search→quote→book not re-exercised)",
+            "nuitee cancel"
+        ]
+    },
+    "notes":  [
+                  "Corpus isolated via .corpus-isolated marker",
+                  "Prior corpora quarantined under recordings-quarantine/pre-2026-09-23-jordan-reset",
+                  "Baseline recovered via booking_lookup (sandbox booking already existed; book returns nuitee_4005 duplicate)",
+                  "Model Studio / Qwen was LIVE during capture and is not recorded — architecture gap for model nondeterminism",
+                  "Transactional Atlas select/pay/ticket and Nuitée cancel NOT captured — stopped at AWAITING_AUTHORITY (CP6 not in this freeze)"
+              ],
+    "operations":  [
+                       {
+                           "provider":  "atlas",
+                           "operation":  "search",
+                           "count":  3,
+                           "files":  [
+                                         "rec_34518610b59c2573957a762d8df8c752.json",
+                                         "rec_71d6274a2afd9394033fa18642e20e97.json",
+                                         "rec_b92e556a48e8776d8211605aaeefa27d.json"
+                                     ]
+                       },
+                       {
+                           "provider":  "frankfurter",
+                           "operation":  "fx.latest",
+                           "count":  1,
+                           "files":  [
+                                         "rec_138389729047ecd0db14ba1f5fbe5df3.json"
+                                     ]
+                       },
+                       {
+                           "provider":  "nuitee",
+                           "operation":  "booking_lookup",
+                           "count":  1,
+                           "files":  [
+                                         "rec_013305930df5ffacb505ecd70a6ebbca.json"
+                                     ]
+                       },
+                       {
+                           "provider":  "nuitee",
+                           "operation":  "quote",
+                           "count":  10,
+                           "files":  [
+                                         "rec_4414205dba814c0830217347311917e6.json",
+                                         "rec_4c568d77688b7a8f7670e6950eed6f17.json",
+                                         "rec_683fed64fe63bc5f3b7c21e1633c53ab.json",
+                                         "rec_8d9882ffbbb5bdfec4a664667f79aa2d.json",
+                                         "rec_97edf93760731c1714e0b392c9584322.json",
+                                         "rec_9afb6bafce648d22af52c1231f537876.json",
+                                         "rec_a0f32a30bdb14a83589edabf36379b12.json",
+                                         "rec_c2798b6357c9f757cbab58808e1f4522.json",
+                                         "rec_ec99fe21c4e39bc41aa468c5b3fd5b43.json",
+                                         "rec_fd4de468ac0c1a4f43b19becdb6c9ba8.json"
+                                     ]
+                       },
+                       {
+                           "provider":  "nuitee",
+                           "operation":  "search",
+                           "count":  4,
+                           "files":  [
+                                         "rec_3453274e073bba4809e874155b28bd8e.json",
+                                         "rec_643f03e481a67eee0a887239ce9a8fcb.json",
+                                         "rec_b70375b4bc57065714c8ffe497dd593a.json",
+                                         "rec_d78b2446148690673e494029c9245719.json"
+                                     ]
+                       },
+                       {
+                           "provider":  "nuitee",
+                           "operation":  "stay_context",
+                           "count":  1,
+                           "files":  [
+                                         "rec_7b3a3030bedf7b58c8d6525247645528.json"
+                                     ]
+                       },
+                       {
+                           "provider":  "official-documents",
+                           "operation":  "document.read",
+                           "count":  5,
+                           "files":  [
+                                         "rec_0abb537c656cca8583075a57b4902d1e.json",
+                                         "rec_6138e044e19a373a56b5275180251b6a.json",
+                                         "rec_7591219d4d645507002e55bab00c3cee.json",
+                                         "rec_cf7dd6ccdc037a01d32d3c07bd910245.json",
+                                         "rec_e6ebf93a063abcce0e9cc534de296f20.json"
+                                     ]
+                       }
+                   ],
+    "files":  [
+                  {
+                      "provider":  "atlas",
+                      "operation":  "search",
+                      "file":  "rec_34518610b59c2573957a762d8df8c752.json",
+                      "sha256":  "0c3369db44b201b4fdd5aa004b445a60811559a0842bea9aba4aff33a87c45b9"
+                  },
+                  {
+                      "provider":  "atlas",
+                      "operation":  "search",
+                      "file":  "rec_71d6274a2afd9394033fa18642e20e97.json",
+                      "sha256":  "76e577a851d6575a6a17d1d1e63a58bb8817ca6e167b21c2b7ed8e4a9ccbb41a"
+                  },
+                  {
+                      "provider":  "atlas",
+                      "operation":  "search",
+                      "file":  "rec_b92e556a48e8776d8211605aaeefa27d.json",
+                      "sha256":  "87e418cbe1d7bb0999b15b309df622bb7478c220259d8bc7f50856d14bbdef46"
+                  },
+                  {
+                      "provider":  "frankfurter",
+                      "operation":  "fx.latest",
+                      "file":  "rec_138389729047ecd0db14ba1f5fbe5df3.json",
+                      "sha256":  "82fea33c6b035f1043844ab411c0a63570276918ada42925fed5cf0607d99c6a"
+                  },
+                  {
+                      "provider":  "nuitee",
+                      "operation":  "booking_lookup",
+                      "file":  "rec_013305930df5ffacb505ecd70a6ebbca.json",
+                      "sha256":  "0a41bc8dda22d778beb0a243440eb9e64b941981c41055141603bdc9365542e8"
+                  },
+                  {
+                      "provider":  "nuitee",
+                      "operation":  "quote",
+                      "file":  "rec_4414205dba814c0830217347311917e6.json",
+                      "sha256":  "6bf1266e4626d696e938f6ef10b174c831731cc61027d63bbed77a33077e1782"
+                  },
+                  {
+                      "provider":  "nuitee",
+                      "operation":  "quote",
+                      "file":  "rec_4c568d77688b7a8f7670e6950eed6f17.json",
+                      "sha256":  "6c2f0aedea65b054f75acd66f6136db138b0da4b129eaec8a469030a2298dce9"
+                  },
+                  {
+                      "provider":  "nuitee",
+                      "operation":  "quote",
+                      "file":  "rec_683fed64fe63bc5f3b7c21e1633c53ab.json",
+                      "sha256":  "7601bbe912f883b4ab66c2b32a44cc1ca5eb6047f18d49318f82cb826236f829"
+                  },
+                  {
+                      "provider":  "nuitee",
+                      "operation":  "quote",
+                      "file":  "rec_8d9882ffbbb5bdfec4a664667f79aa2d.json",
+                      "sha256":  "8d474125be9936108fa6d9f0a635d4466eb3c7283c0d5c4ed0c7551e9af0a701"
+                  },
+                  {
+                      "provider":  "nuitee",
+                      "operation":  "quote",
+                      "file":  "rec_97edf93760731c1714e0b392c9584322.json",
+                      "sha256":  "07dea267aee5a24af6633b2831ee8ee08db39d6eb44f6c4234f53c559bce53ba"
+                  },
+                  {
+                      "provider":  "nuitee",
+                      "operation":  "quote",
+                      "file":  "rec_9afb6bafce648d22af52c1231f537876.json",
+                      "sha256":  "7fb5e86a451e731f38cef96c516eb8893f6c386c4db710c817f00332576a3cba"
+                  },
+                  {
+                      "provider":  "nuitee",
+                      "operation":  "quote",
+                      "file":  "rec_a0f32a30bdb14a83589edabf36379b12.json",
+                      "sha256":  "2458ff892ffc444173ba0a2b05cdba56b494b0284631d3e645fd17cb9d7afb68"
+                  },
+                  {
+                      "provider":  "nuitee",
+                      "operation":  "quote",
+                      "file":  "rec_c2798b6357c9f757cbab58808e1f4522.json",
+                      "sha256":  "fde0f45ab2c3076c441ab92eb08aa772f625709fd73f5e838d86ab4753c5cf0f"
+                  },
+                  {
+                      "provider":  "nuitee",
+                      "operation":  "quote",
+                      "file":  "rec_ec99fe21c4e39bc41aa468c5b3fd5b43.json",
+                      "sha256":  "a3437399c4ec844c675faf5f791aab5169297896162bcded94fb0022b4d9712b"
+                  },
+                  {
+                      "provider":  "nuitee",
+                      "operation":  "quote",
+                      "file":  "rec_fd4de468ac0c1a4f43b19becdb6c9ba8.json",
+                      "sha256":  "89a9877e49ab00a982b36f52dbeb107a64d54eb593a0e70d533d2ab7cb20dced"
+                  },
+                  {
+                      "provider":  "nuitee",
+                      "operation":  "search",
+                      "file":  "rec_3453274e073bba4809e874155b28bd8e.json",
+                      "sha256":  "f50c95107be6b4ce6118b8124405e8f178da57fef1843531f006bae999d47905"
+                  },
+                  {
+                      "provider":  "nuitee",
+                      "operation":  "search",
+                      "file":  "rec_643f03e481a67eee0a887239ce9a8fcb.json",
+                      "sha256":  "9fce0b7ed447e6a4251c06aa69a4e1e54b96441989a7f5aee94827cafa8e2835"
+                  },
+                  {
+                      "provider":  "nuitee",
+                      "operation":  "search",
+                      "file":  "rec_b70375b4bc57065714c8ffe497dd593a.json",
+                      "sha256":  "42d49da2f3efca587d3a15ce1dda9ccc7300670cc928b05b8ff68a37b22d2767"
+                  },
+                  {
+                      "provider":  "nuitee",
+                      "operation":  "search",
+                      "file":  "rec_d78b2446148690673e494029c9245719.json",
+                      "sha256":  "5b55d81bf529d0ef6a9fb51b85290d87af7d47f3b54e383d5096c9998ea019e6"
+                  },
+                  {
+                      "provider":  "nuitee",
+                      "operation":  "stay_context",
+                      "file":  "rec_7b3a3030bedf7b58c8d6525247645528.json",
+                      "sha256":  "2d432658fbee309e4d1a4e01e9aefef211038357dcb15e90bd0bfe88bf63cf60"
+                  },
+                  {
+                      "provider":  "official-documents",
+                      "operation":  "document.read",
+                      "file":  "rec_0abb537c656cca8583075a57b4902d1e.json",
+                      "sha256":  "65720d4d6204acaa09a0f4555f54e7678bf2cf6622e73149f543c2b2290e2bb4"
+                  },
+                  {
+                      "provider":  "official-documents",
+                      "operation":  "document.read",
+                      "file":  "rec_6138e044e19a373a56b5275180251b6a.json",
+                      "sha256":  "b49cd04ad93bf3f34f536f9908e4570b0ff759d5b386bbef5e3ff7063173b173"
+                  },
+                  {
+                      "provider":  "official-documents",
+                      "operation":  "document.read",
+                      "file":  "rec_7591219d4d645507002e55bab00c3cee.json",
+                      "sha256":  "b39ba337e32d85de8108b0af9d7f02f1bc788152e34293f105dc14d29e7607b3"
+                  },
+                  {
+                      "provider":  "official-documents",
+                      "operation":  "document.read",
+                      "file":  "rec_cf7dd6ccdc037a01d32d3c07bd910245.json",
+                      "sha256":  "2a0f02900af226d971290712bd2e68dc7bc703e0524c6800aa90e61df01f258a"
+                  },
+                  {
+                      "provider":  "official-documents",
+                      "operation":  "document.read",
+                      "file":  "rec_e6ebf93a063abcce0e9cc534de296f20.json",
+                      "sha256":  "6a9fcecaeb8a991e9b2590d0a203ff5f99d084a896ad18c1a0dbb644acbff46c"
+                  }
+              ]
+}

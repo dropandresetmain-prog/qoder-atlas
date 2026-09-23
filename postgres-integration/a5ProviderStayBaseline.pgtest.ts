@@ -224,15 +224,36 @@ describe('A5 provider stay baseline (stub HotelCapability)', () => {
     }
   });
 
-  test('REPLAY mode never calls findBookingsByClientReference', async () => {
+  test('REPLAY mode recovers via recorded booking_lookup before booking', async () => {
     const clone = await cloneAitFixtureDatabase(fixture!.databaseName);
     try {
-      const stub = createStubHotel({}, 'REPLAY');
+      const stub = createStubHotel({
+        lookup: capabilityOk({ bookings: [{ bookingId: 'replay-lookup-1' }] }, stubMeta('REPLAY')),
+      }, 'REPLAY');
       const result = await bootstrapProviderStayBaseline(baselineInput({ clone, hotel: stub.hotel, mode: 'REPLAY' }));
       assert.equal(result.ok, true, JSON.stringify(result));
       if (!result.ok) return;
       assert.equal(result.status, 'ATTACHED');
-      assert.equal(stub.calls.lookup, 0, 'REPLAY must not attempt provider client-reference reconciliation');
+      assert.equal(stub.calls.lookup, 1, 'REPLAY uses the recording-backed client-reference lookup');
+      assert.equal(stub.calls.search, 0);
+      assert.equal(stub.calls.book, 0);
+      assert.equal(stub.calls.context, 1);
+    } finally {
+      await clone.drop();
+    }
+  });
+
+  test('REPLAY mode books when booking_lookup misses', async () => {
+    const clone = await cloneAitFixtureDatabase(fixture!.databaseName);
+    try {
+      const stub = createStubHotel({
+        lookup: capabilityOk({ bookings: [] }, stubMeta('REPLAY')),
+      }, 'REPLAY');
+      const result = await bootstrapProviderStayBaseline(baselineInput({ clone, hotel: stub.hotel, mode: 'REPLAY' }));
+      assert.equal(result.ok, true, JSON.stringify(result));
+      if (!result.ok) return;
+      assert.equal(result.status, 'ATTACHED');
+      assert.equal(stub.calls.lookup, 1);
       assert.equal(stub.calls.search, 1);
       assert.equal(stub.calls.book, 1);
     } finally {

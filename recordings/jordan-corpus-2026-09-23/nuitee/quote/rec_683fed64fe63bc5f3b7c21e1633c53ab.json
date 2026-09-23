@@ -1,0 +1,120 @@
+{
+  "id": "rec_683fed64fe63bc5f3b7c21e1633c53ab",
+  "providerId": "nuitee",
+  "operation": "quote",
+  "recordedAt": "2026-09-23T11:31:24.860Z",
+  "sanitized": true,
+  "raw": {
+    "data": {
+      "prebookId": "Vvg9QmM3x",
+      "offerId": "3gAYonJzkd4AEaRzcmlk2gEtR1k0VE1aSldHUTNEU05aV0dZNFRNTkJYR1UzRENOVERHSVlET01SV01ZM0dNTlRFR0lZRE1aUldNVTNES01SUUdZWkRNTkpXR1I2RENJWlNHQVpETU1CWkdJNFhZTVJRR0kzRENNQlFHTjZHSzNTN0tWSlhZVTJIUFJLVkdSRDRHRkFUQVEzNEdRMlRFT0w0TkZJR09WS0lQUVlUT09KUUdFM0RHTUJZR0kyVENORFNLNVhFV0laVUdRNERDTVJWRU1ZVElOSlJGVTJESU9CUkdJMlhZVVNHSlo2REVNQlNHWVlEU01SWEdFWURBTUQ0R0o2RkVNSlJHVVlIWU9KVkdRWlRBSTJTSjRSVkVSU09FTVpEQU1SV0ZVWURTTEpTRzRRRENNQjJHQVlDR6NwcmPLQI3SZmZmZmalb3JfcHLLAAAAAAAAAAClb3JfY23LAAAAAAAAAACiY23LAAAAAAAAAACjcGNkszIwMjYtMDktMjcgMTA6MDA6MDCicnSjUkZOo2JyZKJST6RtcmlkwKNtcm7Ao2hkcMCjZnJuoKNzcm63SW5kaXZpZHVhbCByb29tIG9uZSBiZWSjb2NuAaRwcmtzwKNkZXTLAAAAAAAAAACiY3CCoXCRhaF0szIwMjYtMDktMjcgMTA6MDA6MDChYctAbdKPXCj1w6Fjo1VTRKJ0eaZhbW91bnSidHqjR01UonJ0o1JGTqRzaGlkpjQ0ODEyNaNzaWQCo2hpZKdscDZkNjdko29jY5GBoWEBo2N1cqNVU0SiZ26iU0eiY2mqMjAyNi0wOS0yOaJjb6oyMDI2LTEwLTAzo2dpZKCiY3LLAAAAAAAAAACkc3NpZNkwc2Vzc2lvbl8wMWEwY2UwOGRjZmNFblVBNm15YXIwTThEbE5vTTQ5bWFic2FldFlao2lzaMKjc3NwoKNpZm3CpWlmY2hywqNpZnLCpXNlYWlkp2xwNmQ2N2SibmuxbGl0ZWFwaW9uYm9hcmRpbmeidHiShKFpw6Fkt1Byb3BlcnR5IHNlcnZpY2UgY2hhcmdloWHLQFfbhR64UeyhY6NVU0SEoWnDoWSjVEFYoWHLQFV49cKPXCmhY6NVU0SibHDAo2JrdAKkbXNwYctAkSXMzMzMzaRtc3Bjo1VTRA==",
+      "hotelId": "lp6d67d",
+      "currency": "USD",
+      "termsAndConditions": "",
+      "roomTypes": [
+        {
+          "rates": [
+            {
+              "rateId": "I5MTIVCNLJFFOR2RGNCFGTS2K5DVSNCUJVHEEWCHKUZUIQ2OKRCEOSKZIRHU2USXJVMTGR2NJZKEKR2JLFCE2WSSK5GVKM2EJNGVEUKHLFNEITKOJJLUOURWIRBUSWSTI5AVURCNJVBFUR2JGRMFSTKSKFDUSM2EINGUEUKHJY3EOSZTKM3UWVSKLBMVKMSIKBJEWVSHKJCDIR2GIFKECUJTGRDVCMSUIVHUYNCOIZEUOT2WJNEVAUKZKRHU6SSRI5CTGRCHJVBFSR2JGJKEGTSEKNFTKWCFK5EVUVKHKE2EIQ2NKJLEKTKZKREU4SSSIZKTERCJJ5BFER2JGJMFSVKTI5FFUNSEIVGUEU2HLFMUIU2NKJMEORKZIRAU2RBUI5FDMRSFJVFFER2VLFEFST2KKZDVCWSUIFETEU2KGRJFMRKSKNHUKTK2IRAU2USXIZKVSRCTJRFFGRZUKFCEGTKCGJDUCWKDI56DSNJUFYZTA7BSGAZDMLJQHEWTENZAGEYDUMBQHIYDA7CSJ56HY7D4JFXGI2LWNFSHKYLMEBZG633NEBXW4ZJAMJSWI7BQFYYDA7BQFYYDA7D4GAXDAMD4GAXDAMA",
+              "occupancyNumber": 1,
+              "name": "Individual room one bed",
+              "maxOccupancy": 1,
+              "adultCount": 1,
+              "childCount": 0,
+              "childrenAges": [],
+              "boardType": "RO",
+              "boardName": "Room Only",
+              "remarks": "<br/><br/>From 2026/09/29 to 2026/10/03: Important notices: In case of any amendment please contact us to check the rates and conditions as these could change - Hotel will invoice the total amount of this booking in case of no show / En caso de modificacion, por favor contacten con nosotros para verificar las tarifas y condiciones de la reserva ya que podrian ser diferentes - En caso de no show el hotel se reserva el derecho de aplicar gastos del 100%<br/>From 2026/09/29 to 2026/10/03: These hotel rates are only available when sold as part of a package i.e. combined with one or more transport components (flight, train or car) && sold as one price to the customer. In addition, at no time should the hotel rate be disclosed to the customer or marked-up in any way.<br/>From 2026/09/29 to 2026/10/03: Check-in from 3:00 PM to anytime<br/>From 2026/09/29 to 2026/10/03: Check-out time: 12:00 PM<br/>From 2026/09/29 to 2026/10/03: CHECK-IN INSTRUCTIONS  Extra-person charges may apply and vary depending on property policyGovernment-issued photo identification and a credit card, debit card, or cash deposit may be required at check-in for incidental chargesSpecial requests are subject to availability upon check-in and may incur additional charges; special requests cannot be guaranteedThe name on the credit card used at check-in to pay for incidentals must be the primary name on the guestroom reservationThis property accepts credit cards, debit cards, and cashThis property reserves the right to pre-authorize the guest's credit card prior to arrival.Cashless transactions are availableNoise-free guestrooms cannot be guaranteedSafety features at this property include a fire extinguisher  To make arrangements for check-in please contact the property at least 72 hours before arrival using the information on the booking confirmation. Guests will receive an email within 72 hours before arrival with check-in instructions. Front desk staff will greet guests on arrival at the property. Information provided by the property may be translated using automated translation tools. All guests, including children, are required to present a valid government-issued ID card at check-in. All guests, including children, are required to present a valid passport or physical government-issued ID card at check-in<br/>From 2026/09/29 to 2026/10/03: MANDATORY CHARGES:You'll be asked to pay the following charges at the property. Fees may include applicable taxes: Deposit: SGD 50.00 per day We have included all charges provided to us by the property.<br/>From 2026/09/29 to 2026/10/03: OPTIONAL CHARGES: Covered self parking fee: SGD 15.30 per dayEarly check-in is available for a fee (subject to availability)Late check-out is available for a fee (subject to availability) The above list may not be comprehensive. Fees and deposits may not include tax and are subject to change.<br/>From 2026/09/29 to 2026/10/03: IMPORTANT INFORMATION:   One child 7 years old or younger stays free when occupying the parent or guardian's room, using existing bedding. Only registered guests are allowed in the guestrooms.  No pets and no service animals are allowed at this property. Parking height restrictions apply. Cashless payment methods are available for all transactions.Contactless check-out is available.<br/>From 2026/09/29 to 2026/10/03: There are areas in which the hotels charge a tourist tax. Normally this tax is not included in the price of the booking.The client will be responsible for paying such a tax.<br/>Any cancellation with less than 1 day(s) before of the arrival of the client   the hotel will charge 25 % of the stay. <br/>Cancellation after 0:00 hours on the arrival date of the client   the hotel will charge 100 % of the stay. <br/>",
+              "priceType": "commission",
+              "commission": [
+                {
+                  "amount": 0,
+                  "currency": "USD"
+                }
+              ],
+              "retailRate": {
+                "total": [
+                  {
+                    "amount": 954.3,
+                    "currency": "USD"
+                  }
+                ],
+                "suggestedSellingPrice": [
+                  {
+                    "amount": 1097.45,
+                    "currency": "USD",
+                    "source": ""
+                  }
+                ],
+                "initialPrice": null,
+                "taxesAndFees": [
+                  {
+                    "included": true,
+                    "description": "Property service charge",
+                    "amount": 95.43,
+                    "currency": "USD"
+                  },
+                  {
+                    "included": true,
+                    "description": "TAX",
+                    "amount": 85.89,
+                    "currency": "USD"
+                  }
+                ]
+              },
+              "cancellationPolicies": {
+                "cancelPolicyInfos": [
+                  {
+                    "cancelTime": "2026-09-27 10:00:00",
+                    "amount": 238.58,
+                    "currency": "USD",
+                    "type": "amount",
+                    "timezone": "GMT"
+                  },
+                  {
+                    "cancelTime": "2026-09-28 10:00:00",
+                    "amount": 954.3,
+                    "currency": "USD",
+                    "type": "amount",
+                    "timezone": "GMT"
+                  }
+                ],
+                "hotelRemarks": [],
+                "refundableTag": "RFN"
+              },
+              "paymentTypes": [
+                "NUITEE_PAY"
+              ],
+              "providerCommission": {
+                "amount": 0,
+                "currency": ""
+              },
+              "perks": [],
+              "promotions": null
+            }
+          ]
+        }
+      ],
+      "suggestedSellingPrice": 1097.45,
+      "isPackageRate": true,
+      "commission": 0,
+      "price": 954.3,
+      "priceType": "commission",
+      "priceDifferencePercent": 0,
+      "cancellationChanged": true,
+      "boardChanged": false,
+      "supplier": "nuitee",
+      "supplierId": 2,
+      "paymentTypes": [
+        "NUITEE_PAY",
+        "ACC_CREDIT_CARD",
+        "WALLET"
+      ],
+      "checkin": "2026-09-29",
+      "checkout": "2026-10-03",
+      "sellingPriceToUser": 954.3
+    },
+    "guestLevel": 0,
+    "sandbox": true
+  }
+}

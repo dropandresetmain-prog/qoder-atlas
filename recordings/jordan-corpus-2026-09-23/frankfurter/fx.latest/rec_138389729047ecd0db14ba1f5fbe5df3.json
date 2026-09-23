@@ -1,0 +1,15 @@
+{
+  "id": "rec_138389729047ecd0db14ba1f5fbe5df3",
+  "providerId": "frankfurter",
+  "operation": "fx.latest",
+  "recordedAt": "2026-09-23T11:28:47.533Z",
+  "sanitized": true,
+  "raw": {
+    "amount": 1,
+    "base": "USD",
+    "date": "2026-09-22",
+    "rates": {
+      "SGD": 1.2747
+    }
+  }
+}

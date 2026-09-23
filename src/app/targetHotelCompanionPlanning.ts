@@ -30,6 +30,8 @@ import type { ResolvedOffer, ResolvedStayOffer } from '../resolution/scenarios/o
 type StayVisit = Extract<ScenarioEffect, { effectKind: 'ADD_JOURNEY_STAY' }>['visit'];
 
 const SUBJECT_ID = /^[A-Za-z0-9][A-Za-z0-9_\-:.]*$/;
+/** Opaque provider booking / stay-element refs (Nuitée may lead with `-`). */
+const PROVIDER_STAY_ELEMENT_ID = /^[A-Za-z0-9_\-][A-Za-z0-9_\-:.]*$/;
 const DEFAULT_MAX_PROPERTIES = 3;
 const DEFAULT_MAX_RATES = 2;
 /** Extra quote attempts reserved for destination-stay repair after overnight rates. */
@@ -414,7 +416,7 @@ function validatedStayReplacement(input: {
       && candidateAllocation.journeyItemId === old.id && candidateAllocation.travellerId === journey.travellerId,
   ) : undefined;
   if (!journey || !line || line.productType !== 'STAY' || !reservation || reservation.reservationType !== 'STAY' || !allocation) return undefined;
-  if (!SUBJECT_ID.test(replacement.stayElementId) || replacement.replacement.baseCandidateKey !== candidate.key
+  if (!PROVIDER_STAY_ELEMENT_ID.test(replacement.stayElementId) || replacement.replacement.baseCandidateKey !== candidate.key
     || replacement.replacement.journeyId !== journey.id) return undefined;
 
   const select = candidate.effects.filter((effect): effect is Extract<ScenarioEffect, { effectKind: 'SELECT_OFFER' }> => effect.effectKind === 'SELECT_OFFER');

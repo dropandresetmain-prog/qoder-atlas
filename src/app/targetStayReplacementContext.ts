@@ -27,7 +27,14 @@ import type { CapturedWorld, WCredential, WCredentialVersion } from '../resoluti
 import { projectEffectiveWorld } from '../resolution/world/effectiveItinerary.ts';
 
 const SUBJECT_ID = /^[A-Za-z0-9][A-Za-z0-9_\-:.]*$/;
+/** Opaque provider booking / stay-element refs (Nuitée may lead with `-`). */
+const PROVIDER_STAY_ELEMENT_ID = /^[A-Za-z0-9_\-][A-Za-z0-9_\-:.]*$/;
 const NATIONALITY = /^[A-Z]{2}$/;
+
+/** True when a provider stay-element / booking ref is structurally usable. */
+export function isOpaqueProviderStayElementId(value: string): boolean {
+  return PROVIDER_STAY_ELEMENT_ID.test(value);
+}
 
 /** Protected provider and traveller facts supplied by the trusted coordinator. */
 export interface StayReplacementBinding {
@@ -136,7 +143,7 @@ function validBinding(binding: StayReplacementBinding): boolean {
   const provenance = PlanningToolProvenanceSchema.safeParse(binding.provenance);
   if (!(SUBJECT_ID.test(binding.reservationId)
     && SUBJECT_ID.test(binding.reservationLineId)
-    && SUBJECT_ID.test(binding.stayElementId)
+    && isOpaqueProviderStayElementId(binding.stayElementId)
     && SUBJECT_ID.test(binding.visitId)
     && binding.propertyExternalRef.system.trim().length > 0
     && binding.propertyExternalRef.value.trim().length > 0

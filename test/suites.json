@@ -136,6 +136,7 @@
       "test/r2-focused-case-graph.test.ts",
       "test/a5-founder-qc-progression.test.ts",
       "test/a5-corpus-isolation.test.ts",
+      "test/a5-stay-element-id.test.ts",
       "test/a5-hero-seed-truth.test.ts",
       "test/a5-timed-cancellation-policy.test.ts",
       "test/a5-stay-recovery-economics.test.ts",

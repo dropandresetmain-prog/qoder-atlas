@@ -210,7 +210,12 @@ export async function bootstrapProviderStayBaseline(input: ProviderStayBaselineI
     .update(`${input.binding.sourceBookingReference}|${checkInDate}|${checkOutDate}`).digest('hex').slice(0, 24)}`;
 
   let bookingId: string | undefined;
-  if (input.mode !== 'REPLAY' && input.hotel.findBookingsByClientReference) {
+  // Prefer client-reference recovery when the adapter can honour it. RECORD may
+  // hit the sandbox; REPLAY loads a booking_lookup recording (never a live call).
+  // NORTHSTAR_BASELINE_FORCE_BOOK=1 skips lookup so a corpus capture can exercise
+  // search → quote → book when the sandbox booking is absent.
+  const forceBook = process.env.NORTHSTAR_BASELINE_FORCE_BOOK === '1';
+  if (!forceBook && input.hotel.findBookingsByClientReference) {
     const found = await input.hotel.findBookingsByClientReference({ clientReference });
     if (found.ok && found.data.bookings.length === 1) bookingId = found.data.bookings[0]!.bookingId;
     if (found.ok && found.data.bookings.length > 1) {
