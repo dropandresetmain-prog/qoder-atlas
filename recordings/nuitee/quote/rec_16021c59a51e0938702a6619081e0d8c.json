@@ -1,0 +1,113 @@
+{
+  "id": "rec_16021c59a51e0938702a6619081e0d8c",
+  "providerId": "nuitee",
+  "operation": "quote",
+  "recordedAt": "2026-09-23T08:13:23.200Z",
+  "sanitized": true,
+  "raw": {
+    "data": {
+      "prebookId": "tEY9Tslr5",
+      "offerId": "3gAYonJzkd4AEaRzcmlk2gEQR1pTVE1NSldNVTNHTU1SUUc0WVRPTkpXR1UzREtOVEZQUVlTR01SUUdJM0RBT0pTSEY2REVNQlNHWVlUQU1CVFBSU1c0WDJWS042RkdSMzRLVkpVSTdCUklFWUVHN0JVR1VaRFM3REpLQlRWS1NENEdFM1RTTUJSR1VZVEVNQlFHUTNES1NLS1BCS0NHTkJVSEFZVEVOSkRHSVlUQ05STkdRMkRRTUpTR1Y2RkVSU09QUVpEQU1SV0dBNFRFTlJSR0FZREE3QlJQUkpEQ01KVkdCQkRTT0pWSllZRktPRDRIRTJUS05SWkVOSkU2STJTSVpIQ0dNUlFHSTNDMk1CWkZVWkRNSUJSR0E1REFNQkSjcHJjy0CN3YUeuFHspW9yX3ByywAAAAAAAAAApW9yX2NtywAAAAAAAAAAomNtywAAAAAAAAAAo3BjZLMyMDI2LTA5LTI2IDEwOjAwOjAwonJ0o1JGTqNicmSiUk-kbXJpZMCjbXJuwKNoZHDAo2ZybqCjc3Juqk5hbm8gUXVlZW6jb2NuAaRwcmtzwKNkZXTLAAAAAAAAAACiY3CCoXCRhaF0szIwMjYtMDktMjYgMTA6MDA6MDChYctAjd2FHrhR7KFjo1VTRKJ0eaZhbW91bnSidHqjR01UonJ0o1JGTqRzaGlkpjQ0ODEyNaNzaWQCo2hpZKdscDZkNjdko29jY5GBoWEBo2N1cqNVU0SiZ26iU0eiY2mqMjAyNi0wOS0yOaJjb6oyMDI2LTEwLTAzo2dpZKCiY3LLAAAAAAAAAACkc3NpZNkwc2Vzc2lvbl8wMWEwY2Q1MzhlYmRXWHNRRUkzblBDY0pleks5RTFLSnVyM3duWDlWo2lzaMKjc3NwoKNpZm3CpWlmY2hywqNpZnLCpXNlYWlkp2xwNmQ2N2SibmuxbGl0ZWFwaW9uYm9hcmRpbmeidHiShKFpw6Fkt1Byb3BlcnR5IHNlcnZpY2UgY2hhcmdloWHLQFfkeuFHrhShY6NVU0SEoWnDoWSjVEFYoWHLQFWAo9cKPXGhY6NVU0SibHDAo2JrdAKkbXNwYctAkUJHrhR64aRtc3Bjo1VTRA==",
+      "hotelId": "lp6d67d",
+      "currency": "USD",
+      "termsAndConditions": "",
+      "roomTypes": [
+        {
+          "rates": [
+            {
+              "rateId": "I5NFGVCNJVFFOTKVGNDU2TKSKFDTIWKUJ5HEUV2HKUZUIS2OKRDFAUKZKNDU2USRI5ETGRCBJ5FFGSCGGZCEKTKCKNDVSWKUIFGUEVCQKJJVONCYGJLEWTRWIZDVEMZUJNLEUVKJG5BFESKFLFCUON2CKVDVKWSEKM3UISSLIJKFMS2TIQ2EORJTKRJU2QSSI5KVSVCFJVBFCR2RGNCEWU2LJNIEES2DI5HEEVKIIFMVIRKOJJCEOSKZKRBU4USOI5ITERCRJVFFGR2WGZDEKUSTJ5IFCWSEIFGVEV2HIE2FIRKOKJJEOQKZIRATOQSSKBJEURCDJVFFMR2CIJCFGT2KKZFFSWKGJNHUINCIIUZFIS2OKJNEKTSKIU3ESMSTJFNEQQ2HJVJFCR2JGNBTETKCLJDFKWSEJVEUEUSHIE2UIQKNIJCHYOJVGUXDMOL4GIYDENRNGA4S2MRWEAYTAORQGA5DAMD4KJHXY7D4PRHGC3TPEBIXKZLFNZ6DALRQGB6DALRQGB6HYMBOGAYHYMBOGAYA",
+              "occupancyNumber": 1,
+              "name": "Nano Queen",
+              "maxOccupancy": 1,
+              "adultCount": 1,
+              "childCount": 0,
+              "childrenAges": [],
+              "boardType": "RO",
+              "boardName": "Room Only",
+              "remarks": "",
+              "priceType": "commission",
+              "commission": [
+                {
+                  "amount": 0,
+                  "currency": "USD"
+                }
+              ],
+              "retailRate": {
+                "total": [
+                  {
+                    "amount": 955.69,
+                    "currency": "USD"
+                  }
+                ],
+                "suggestedSellingPrice": [
+                  {
+                    "amount": 1099.04,
+                    "currency": "USD",
+                    "source": ""
+                  }
+                ],
+                "initialPrice": null,
+                "taxesAndFees": [
+                  {
+                    "included": true,
+                    "description": "Property service charge",
+                    "amount": 95.57,
+                    "currency": "USD"
+                  },
+                  {
+                    "included": true,
+                    "description": "TAX",
+                    "amount": 86.01,
+                    "currency": "USD"
+                  }
+                ]
+              },
+              "cancellationPolicies": {
+                "cancelPolicyInfos": [
+                  {
+                    "cancelTime": "2026-09-26 10:00:00",
+                    "amount": 955.69,
+                    "currency": "USD",
+                    "type": "amount",
+                    "timezone": "GMT"
+                  }
+                ],
+                "hotelRemarks": [],
+                "refundableTag": "RFN"
+              },
+              "paymentTypes": [
+                "NUITEE_PAY"
+              ],
+              "providerCommission": {
+                "amount": 0,
+                "currency": ""
+              },
+              "perks": [],
+              "promotions": null
+            }
+          ]
+        }
+      ],
+      "suggestedSellingPrice": 1104.57,
+      "isPackageRate": true,
+      "commission": 0,
+      "price": 955.69,
+      "priceType": "commission",
+      "priceDifferencePercent": 0,
+      "cancellationChanged": false,
+      "boardChanged": false,
+      "supplier": "nuitee",
+      "supplierId": 2,
+      "paymentTypes": [
+        "NUITEE_PAY",
+        "ACC_CREDIT_CARD",
+        "WALLET"
+      ],
+      "checkin": "2026-09-29",
+      "checkout": "2026-10-03",
+      "sellingPriceToUser": 955.69
+    },
+    "guestLevel": 0,
+    "sandbox": true
+  }
+}

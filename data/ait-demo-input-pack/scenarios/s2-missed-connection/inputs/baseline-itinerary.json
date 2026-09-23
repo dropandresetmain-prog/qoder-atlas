@@ -31,10 +31,10 @@
   "hotelStay": {
     "placeId": "place-hotel-lyf-bugis",
     "providerPropertyId": "lp6d67d",
-    "bookingId": "z-xdzAxcv",
+    "bookingId": null,
     "checkIn": "2026-09-29T15:00:00+08:00",
     "checkOut": "2026-10-03T11:00:00+08:00",
-    "note": "One confirmed four-night sandbox booking z-xdzAxcv, retrieve rec_09c4c22e006e5e2df8408247c4716fe8. The checked-in policy is a single USD 670.77 cancel tier at 2026-09-29T23:59:59Z. There is no zero-amount window, so the represented cancellation penalty is that full stay price. A later arrival still needs a separate replacement stay, then cancellation of this booking. Do not treat a shorter stay as a modification of this reservation."
+    "note": "The active provider booking is created per recording world by the explicit provider stay baseline bootstrap (POST /api/v2/demo/provider-baseline) and attached to the canonical reservation; its confirmed total and cancellation policy come from that booking. Historical booking z-xdzAxcv (USD 670.77) is cancelled and is never the active baseline. A later arrival needs a separate replacement stay, then cancellation of the original booking only after the replacement is confirmed."
   },
   "arrivalTransfer": {
     "mode": "PRIVATE_TRANSFER",

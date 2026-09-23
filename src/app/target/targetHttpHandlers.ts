@@ -1,6 +1,7 @@
 /**
  * Target PostgreSQL HTTP handlers for M9 product read models and commands.
  */
+import { runProviderStayBaseline } from '../demo/providerStayBaselineRuntime.ts';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { z } from 'zod';
 import { ExpectedRevisionSchema } from '../../domain/v2/shared/identity.ts';
@@ -718,6 +719,30 @@ export async function handleTargetProductHttp(
         variant: result.variant,
         detail: result.detail,
         evaluationClock: result.evaluationClock,
+      });
+      return true;
+    }
+
+    if (req.method === 'POST' && pathname === '/api/v2/demo/provider-baseline') {
+      // Explicit provider-world bootstrap on the CURRENT working clone. In
+      // RECORD/LIVE this makes one sandbox booking; it never runs on boot or
+      // Reset, and is idempotent per stay reservation.
+      if (refuseDemoGate(res)) return true;
+      const result = await runProviderStayBaseline({
+        pool: ctx.app.pool,
+        uow: () => ctx.app.unitOfWork(),
+        workspaceId: ctx.app.workspaceId,
+        actorPrincipalId: `demo-console:${ctx.app.workspaceId}`,
+      });
+      if (!result.ok) {
+        sendJson(res, 409, { error: result.code, message: result.message });
+        return true;
+      }
+      await ctx.app.runtimeHooks?.wakeEvaluation?.();
+      sendJson(res, 200, {
+        ok: true, status: result.status, mode: result.mode, bookingId: result.bookingId,
+        reservationId: result.reservationId, checkInDate: result.checkInDate, checkOutDate: result.checkOutDate,
+        ...(result.context ? { bookedTotal: result.context.bookedTotal, cancellation: result.context.cancellation } : {}),
       });
       return true;
     }

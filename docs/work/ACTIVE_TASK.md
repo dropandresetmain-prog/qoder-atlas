@@ -27,10 +27,29 @@
   (`late_arrival_retained` / `no_show_cutoff` operands, dataset `lateArrivalEvidence`).
   None → UNKNOWN. Nuitée exposes no machine-readable no-show terms.
 
+## Provider baseline model (CP2)
+
+- Dataset stay carries only a source reference (`source-booking-ref: ait-draft-09-destination-stay`);
+  `recovery-research.json` binds `sourceBookingReference`, never a provider booking id.
+- `POST /api/v2/demo/provider-baseline` (demo gate) → `bootstrapProviderStayBaseline`: attached-link
+  check → provider lookup by deterministic `ns-baseline-…` clientReference → else search/quote/book
+  → `getStayContext` → observed `HOTEL_BOOKING` record linked to the RESERVATION on the (created)
+  `nuitee` connection. REPLAY replays the recorded chain. Never on boot/Reset.
+- `completeStayBinding` uses the attached booking as the stay element; none attached → no stay
+  replacement economics (honest unavailability).
+- Found gap: nothing in normal runtime created the `nuitee` external connection stay execution needs;
+  the bootstrap creates it.
+
 ## Checkpoint ledger
 
-- [ ] CP1 — hotel contract + no-show/refund semantics
-- [ ] CP2 — fresh sandbox baseline booking + canonical binding (explicit bootstrap)
+- [x] CP1 — hotel contract + no-show/refund semantics (`1a19749`)
+- [~] CP2 — fresh sandbox baseline booking + canonical binding (explicit bootstrap) — booking MADE,
+  attach proven via HTTP on RECORD clone; PG test + REPLAY migration of D3 test NOT done
+  - Fresh booking `DpnZRH43H` (Nuitée sandbox, lyf Bugis 2026-09-29→10-03, 1 adult), confirmed USD 955.69,
+    RFN, free cancel until 2026-09-26T10:00:00Z, then USD 955.69 (full). Attached on clone
+    `ns_demo_cl_c1e467c8ce574a92`, reservation `39e6f1f7-17a6-5cc8-8d87-93f895b1c875`.
+  - NOTE: at simulated D3 (2026-09-29) the free window is CLOSED → current fee 955.69, recoverable 0.
+    Economics must be recomputed from this; the brief's −125.07 assumed an open window.
 - [ ] CP3 — Path A/B cost ranking + Case cost UX with fresh evidence
 - [ ] CP4 — focused graph spine + proposed-service preview
 - [ ] CP5 — Chromium D1/D2/D3 acceptance

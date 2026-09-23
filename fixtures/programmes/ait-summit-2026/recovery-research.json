@@ -27,14 +27,14 @@
     }
   ],
   "stayReplacementBinding": {
-    "stayElementId": "z-xdzAxcv",
+    "sourceBookingReference": "ait-draft-09-destination-stay",
     "propertyExternalRef": { "system": "nuitee-hotel-id", "value": "lp6d67d" },
     "passport": { "guestNationality": "SG" },
     "guests": { "adults": 1, "rooms": 1 },
     "provenance": {
       "mode": "REPLAY",
       "observedAt": "2026-09-21T01:40:00.000Z",
-      "sourceRefs": ["z-xdzAxcv"]
+      "sourceRefs": ["ait-draft-09-destination-stay"]
     }
   }
 }

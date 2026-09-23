@@ -13,6 +13,7 @@ import { composeTargetHotelResearch } from './targetHotelResearch.ts';
 import { createTargetRecoveryContextPreparer } from './targetRecoveryContext.ts';
 import { createStayReplacementContextResolver, type StayReplacementBinding } from './targetStayReplacementContext.ts';
 import { PlanningToolProvenanceSchema } from '../contracts/v2/planning/planningTool.ts';
+import { findAttachedProviderStayBooking } from './demo/providerStayBaseline.ts';
 
 const SourceRef = (kind: string) => z.string().regex(new RegExp(`^SOURCE_${kind}:\\S+$`));
 export const RecoveryResearchConfigurationSchema = z.strictObject({
@@ -43,7 +44,12 @@ export const RecoveryResearchConfigurationSchema = z.strictObject({
   stayReplacementBinding: z.strictObject({
     reservationId: z.uuid().optional(),
     reservationLineId: z.uuid().optional(),
-    stayElementId: z.string().min(1),
+    /**
+     * Source booking reference identifying the canonical stay reservation. The
+     * provider stay element is never configured: it is the provider booking
+     * attached to that reservation on the working world (see providerStayBaseline).
+     */
+    sourceBookingReference: z.string().min(1),
     propertyExternalRef: z.strictObject({ system: z.string().min(1), value: z.string().min(1) }),
     areaSearch: z.strictObject({
       latitude: z.number().min(-90).max(90),
@@ -96,12 +102,16 @@ async function completeStayBinding(
          JOIN reservation_lines line
            ON line.workspace_id = rsv.workspace_id AND line.reservation_id = rsv.id AND line.product_type = 'STAY'
         WHERE er.workspace_id = $1 AND er.record_type = 'SOURCE_BOOKING_REFERENCE' AND er.external_id = $2`,
-      [workspaceId, binding.stayElementId],
+      [workspaceId, binding.sourceBookingReference],
     );
     if (stay.rows.length !== 1) return undefined;
     reservationId = stay.rows[0]!.reservation_id;
     reservationLineId = stay.rows[0]!.line_id;
   }
+  // No attached provider booking means no provider policy/value can be read:
+  // replacement economics stay unavailable rather than borrowing another booking.
+  const stayElementId = await findAttachedProviderStayBooking(pool, workspaceId, reservationId);
+  if (!stayElementId) return undefined;
   let credentialId = binding.passport.credentialId;
   let credentialVersionId = binding.passport.credentialVersionId;
   if (!credentialId || !credentialVersionId) {
@@ -143,7 +153,7 @@ async function completeStayBinding(
     visitId = visit.rows[0]!.id;
   }
   return {
-    reservationId, reservationLineId, stayElementId: binding.stayElementId,
+    reservationId, reservationLineId, stayElementId,
     propertyExternalRef: binding.propertyExternalRef,
     ...(binding.areaSearch ? { areaSearch: binding.areaSearch } : {}),
     passport: { credentialId, credentialVersionId, guestNationality: binding.passport.guestNationality },
