@@ -29,6 +29,8 @@ coverage/
 
 # Provider recordings
 recordings/private/
+# Local quarantine copies of pre-reset corpora (manifest is committed under docs/work/)
+recordings-quarantine/
 /output/
 logs/
 *.log

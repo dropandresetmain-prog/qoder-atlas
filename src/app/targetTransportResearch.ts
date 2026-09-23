@@ -1,9 +1,9 @@
 /**
- * R3 ‚Äî provider-neutral read-only transport research for the NORMAL target boot.
+ * R3 ó provider-neutral read-only transport research for the NORMAL target boot.
  *
  * Normal boot composed the accepted R1 coordinator without transport research,
  * so TRANSPORT failed closed in the product runtime even though tests injected
- * it. This module closes that gap by reusing the existing stack ‚Äî no second
+ * it. This module closes that gap by reusing the existing stack ó no second
  * engine:
  *
  *   provider config (LIVE | RECORD | REPLAY)
@@ -28,15 +28,14 @@
  * resolved per corridor from authoritative state by the resolver in
  * `transportCorridors.ts`, and provider facts live in config/recordings.
  */
-import { readdirSync } from 'node:fs';
-import { join } from 'node:path';
 import type { Pool } from '../persistence/postgres/pool.ts';
 import type { AppConfig } from '../config/config.ts';
 import { hasLiveCredentials } from '../config/config.ts';
 import type { ToolDispatchCapabilities } from './dispatch.ts';
 import { createPlanningToolTransport } from '../resolution/planning/replayPlanningTransport.ts';
 import { travellersForJourneyItemPassengers, type TransportPassengersResolver } from '../resolution/planning/transportCorridors.ts';
-import { FileRecordingStore, type RecordingStore } from '../providers/recordingStore.ts';
+import type { RecordingStore } from '../providers/recordingStore.ts';
+import { createAppRecordingStore } from '../providers/recordingStoreFactory.ts';
 import { AtlasFlightAdapter } from '../providers/atlas/adapter.ts';
 import type { AtlasTimezoneResolver } from '../providers/atlas/normalize.ts';
 import type { FareRulesOutcome, FlightOffer, FlightVerifyOutcome } from '../contracts/capabilities.ts';
@@ -48,7 +47,7 @@ import type { PlanningToolResult } from '../contracts/v2/planning/planningTool.t
  * place whose IATA/airport-code external ref equals the code contributes its
  * `time_zone`. Unknown codes return undefined so normalization fails honestly.
  *
- * Built per search (lazy) so places promoted after boot normalize honestly ‚Äî
+ * Built per search (lazy) so places promoted after boot normalize honestly ó
  * the same lazy contract the accepted composition uses.
  */
 export function buildTargetTimezoneResolver(pool: Pool, workspaceId: string): () => Promise<AtlasTimezoneResolver | undefined> {
@@ -82,7 +81,7 @@ export interface TargetTransportResearch {
 /**
  * Compose the read-only FLIGHT research seam for normal boot from the shared
  * AppConfig (the same config the legacy root reads, loaded from env). Returns
- * `undefined` ‚Äî and the coordinator then leaves TRANSPORT unavailable ‚Äî unless
+ * `undefined` ó and the coordinator then leaves TRANSPORT unavailable ó unless
  * an honest capability can be composed; never invents a provider.
  *
  * The recording store is constructed for every mode because it is the single
@@ -133,18 +132,16 @@ function flightCapabilityIsHonest(config: AppConfig): boolean {
 
 /** Recording store from config paths: read dirs for all modes, write dir for RECORD. */
 function recordingStore(config: AppConfig, cwd: string): RecordingStore {
-  const readDirs = [config.recordingsDir, join(config.fixturesDir, 'recordings')];
-  const scenarioRecordingDirs = readdirSync(join(cwd, config.fixturesDir, 'scenarios'), { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => join(config.fixturesDir, 'scenarios', entry.name, 'recordings'));
-  return new FileRecordingStore({
-    readDirs: [...readDirs, ...scenarioRecordingDirs],
-    ...(config.adapterMode === 'RECORD' ? { writeDir: config.recordingsDir } : {}),
+  return createAppRecordingStore({
+    recordingsDir: config.recordingsDir,
+    fixturesDir: config.fixturesDir,
+    cwd,
+    adapterMode: config.adapterMode,
   });
 }
 
 /**
- * R4 (lane C) ó read-only offer enrichment for transport research.
+ * R4 (lane C) ù read-only offer enrichment for transport research.
  *
  * `flight.search` alone yields schedule + price. Recovery decisions also need to
  * know whether the offer is still bookable at that price (verify) and what its

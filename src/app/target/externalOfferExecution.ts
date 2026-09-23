@@ -45,10 +45,8 @@ import { createHash } from 'node:crypto';
 import { deterministicUuid, RUNTIME_ID_NAMESPACES } from './deterministicId.ts';
 import { ATLAS_SANDBOX_BALANCE_PAYMENT_REF, ATLAS_SANDBOX_HOST, AtlasFlightTransactionAdapter } from '../../providers/atlas/transactionAdapter.ts';
 import { AtlasFlightAdapter } from '../../providers/atlas/adapter.ts';
-import { FileRecordingStore } from '../../providers/recordingStore.ts';
+import { createAppRecordingStore } from '../../providers/recordingStoreFactory.ts';
 import { hasLiveCredentials, type AppConfig } from '../../config/config.ts';
-import { existsSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
 import type { CapabilityStatement } from '../../resolution/planning/compiler.ts';
 import { validateExistingOrder, type ExpectedOrderTerms } from './existingOrderValidation.ts';
 import type { FlightOrderStatus } from '../../contracts/capabilities.ts';
@@ -670,13 +668,11 @@ export function composeOfferExecution(config: AppConfig, cwd: string): ExternalO
   let host: string;
   try { host = new URL(atlas.baseUrl).hostname; } catch { return undefined; }
   if (host !== ATLAS_SANDBOX_HOST) return undefined;
-  const scenariosDir = join(cwd, config.fixturesDir, 'scenarios');
-  const scenarioRecordingDirs = existsSync(scenariosDir)
-    ? readdirSync(scenariosDir, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => join(config.fixturesDir, 'scenarios', e.name, 'recordings'))
-    : [];
-  const store = new FileRecordingStore({
-    readDirs: [config.recordingsDir, join(config.fixturesDir, 'recordings'), ...scenarioRecordingDirs],
-    ...(config.adapterMode === 'RECORD' ? { writeDir: config.recordingsDir } : {}),
+  const store = createAppRecordingStore({
+    recordingsDir: config.recordingsDir,
+    fixturesDir: config.fixturesDir,
+    cwd,
+    adapterMode: config.adapterMode,
   });
   const common = { mode: config.adapterMode, store, baseUrl: atlas.baseUrl, clientId: atlas.clientId, clientSecret: atlas.clientSecret };
   return {

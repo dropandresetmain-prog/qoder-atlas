@@ -10,7 +10,7 @@ import { join, resolve } from 'node:path';
 import { hasLiveCredentials, loadConfig, mergeEnvWithDotenvFiles } from '../../config/config.ts';
 import { applyDemoProfileToEnv } from '../../config/demoProfiles.ts';
 import { NuiteeAdapter } from '../../providers/hotel/nuiteeAdapter.ts';
-import { FileRecordingStore } from '../../providers/recordingStore.ts';
+import { createAppRecordingStore } from '../../providers/recordingStoreFactory.ts';
 import type { Pool } from '../../persistence/postgres/pool.ts';
 import type { PgUnitOfWork } from '../../persistence/postgres/pgUnitOfWork.ts';
 import { RecoveryResearchConfigurationSchema } from '../composeTargetRecoveryResearch.ts';
@@ -43,10 +43,11 @@ export async function runProviderStayBaseline(input: {
   if (config.adapterMode !== 'REPLAY' && !hasLiveCredentials(config, 'nuitee')) {
     return { ok: false, code: 'PROVIDER_UNAVAILABLE', message: 'Nuitée sandbox credentials are required outside REPLAY' };
   }
-  const recordingsDir = resolve(cwd, config.recordingsDir);
-  const store = new FileRecordingStore({
-    readDirs: [recordingsDir, resolve(cwd, config.fixturesDir, 'recordings')],
-    ...(config.adapterMode === 'RECORD' ? { writeDir: recordingsDir } : {}),
+  const store = createAppRecordingStore({
+    recordingsDir: config.recordingsDir,
+    fixturesDir: config.fixturesDir,
+    cwd,
+    adapterMode: config.adapterMode,
   });
   const nuitee = config.providers.nuitee;
   const hotel = new NuiteeAdapter({

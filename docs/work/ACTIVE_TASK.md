@@ -8,6 +8,14 @@
 - Starting SHA: `b67d0d7a54b04f6918064dea0d1a01ec406edf95`
 - Sarah is frozen on `finish/sarah-programme-recovery` @ `3e35c6c` — do not touch.
 
+## Canonical recording corpus (clean-room reset 2026-09-23)
+
+- **CANONICAL:** `recordings/jordan-corpus-2026-09-23/` (`RECORDINGS_DIR`; `.corpus-isolated`).
+- **QUARANTINED / NON-CANONICAL:** `recordings-quarantine/pre-2026-09-23-jordan-reset/` + manifest
+  `docs/work/JORDAN_RECORDINGS_QUARANTINE_MANIFEST.json` (274 prior captures: runtime + fixtures +
+  scenario + test fixtures). Do not use for Jordan RECORD/REPLAY.
+- Fresh RECORD → REPLAY freeze is in progress (CP-R1 quarantine done; CP-R2/CP-R3 pending).
+
 ## Scenario truth (recording world)
 
 - TODAY 2026-09-23; original lyf Bugis 29 Sep → 3 Oct (4 nights) booked TODAY as a

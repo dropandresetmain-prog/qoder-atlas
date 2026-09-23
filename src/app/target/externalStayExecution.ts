@@ -34,9 +34,7 @@ import {
 } from '../../persistence/postgres/execution/selectedPlanContinuation.ts';
 import { hasLiveCredentials, type AppConfig } from '../../config/config.ts';
 import { NuiteeAdapter } from '../../providers/hotel/nuiteeAdapter.ts';
-import { FileRecordingStore } from '../../providers/recordingStore.ts';
-import { existsSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { createAppRecordingStore } from '../../providers/recordingStoreFactory.ts';
 import type { CapabilityStatement } from '../../resolution/planning/compiler.ts';
 
 export const EXTERNAL_STAY_BOOK_CAPABILITY = 'external:stay.book';
@@ -940,15 +938,11 @@ export function composeStayExecution(config: AppConfig, cwd: string): ExternalSt
   const nuitee = config.providers.nuitee;
   if (!nuitee.apiKey) return undefined;
 
-  const scenariosDir = join(cwd, config.fixturesDir, 'scenarios');
-  const scenarioRecordingDirs = existsSync(scenariosDir)
-    ? readdirSync(scenariosDir, { withFileTypes: true })
-        .filter((e) => e.isDirectory())
-        .map((e) => join(config.fixturesDir, 'scenarios', e.name, 'recordings'))
-    : [];
-  const store = new FileRecordingStore({
-    readDirs: [config.recordingsDir, join(config.fixturesDir, 'recordings'), ...scenarioRecordingDirs],
-    ...(config.adapterMode === 'RECORD' ? { writeDir: config.recordingsDir } : {}),
+  const store = createAppRecordingStore({
+    recordingsDir: config.recordingsDir,
+    fixturesDir: config.fixturesDir,
+    cwd,
+    adapterMode: config.adapterMode,
   });
 
   const hotel = new NuiteeAdapter({

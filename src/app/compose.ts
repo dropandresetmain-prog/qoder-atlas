@@ -33,6 +33,7 @@ import { AtlasFlightTransactionAdapter } from '../providers/atlas/transactionAda
 import { GoogleRoutesAdapter } from '../providers/googleRoutes/adapter.ts';
 import { NuiteeAdapter } from '../providers/hotel/nuiteeAdapter.ts';
 import { FileRecordingStore } from '../providers/recordingStore.ts';
+import { recordingReadDirs } from '../providers/recordingStoreFactory.ts';
 import {
   IntelligenceClient,
   MODEL_STUDIO_DEFAULT_BASE_URL,
@@ -237,22 +238,16 @@ export async function composeAppRuntime(
   // (liteAPI) replays the curated hotel corpus without credentials and fails
   // closed (NOT_CONFIGURED) for LIVE/RECORD without NUITEE_API_KEY. Scenario
   // bundles may ship their own recordings; the curated fixtures/recordings
-  // corpus is readable by the composed app too. The Atlas transaction
+  // corpus is readable by the composed app too — unless RECORDINGS_DIR is an
+  // isolated corpus (`.corpus-isolated` marker). The Atlas transaction
   // adapter (DR-2) shares the same recording store and fails closed unless
   // the configured environment is unambiguously the Atlas sandbox.
-  const recordingReadDirs = [
-    ...readdirSync(join(config.fixturesDir, 'scenarios'), { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => join(config.fixturesDir, 'scenarios', entry.name, 'recordings')),
-    join(config.fixturesDir, 'recordings'),
-    config.recordingsDir,
-  ];
-  // RECORD persists sanitized provider-shaped payloads under recordingsDir so
-  // later REPLAY shares the same normalizer path. LIVE/REPLAY never require a
-  // writable store; writeDir is still set so RECORD does not fail closed on a
-  // read-only store misconfiguration.
   const recordingStore = new FileRecordingStore({
-    readDirs: recordingReadDirs,
+    readDirs: recordingReadDirs({
+      recordingsDir: config.recordingsDir,
+      fixturesDir: config.fixturesDir,
+      cwd: process.cwd(),
+    }),
     writeDir: config.recordingsDir,
   });
   const flight = new AtlasFlightAdapter({

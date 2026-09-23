@@ -7,14 +7,13 @@
  * LayeredFxRateResolver and deterministic selector retain ownership of
  * freshness, authority and future-rate handling.
  */
-import { readdirSync } from 'node:fs';
-import { join } from 'node:path';
 import type { AppConfig } from '../config/config.ts';
 import type { FactAuthority } from '../domain/common.ts';
 import { FxRateEvidenceSchema, type FxRateEvidence } from '../engine/fx.ts';
 import { LayeredFxRateResolver } from './fxResolver.ts';
 import { FrankfurterFxAdapter } from '../providers/frankfurter/adapter.ts';
-import { FileRecordingStore, type RecordingStore } from '../providers/recordingStore.ts';
+import type { RecordingStore } from '../providers/recordingStore.ts';
+import { createAppRecordingStore } from '../providers/recordingStoreFactory.ts';
 import { PgArrangementReadQueries } from '../persistence/postgres/queries/pgArrangementReadQueries.ts';
 import type { FxObservationHit } from '../contracts/v2/repository/arrangementQueries.ts';
 import type { Pool } from '../persistence/postgres/pool.ts';
@@ -78,19 +77,11 @@ export function createPgBudgetFxRateReader(
 }
 
 function recordingStore(config: AppConfig, cwd: string): RecordingStore {
-  const readDirs = [config.recordingsDir, join(config.fixturesDir, 'recordings')];
-  const scenariosRoot = join(cwd, config.fixturesDir, 'scenarios');
-  const scenarioDirs: string[] = [];
-  try {
-    for (const entry of readdirSync(scenariosRoot, { withFileTypes: true })) {
-      if (entry.isDirectory()) scenarioDirs.push(join(config.fixturesDir, 'scenarios', entry.name, 'recordings'));
-    }
-  } catch {
-    // A minimal focused composition may not have a scenario directory.
-  }
-  return new FileRecordingStore({
-    readDirs: [...readDirs, ...scenarioDirs],
-    ...(config.adapterMode === 'RECORD' ? { writeDir: config.recordingsDir } : {}),
+  return createAppRecordingStore({
+    recordingsDir: config.recordingsDir,
+    fixturesDir: config.fixturesDir,
+    cwd,
+    adapterMode: config.adapterMode,
   });
 }
 

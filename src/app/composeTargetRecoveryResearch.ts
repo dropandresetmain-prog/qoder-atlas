@@ -6,7 +6,7 @@ import type { AppConfig } from '../config/config.ts';
 import type { Pool } from '../persistence/postgres/pool.ts';
 import type { PgUnitOfWork } from '../persistence/postgres/pgUnitOfWork.ts';
 import { OfficialDocumentReader } from '../providers/research/officialDocuments.ts';
-import { FileRecordingStore } from '../providers/recordingStore.ts';
+import { createAppRecordingStore } from '../providers/recordingStoreFactory.ts';
 import { HotelPropertyPolicySchema } from '../resolution/planning/hotelPropertyPolicy.ts';
 import { ReviewedEntryPolicySchema } from '../resolution/planning/reviewedEntryEvidence.ts';
 import { composeTargetHotelResearch } from './targetHotelResearch.ts';
@@ -206,13 +206,14 @@ export async function composeTargetRecoveryResearch(input: {
   }
   const hotel = composeTargetHotelResearch(input.config, input.cwd);
   if (!hotel) return undefined;
-  const recordingsDir = resolve(input.cwd, input.config.recordingsDir);
   const officialDocuments = new OfficialDocumentReader({
     catalog: [...sources.values()],
     mode: input.config.adapterMode,
-    store: new FileRecordingStore({
-      readDirs: [recordingsDir, resolve(input.cwd, input.config.fixturesDir, 'recordings')],
-      ...(input.config.adapterMode === 'RECORD' ? { writeDir: recordingsDir } : {}),
+    store: createAppRecordingStore({
+      recordingsDir: input.config.recordingsDir,
+      fixturesDir: input.config.fixturesDir,
+      cwd: input.cwd,
+      adapterMode: input.config.adapterMode,
     }),
   });
   const preparer = createTargetRecoveryContextPreparer({

@@ -27,6 +27,13 @@ Preflight runs before boot: missing sandbox credentials print required variable 
 
 `ADAPTER_MODE=RECORD` writes **sanitized** provider-shaped captures under `RECORDINGS_DIR` for later REPLAY. Intelligence (Model Studio / OpenRouter) remains independent of Atlas mode.
 
+## Canonical Jordan corpus (clean-room)
+
+- **Active:** `recordings/jordan-corpus-2026-09-23/` (set `RECORDINGS_DIR` to this path).
+- The directory contains a `.corpus-isolated` marker so runtime reads **only** that corpus (no fixtures/scenario fallback).
+- **Quarantined / NON-CANONICAL:** everything under `recordings-quarantine/pre-2026-09-23-jordan-reset/` (see `docs/work/JORDAN_RECORDINGS_QUARANTINE_MANIFEST.json`).
+- Do not point founder QC or Jordan debugging at the legacy `recordings/` tree or `fixtures/recordings`.
+
 ## Env composition (`NORTHSTAR_DEMO_PROFILE=record`)
 
 Forced markers (override sticky `ADAPTER_MODE=REPLAY` in `.env.local`):

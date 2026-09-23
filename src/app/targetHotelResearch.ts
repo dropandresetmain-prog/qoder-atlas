@@ -7,8 +7,6 @@
  * but this composition only hands planning the closed HOTEL context/search/
  * quote/retrieve operations. It is not boot wiring and cannot book or cancel.
  */
-import { readdirSync } from 'node:fs';
-import { join } from 'node:path';
 import type { AppConfig } from '../config/config.ts';
 import { hasLiveCredentials } from '../config/config.ts';
 import { capabilityError, type CapabilityResult } from '../contracts/envelope.ts';
@@ -18,7 +16,8 @@ import type {
   HotelSearchOutcome,
 } from '../contracts/capabilities.ts';
 import { createPlanningToolTransport } from '../resolution/planning/replayPlanningTransport.ts';
-import { FileRecordingStore, type RecordingStore } from '../providers/recordingStore.ts';
+import type { RecordingStore } from '../providers/recordingStore.ts';
+import { createAppRecordingStore } from '../providers/recordingStoreFactory.ts';
 import { NuiteeAdapter } from '../providers/hotel/nuiteeAdapter.ts';
 import type { PlanningToolTransport } from '../resolution/planning/researchDispatcher.ts';
 
@@ -43,21 +42,11 @@ export interface TargetHotelResearchOptions {
 }
 
 function recordingStore(config: AppConfig, cwd: string): RecordingStore {
-  const readDirs = [config.recordingsDir, join(config.fixturesDir, 'recordings')];
-  const scenariosRoot = join(cwd, config.fixturesDir, 'scenarios');
-  const scenarioRecordingDirs: string[] = [];
-  try {
-    for (const entry of readdirSync(scenariosRoot, { withFileTypes: true })) {
-      if (entry.isDirectory()) scenarioRecordingDirs.push(join(config.fixturesDir, 'scenarios', entry.name, 'recordings'));
-    }
-  } catch {
-    // A caller may supply a deliberately minimal recording root in a focused
-    // composition test; an absent optional scenario directory is not a claim
-    // that HOTEL is available or unavailable.
-  }
-  return new FileRecordingStore({
-    readDirs: [...readDirs, ...scenarioRecordingDirs],
-    ...(config.adapterMode === 'RECORD' ? { writeDir: config.recordingsDir } : {}),
+  return createAppRecordingStore({
+    recordingsDir: config.recordingsDir,
+    fixturesDir: config.fixturesDir,
+    cwd,
+    adapterMode: config.adapterMode,
   });
 }
 

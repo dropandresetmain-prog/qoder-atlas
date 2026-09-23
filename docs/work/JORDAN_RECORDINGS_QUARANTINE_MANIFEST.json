@@ -1,0 +1,2495 @@
+{
+  "stamp": "pre-2026-09-23-jordan-reset",
+  "status": "QUARANTINED_NON_CANONICAL",
+  "createdAt": "2026-09-23T11:08:25.941Z",
+  "gitHead": "47f24cb5879c4cf655f414bb0819086f0085ab39",
+  "quarantineRoot": "recordings-quarantine/pre-2026-09-23-jordan-reset",
+  "freshCorpusDir": "recordings/jordan-corpus-2026-09-23",
+  "corpusId": "jordan-corpus-2026-09-23",
+  "isolation": {
+    "marker": ".corpus-isolated",
+    "effect": "FileRecordingStore readDirs = [RECORDINGS_DIR] only"
+  },
+  "counts": {
+    "total": 274,
+    "tracked": 245,
+    "untracked": 29,
+    "moved": 29,
+    "copied": 245,
+    "bySourceRoot": {
+      "runtime-recordings": 148,
+      "fixtures-recordings": 104,
+      "test-fixtures-recordings": 13,
+      "scenario-anchor-event-speaker": 6,
+      "scenario-corporate-tmc": 3
+    }
+  },
+  "files": [
+    {
+      "originalPath": "fixtures/recordings/atlas/fare_rules/rec_28c75cb05b46bfa49e51fff3faf6c680.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/atlas/fare_rules/rec_28c75cb05b46bfa49e51fff3faf6c680.json",
+      "size": 6209,
+      "sha256": "2443cadbe54b7471dc1422427e03d9e344c5b5fb62354b40e66d86ff50c51d17",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/atlas/flight_state_query/rec_2b0e2a05f9e6cdb32b8b404d8c2ffeb8.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/atlas/flight_state_query/rec_2b0e2a05f9e6cdb32b8b404d8c2ffeb8.json",
+      "size": 723,
+      "sha256": "da4e64d0646ef7c026e23de1052e0297c710409e46a9ebc5c89fd08dbb58e1b6",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/atlas/flight_state_query/rec_2dcc7b763337184df6b7612bd06bcc3a.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/atlas/flight_state_query/rec_2dcc7b763337184df6b7612bd06bcc3a.json",
+      "size": 721,
+      "sha256": "78fb2ed01d7e2dab17a2996252aba5309487026003d85087a4b629795674ea80",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/atlas/flight_state_query/rec_3c6a1aefd81418e9a902f286a4e02713.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/atlas/flight_state_query/rec_3c6a1aefd81418e9a902f286a4e02713.json",
+      "size": 838,
+      "sha256": "73e281730c42d13d4c443a4d6cf7922bf2969f0e14636cfd10b98a6ebe262b43",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/atlas/flight_state_query/rec_4682f6383d27445d6fea1a637985125f.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/atlas/flight_state_query/rec_4682f6383d27445d6fea1a637985125f.json",
+      "size": 838,
+      "sha256": "4b0b47fae65a72eb0bdc5aef1a12184fd644ebd7d69bf8b50f456a38f3448534",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/atlas/flight_state_query/rec_5137eaf7d29df3c7dd243607facfa3f0.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/atlas/flight_state_query/rec_5137eaf7d29df3c7dd243607facfa3f0.json",
+      "size": 838,
+      "sha256": "d342408ff0504d8558fd62563270446d8516cb83277081c424e663a67155942e",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/atlas/flight_state_query/rec_5f81ddd9260942bfccbb6bb3accfce38.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/atlas/flight_state_query/rec_5f81ddd9260942bfccbb6bb3accfce38.json",
+      "size": 719,
+      "sha256": "f290c37cbbc99e2e701f58cc81aadd94ca99df950f94918ad18db88a3571cafa",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/atlas/flight_state_query/rec_61a8c1ec175d8969edb7b50abce7c7c1.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/atlas/flight_state_query/rec_61a8c1ec175d8969edb7b50abce7c7c1.json",
+      "size": 721,
+      "sha256": "52ddd80cb5520b93efcb69906155736da224ff757cd6dc3abe978e833b8529c1",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/atlas/flight_state_query/rec_696a9e5a9cd8010beaeea4a42e9456ff.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/atlas/flight_state_query/rec_696a9e5a9cd8010beaeea4a42e9456ff.json",
+      "size": 838,
+      "sha256": "936bce62920600f58310a3b380866c44c0445fb0027f290388ce5684c40a8812",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/atlas/flight_state_query/rec_79ad15c4d11a33a8af385736c69e6029.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/atlas/flight_state_query/rec_79ad15c4d11a33a8af385736c69e6029.json",
+      "size": 721,
+      "sha256": "e9429a745b52abd5bbd459abbd05a07b15494fecf73c07e43694542ace39915c",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/atlas/flight_state_query/rec_a8bbaddb49dae0822d0a1f665b4c812f.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/atlas/flight_state_query/rec_a8bbaddb49dae0822d0a1f665b4c812f.json",
+      "size": 721,
+      "sha256": "b0ceb8b599c37a1313d9ff9bb9a7f04812bcbbea4b4fa62d0c9f915da62255b4",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/atlas/flight_state_query/rec_e4f21be12d15ec25aa2f2aae971a6689.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/atlas/flight_state_query/rec_e4f21be12d15ec25aa2f2aae971a6689.json",
+      "size": 721,
+      "sha256": "42445bd5a96486fcbd91b578b199bfe7711e6fd568395eb4d52a52ddefa1479b",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/atlas/flight_state_query/rec_ed3d0900ed4aa64bd9d31b031d25c6fa.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/atlas/flight_state_query/rec_ed3d0900ed4aa64bd9d31b031d25c6fa.json",
+      "size": 838,
+      "sha256": "b4c65f4e19000500540f4692c62965b19311f94d756c1049b71b51cfd4e7273e",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/atlas/search/rec_0b5ffacd6295a2fad50f2b66055d44c3.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/atlas/search/rec_0b5ffacd6295a2fad50f2b66055d44c3.json",
+      "size": 1792,
+      "sha256": "a3304025307509503a40c82d7700a32fee0ada65c613b329cdef8930fd6fb3dc",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/atlas/search/rec_1769f8821ed1781ddf23a127e8d8be9d.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/atlas/search/rec_1769f8821ed1781ddf23a127e8d8be9d.json",
+      "size": 78383,
+      "sha256": "d85c800ad4150b5ef100e6dfc1c477625a0ca97b1de7e1419df685420142e963",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/atlas/search/rec_2d88df0f5d2c1ed0c8bf9daf14639ec8.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/atlas/search/rec_2d88df0f5d2c1ed0c8bf9daf14639ec8.json",
+      "size": 1790,
+      "sha256": "06d018c5c7b8d6121c49d6150c2a589addad2e6c967f516dfcd2331720f82762",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/atlas/search/rec_34518610b59c2573957a762d8df8c752.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/atlas/search/rec_34518610b59c2573957a762d8df8c752.json",
+      "size": 75415,
+      "sha256": "0cb797ad02403e6b25f9d4abd7f31fb695873b31cf597f4c0e0c8ac2bd8c0b16",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/atlas/search/rec_59f56c1b226487e6392bb03db62ac30c.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/atlas/search/rec_59f56c1b226487e6392bb03db62ac30c.json",
+      "size": 1792,
+      "sha256": "31584fb11b16262554bff1fafb9456b0a20a610c3b20b5a6f09b9b5b03f16781",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/atlas/search/rec_678b3eb803c900d2ef37b76373f88b75.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/atlas/search/rec_678b3eb803c900d2ef37b76373f88b75.json",
+      "size": 1792,
+      "sha256": "3db8523d250fbf080224e255b85d9adacfd45c7ed74f70817103439fe2361e23",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/atlas/search/rec_71d6274a2afd9394033fa18642e20e97.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/atlas/search/rec_71d6274a2afd9394033fa18642e20e97.json",
+      "size": 78383,
+      "sha256": "52acd46ddb0909bd69f9ec53e70aa5f289ff7963f88e946873895a723d54a6d0",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/atlas/search/rec_ac9fd89bb364d688bbeadef62be55aa5.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/atlas/search/rec_ac9fd89bb364d688bbeadef62be55aa5.json",
+      "size": 19784,
+      "sha256": "3976368303ea28dc624734d6b5d694114891166e32309a854f713359e5ed556a",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/atlas/search/rec_b92e556a48e8776d8211605aaeefa27d.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/atlas/search/rec_b92e556a48e8776d8211605aaeefa27d.json",
+      "size": 4927,
+      "sha256": "96806a53bf18ee9c66fe0cf6df46b7799619964b10a1c2673df5f81234032349",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/atlas/search/rec_f1ac354481236b79fc72db5b0d5283bb.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/atlas/search/rec_f1ac354481236b79fc72db5b0d5283bb.json",
+      "size": 75415,
+      "sha256": "37c1a7e218c27c8afcee3de929393a8ce5c862e010a9c09ebb0a83de8d5c52a1",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/atlas/search/rec_f23d573b0c20beedac2e831573ea3058.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/atlas/search/rec_f23d573b0c20beedac2e831573ea3058.json",
+      "size": 11940,
+      "sha256": "a32993b9a5340e8cba81023d2e00def6e695417cd17f3839a09e07e6c1c1e81d",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/atlas/verify/rec_5e5aac6c5a7102029b190fca4f6b3fbf.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/atlas/verify/rec_5e5aac6c5a7102029b190fca4f6b3fbf.json",
+      "size": 6205,
+      "sha256": "4fff7a83a54cda33350c7c5996a3d0d547a1e5c14ccd93874d830e0ab0eb23b7",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/google-routes/route_context/rec_c47bcdae6b369baf521a9a2b03638faf.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/google-routes/route_context/rec_c47bcdae6b369baf521a9a2b03638faf.json",
+      "size": 342,
+      "sha256": "6a5f06d2420a46e8c2d1084fa343ef46664aada93c8ac36ee4a93e76d6e2d29f",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/book/rec_0bb05c0d546ff864793ffe42f1d79e01.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/book/rec_0bb05c0d546ff864793ffe42f1d79e01.json",
+      "size": 7125,
+      "sha256": "acd6d98b0ab04993952e50be41230c42291d3c521b1ced538e5ddc8bd9e0436e",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/book/rec_57ce3b7488871b956efbc79843202ba1.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/book/rec_57ce3b7488871b956efbc79843202ba1.json",
+      "size": 6906,
+      "sha256": "f1bb3971a3611fe55f2241fe8212a35442ab84a5b078a1b75e3fae21843d052c",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/book/rec_5beffff53f2c01ffe9bdfdf64407622d.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/book/rec_5beffff53f2c01ffe9bdfdf64407622d.json",
+      "size": 8368,
+      "sha256": "bfa0aefb118c0bbdccd22df242eb479cd66e5d7bed95e05184b892a1227ac6f1",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/book/rec_8b55a4d7eedd8b54491f969796d0c166.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/book/rec_8b55a4d7eedd8b54491f969796d0c166.json",
+      "size": 6374,
+      "sha256": "fcb7e8941287f068def7751c8da552d9021d01efc6bb9e30c82aabcff475069e",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/book/rec_8c90d6bb58cf7db43e382341d30b7559.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/book/rec_8c90d6bb58cf7db43e382341d30b7559.json",
+      "size": 7475,
+      "sha256": "cc35bf0bc85dac2175ab67eda9fc7f2dee0a81f5b00a8fa0fd5f485af4aae8fc",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/book/rec_932238726c9a1f290bf9000942e0b541.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/book/rec_932238726c9a1f290bf9000942e0b541.json",
+      "size": 8385,
+      "sha256": "46587e64e149744a8ed065880618f4c52a0f6be7ccddf7c3036ed076b193e0f8",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/book/rec_a6b1c3d0c33d63f3a75c5bb7079fd350.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/book/rec_a6b1c3d0c33d63f3a75c5bb7079fd350.json",
+      "size": 8385,
+      "sha256": "9ad0b91792856e2bf3bb5701de91caa014f7b58f027265df95c91989c7999302",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/book/rec_ade124aa0378588bdc364f479c954aa5.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/book/rec_ade124aa0378588bdc364f479c954aa5.json",
+      "size": 6287,
+      "sha256": "8422066e6e6dc7db22ed4ea371391d1f093c9fdc75389b76b92322bade109194",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/book/rec_ba0b2037b83a163d87848a6be20d8c8f.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/book/rec_ba0b2037b83a163d87848a6be20d8c8f.json",
+      "size": 7584,
+      "sha256": "2515a6d66aa94b785332ca59974b29e5d4a8ecf54274523f5b26d2ee076d69a8",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/book/rec_c8241607abb8e97e4bf95341a1af5a46.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/book/rec_c8241607abb8e97e4bf95341a1af5a46.json",
+      "size": 8385,
+      "sha256": "180b612a2b259b8e0028be0f5cca24f8fc46ba769c73b24faca6549ca391f66a",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/book/rec_cad8592424962e81ca524680c9355dfc.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/book/rec_cad8592424962e81ca524680c9355dfc.json",
+      "size": 7515,
+      "sha256": "b787ea9abf24b65e9a178badef88baffb97bfd458a33035cd8d9ac6a709aa933",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/book/rec_cb93729e167c584d3fa8fa2bfe61c984.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/book/rec_cb93729e167c584d3fa8fa2bfe61c984.json",
+      "size": 6132,
+      "sha256": "935dcfb37b5045478af4b83b62017d18ba0d6a8bca386caea1e33da4d6548109",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/book/rec_e82d7d7a4152a70c41d86d66f844f6f0.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/book/rec_e82d7d7a4152a70c41d86d66f844f6f0.json",
+      "size": 8368,
+      "sha256": "ea669af767d2d087cbc81d687dfaf38670b019576e10f75983866566efea466f",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/cancel/rec_070925a87799786fd9ee7ca2946e4ddd.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/cancel/rec_070925a87799786fd9ee7ca2946e4ddd.json",
+      "size": 386,
+      "sha256": "697b71d90ec7eaf28f1c32808f17b15db791d74b84c549fbac045f1d65c15d38",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/cancel/rec_0a28da496bab688440a4a56b7bd5c640.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/cancel/rec_0a28da496bab688440a4a56b7bd5c640.json",
+      "size": 387,
+      "sha256": "b427d2bed335a6504f5cff15716395fc7a00ab21ca36b2a5de779e419ee47a05",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/cancel/rec_46a614b7fa4632f500a92d655d7d0ab7.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/cancel/rec_46a614b7fa4632f500a92d655d7d0ab7.json",
+      "size": 399,
+      "sha256": "17001a0195c738a52c5fd53261b612d12edec3c883a2924dd8c6bd0da1203600",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/cancel/rec_4a7eea8a964b7ce73b425aa003b8f4f9.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/cancel/rec_4a7eea8a964b7ce73b425aa003b8f4f9.json",
+      "size": 386,
+      "sha256": "038facd564f39ed231956bf945594200bedb32b905488db880f900b8e0d07994",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/cancel/rec_5676fcdd134f0c0c1e6a6fb775b812cd.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/cancel/rec_5676fcdd134f0c0c1e6a6fb775b812cd.json",
+      "size": 399,
+      "sha256": "50251f0db0febf9b191ca2a64f7789e7806f59cd073ecb39141a96462ce1868e",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/cancel/rec_5cd8981d196aa7548153c11c38008f63.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/cancel/rec_5cd8981d196aa7548153c11c38008f63.json",
+      "size": 386,
+      "sha256": "2826f04e24058879af7026dce88fe2d1f967ddd4b6f28cc70a62847c53582214",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/cancel/rec_943edb319c4719da796799b27c48dd35.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/cancel/rec_943edb319c4719da796799b27c48dd35.json",
+      "size": 385,
+      "sha256": "010eb080e7fb141e26203c824792fca3aa71dc0a459083e722e048495cb1c3f0",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/cancel/rec_a7de16434bd328ee416048b44302c676.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/cancel/rec_a7de16434bd328ee416048b44302c676.json",
+      "size": 385,
+      "sha256": "bd367e0e528aeef91fce2bfbf10d9f7ffd117e1713d934db2c5bb793313b15b6",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/cancel/rec_b26fdd3872cd221e9f2a04ad4c4a42ea.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/cancel/rec_b26fdd3872cd221e9f2a04ad4c4a42ea.json",
+      "size": 386,
+      "sha256": "65a431ad2d8c3079365223411ec3823cf7b5e6cb823df4143fe64896b8a5d9b3",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/cancel/rec_b750523a611ef6a3254db600b872c9ab.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/cancel/rec_b750523a611ef6a3254db600b872c9ab.json",
+      "size": 399,
+      "sha256": "fac1e6e898e2c8a7b38e079d4aa6a3de55e2c489ed67709bcb6657477e47802a",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/cancel/rec_bbbb22235e232e6930caf4572f09cd3a.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/cancel/rec_bbbb22235e232e6930caf4572f09cd3a.json",
+      "size": 385,
+      "sha256": "357e13da5e8c6b8a72ca1097cd90ad8b9671acb182e2cfb934aa532b7337d477",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/cancel/rec_e9072e575e14bb7728f2c33c2f12d9bc.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/cancel/rec_e9072e575e14bb7728f2c33c2f12d9bc.json",
+      "size": 386,
+      "sha256": "8741b8638de5f83f1dbf5c3bcc3607bd7225cd14c56aadb590189473cfe2bdfe",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/quote/rec_093fc711f12a3f62bd3a2e823003ff4b.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/quote/rec_093fc711f12a3f62bd3a2e823003ff4b.json",
+      "size": 6330,
+      "sha256": "c8cb259d025d66e77e1ae34c62c72883027d86436f5439361c4942651cfc242c",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/quote/rec_14e65ce422a0432f1e0bcc5c99115ad0.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/quote/rec_14e65ce422a0432f1e0bcc5c99115ad0.json",
+      "size": 6330,
+      "sha256": "417dba6ae5e4b3c86ae8ab7a8a1ce8108a22a369dda9925078bab9ebcca8b6bf",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/quote/rec_2453d0211e6fe18c12e2e00100e80292.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/quote/rec_2453d0211e6fe18c12e2e00100e80292.json",
+      "size": 5984,
+      "sha256": "8701c5b650435e8ab369f64a73f5170a0fc0ed42d7ce506ca69f31ac218a14f8",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/quote/rec_4292ef5a45d7b63e80821b3ecbbd8103.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/quote/rec_4292ef5a45d7b63e80821b3ecbbd8103.json",
+      "size": 5979,
+      "sha256": "59f2912e4800e8f83c0bbc9562a793dab644dd6364b8e457eded4bb67aa482da",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/quote/rec_4a1003789bf7cb4ae3de30d7f0b3c4b1.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/quote/rec_4a1003789bf7cb4ae3de30d7f0b3c4b1.json",
+      "size": 6339,
+      "sha256": "4b34a25511f439e4e4d9df321717c773d81484898ec66affb9518d38e7b152a8",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/quote/rec_4cc6b77d64b00d2cc20aaac3d2b1860f.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/quote/rec_4cc6b77d64b00d2cc20aaac3d2b1860f.json",
+      "size": 4539,
+      "sha256": "b82be5771c02af42103ca51502c8228d7deb08bcf5798da8c4e13b70c3ebad05",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/quote/rec_4d71385e0cfcf22dfbeb0c528fae44e4.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/quote/rec_4d71385e0cfcf22dfbeb0c528fae44e4.json",
+      "size": 5972,
+      "sha256": "87279da97ca98046be73428666c90d1982bce334a74164ec1664417d16c7b043",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/quote/rec_5866034ca45e6cc8aab4ae72f013ab74.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/quote/rec_5866034ca45e6cc8aab4ae72f013ab74.json",
+      "size": 5243,
+      "sha256": "9452b1ce8de87c33695bd7d769a821a27fcd7bf78c3d85552bb547a5e9a3a650",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/quote/rec_77f3614418b8cabb5d89924a000a6bf8.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/quote/rec_77f3614418b8cabb5d89924a000a6bf8.json",
+      "size": 4222,
+      "sha256": "e529694d271a78408d4b8eb616581bb84a46aaa89d546f47a4570589a866d5f1",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/quote/rec_8506035567a4373c01a18c12324819d5.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/quote/rec_8506035567a4373c01a18c12324819d5.json",
+      "size": 5225,
+      "sha256": "ca41d6741d2d9c1025178fddd7d50b581c53dcb7bb7ad2e17962a3be070f68ee",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/quote/rec_8b59b7981e7cbd43ccd09352f5376de4.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/quote/rec_8b59b7981e7cbd43ccd09352f5376de4.json",
+      "size": 4436,
+      "sha256": "d63acc76a0fc677a357defa126b753fc765f60e0b0a7fa0030299df6ce4b2b2f",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/quote/rec_980c078fddd57ae8a5d3be04b68a7037.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/quote/rec_980c078fddd57ae8a5d3be04b68a7037.json",
+      "size": 6339,
+      "sha256": "87ff03e39f8690f17d5d676e32a3137d4b2b17e1a38702d7699154f368269b38",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/quote/rec_992a593a21b48682120c4dbfa6bdf861.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/quote/rec_992a593a21b48682120c4dbfa6bdf861.json",
+      "size": 5451,
+      "sha256": "3013af268cae9ea22289d953d39567ccecc0786eb8afbf35eb1fa2c04eaec41c",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/quote/rec_9b0b3538b0b23187d5f65ba823d4f785.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/quote/rec_9b0b3538b0b23187d5f65ba823d4f785.json",
+      "size": 5258,
+      "sha256": "f7a56cdaff6a5e65a53f4d9d1c350aae9b83a4e3310d830f90dc7044a1b4cd27",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/quote/rec_a15d50f60bb9f421b3f0273e32d43233.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/quote/rec_a15d50f60bb9f421b3f0273e32d43233.json",
+      "size": 4534,
+      "sha256": "6149cedfb5229b0e6d8f0ef807a1ae9c78b6b05f697b4f30a72cf0d4f2a05d7d",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/quote/rec_bed6146e437142a546eb3ed083d349fe.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/quote/rec_bed6146e437142a546eb3ed083d349fe.json",
+      "size": 5972,
+      "sha256": "7df58990a3a1919754a4113f47466af5b5c0c900607638cb71aab41a84a25922",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/quote/rec_c29dd0edebb52d8070d4fb70888a5ae1.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/quote/rec_c29dd0edebb52d8070d4fb70888a5ae1.json",
+      "size": 6441,
+      "sha256": "a6c627552f26557ee7c7fc308285959b3dddaa6e3780091a6d79e2a093ea3d31",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/quote/rec_d70abff44d0cc6c33e97743c2f8fcc3a.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/quote/rec_d70abff44d0cc6c33e97743c2f8fcc3a.json",
+      "size": 6425,
+      "sha256": "a3d0780d82057a85f5cf9c2d8e00b22b7369575fb9750ebf89383a02c6a24db4",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/quote/rec_dde2ab9fb8790afdf391eb49a05975f4.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/quote/rec_dde2ab9fb8790afdf391eb49a05975f4.json",
+      "size": 4951,
+      "sha256": "59499932dbebd981cb1b7b85c534744aeeda2d82b9a53a12872d3ebe2a2efcb2",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/quote/rec_f51fb58103b13dd359e64898dd330252.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/quote/rec_f51fb58103b13dd359e64898dd330252.json",
+      "size": 6000,
+      "sha256": "46d6ca0e4b686935f938f3d48249d6d61814bf8544c085afb0c1bd87f1d88449",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/quote/rec_f6f8219e49a08824e8a14f7706992d6e.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/quote/rec_f6f8219e49a08824e8a14f7706992d6e.json",
+      "size": 5460,
+      "sha256": "afcf6cb0c1e0aabe85c7d62bc777c3a2df7af0ef7c69b088410991143ad92629",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/retrieve/rec_09c4c22e006e5e2df8408247c4716fe8.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/retrieve/rec_09c4c22e006e5e2df8408247c4716fe8.json",
+      "size": 6957,
+      "sha256": "d8e4897b4b612903e4717cf0be349232589cb908624ee83ca142927d00fa41d8",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/retrieve/rec_15690d819c4604f18e951f3e54d6d085.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/retrieve/rec_15690d819c4604f18e951f3e54d6d085.json",
+      "size": 6444,
+      "sha256": "c4abe83e6a743eadfa7a55717f555ea6576781ac6648cfb4f0b50594a4b30b20",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/retrieve/rec_559901ef43595b6545719df7a49ed4cd.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/retrieve/rec_559901ef43595b6545719df7a49ed4cd.json",
+      "size": 7893,
+      "sha256": "d3377163a4db0a14c93903601b04eadccff8c7df0ab695b4049de27fbde3ad0d",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/retrieve/rec_6777e350b5bb51e0ae8eb661ebaed548.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/retrieve/rec_6777e350b5bb51e0ae8eb661ebaed548.json",
+      "size": 7044,
+      "sha256": "dfcf427f04cf3566057afa64322e7a400128d626ef690313af2a51838957892a",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/retrieve/rec_aa8a09b95dda04bf95653b3bf8dbba26.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/retrieve/rec_aa8a09b95dda04bf95653b3bf8dbba26.json",
+      "size": 5246,
+      "sha256": "7d70597f408088beba86b42f20037ad07e47137d8d02c6ebf9e5e43da9476b15",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/retrieve/rec_be5278ac391c30ff40f72c4601400eb4.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/retrieve/rec_be5278ac391c30ff40f72c4601400eb4.json",
+      "size": 7893,
+      "sha256": "f45c79f12df7bb5bf865cb49e66e22211f04319a0f5c0bbfcb6f1372f57b5c36",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/retrieve/rec_ce79ca091b792c171b9234880bc979ab.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/retrieve/rec_ce79ca091b792c171b9234880bc979ab.json",
+      "size": 7004,
+      "sha256": "3afeb0f34599424af22bf80e7072818051fc1f14fdc97dadab2e7fb20109e70a",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/retrieve/rec_cfa220ae62a7446e0e6d18d0e579d114.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/retrieve/rec_cfa220ae62a7446e0e6d18d0e579d114.json",
+      "size": 5472,
+      "sha256": "fde4aeedcf997a7dcaa1ceddc774b4c2c6faf4720f35fe04fde3ed657987fcf8",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/retrieve/rec_d94e78f7b6cc9b347a08194bf3d33eda.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/retrieve/rec_d94e78f7b6cc9b347a08194bf3d33eda.json",
+      "size": 7881,
+      "sha256": "b2122c8b2b12c5e1899ada60fa094ec5a2c15d68091dca936f407de29de0229d",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/retrieve/rec_db1aad2331d49ecd0fa11d47da0e6d38.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/retrieve/rec_db1aad2331d49ecd0fa11d47da0e6d38.json",
+      "size": 6269,
+      "sha256": "223c2c037eb7bc91cc65d84ad3c6f5c527597f893eacede1654555946b8430d6",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/retrieve/rec_e1ad7e5d5f4f21de8b85f15e90e25501.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/retrieve/rec_e1ad7e5d5f4f21de8b85f15e90e25501.json",
+      "size": 7893,
+      "sha256": "23879429ff262c9120b863f2aada934135401392db01d9f3eb1b2030b6501dd8",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/retrieve/rec_eaaaa14f64f869226a3d5e78f42b490e.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/retrieve/rec_eaaaa14f64f869226a3d5e78f42b490e.json",
+      "size": 7881,
+      "sha256": "bc4fb3087e1ed817de28ea19ef59141e475b051a535947d7bf74f36823a99df1",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/search/rec_1b93b06751de490f642638fdfce8408f.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/search/rec_1b93b06751de490f642638fdfce8408f.json",
+      "size": 2590017,
+      "sha256": "3d7352e51d9ce275a4e5cfe3a0da82339b12798a5a65f687fb99006564cd4c25",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/search/rec_3095c7ebdbe8201cd23d4e314c2466cb.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/search/rec_3095c7ebdbe8201cd23d4e314c2466cb.json",
+      "size": 14903,
+      "sha256": "28520622fbff6060d6249a179734c5ca28dec04129fc50ffd3aa6c1fe3a4d043",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/search/rec_3453274e073bba4809e874155b28bd8e.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/search/rec_3453274e073bba4809e874155b28bd8e.json",
+      "size": 19444,
+      "sha256": "69e410fe682874d024d9316694ab9bb3209d0f853ff744d44583bdbf4dc2ea3a",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/search/rec_3c22371c266b84a27d5b51a179a1eda5.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/search/rec_3c22371c266b84a27d5b51a179a1eda5.json",
+      "size": 2589863,
+      "sha256": "3863889d0d1d291eb3665243cd4ffe1bfe85741960f4613fe14a1b060b7618ca",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/search/rec_4c1b376be4f1c0863cb0a2f425c1c485.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/search/rec_4c1b376be4f1c0863cb0a2f425c1c485.json",
+      "size": 14011,
+      "sha256": "a1dec56629aacf1593cf180f0b0b52f42f67d6008126b1d003b3699e7bf86109",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/search/rec_643f03e481a67eee0a887239ce9a8fcb.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/search/rec_643f03e481a67eee0a887239ce9a8fcb.json",
+      "size": 16186,
+      "sha256": "81cd3d71f4c96444b8b79699ab717fa05b88d48d2e703d7d09b8e29f39a95968",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/search/rec_6e4f1482aa4c726f8eeb71a3883c55d0.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/search/rec_6e4f1482aa4c726f8eeb71a3883c55d0.json",
+      "size": 2671727,
+      "sha256": "ac4f64503dc20e4c085f7e86f25197b10996a928592b1dbcaae870936aa0efcf",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/search/rec_8127a76ecda84adea077940f2ca70b77.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/search/rec_8127a76ecda84adea077940f2ca70b77.json",
+      "size": 289413,
+      "sha256": "00f513f27be95aedf00fcc68e74f456fe7dfbffbcf49df9873a84c999c3e1d22",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/search/rec_9a78f5e6cd8b3bf5eebafaba32406977.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/search/rec_9a78f5e6cd8b3bf5eebafaba32406977.json",
+      "size": 2590017,
+      "sha256": "91ab7c7bcf992f367a1c8dbde1ec5891fa85221e45b92555a4d6426c06c7e18b",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/search/rec_b70375b4bc57065714c8ffe497dd593a.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/search/rec_b70375b4bc57065714c8ffe497dd593a.json",
+      "size": 16230,
+      "sha256": "cafbf25f143b309145aa6369d895c8336e166eca2abe793ca75b9a7f408fe87a",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/search/rec_d78b2446148690673e494029c9245719.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/search/rec_d78b2446148690673e494029c9245719.json",
+      "size": 15407,
+      "sha256": "f85067b00cb76b93e45467ac2bee7e9d0876362ef97252dace6a9403eb8cfd20",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/search/rec_dd9573dc25c6f872bb575d455bb8846f.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/search/rec_dd9573dc25c6f872bb575d455bb8846f.json",
+      "size": 13971,
+      "sha256": "9bb7f05e22d3daff73dc2a986222f5fd4019cdd30f117d768bf51c56810bf2b2",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/search/rec_f90cef2343dab3cba7425e9cae5580b1.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/search/rec_f90cef2343dab3cba7425e9cae5580b1.json",
+      "size": 926762,
+      "sha256": "bbfae7b35c2d5fa5d5eba4d523f84b75556d11a2b554b6cfc8e72861aee6da3e",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/stay_context/rec_6c19286f42baf52cc1f52ba92685393c.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/stay_context/rec_6c19286f42baf52cc1f52ba92685393c.json",
+      "size": 6961,
+      "sha256": "56170c1ec04ec2afc5c58225153e51c06c03079d44d87886048a3451bbf45f9e",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/nuitee/stay_context/rec_b3356c66cb435b7bba351460b3ed74b3.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/nuitee/stay_context/rec_b3356c66cb435b7bba351460b3ed74b3.json",
+      "size": 6273,
+      "sha256": "bbb8419f41ec733572acc7b7b20e335b06e723dddad9043151ffbaa76c090ba3",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/official-documents/document.read/rec_0abb537c656cca8583075a57b4902d1e.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/official-documents/document.read/rec_0abb537c656cca8583075a57b4902d1e.json",
+      "size": 23624,
+      "sha256": "c7dabc23eed207468985683973ed0e0649f945a8649acda63e230cc1e59e6384",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/official-documents/document.read/rec_6138e044e19a373a56b5275180251b6a.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/official-documents/document.read/rec_6138e044e19a373a56b5275180251b6a.json",
+      "size": 39015,
+      "sha256": "3bc308f61d907e19c023e6c3a3bd1f217a468a49461f3e9ec034891668f96b4b",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/official-documents/document.read/rec_7591219d4d645507002e55bab00c3cee.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/official-documents/document.read/rec_7591219d4d645507002e55bab00c3cee.json",
+      "size": 28885,
+      "sha256": "be05cda45d734ea06f7fc1683dd5d3756ada26dbf4ec8f50dfb89417fd403496",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/official-documents/document.read/rec_cf7dd6ccdc037a01d32d3c07bd910245.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/official-documents/document.read/rec_cf7dd6ccdc037a01d32d3c07bd910245.json",
+      "size": 49306,
+      "sha256": "fe4b1a849a7d121273a1e1c5712cb271a71512792093c4800f81f1a6edaaad3b",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/recordings/official-documents/document.read/rec_e6ebf93a063abcce0e9cc534de296f20.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/fixtures-recordings/official-documents/document.read/rec_e6ebf93a063abcce0e9cc534de296f20.json",
+      "size": 49523,
+      "sha256": "ea4e559092009bf5f4f89e494660374c3cb66f06a66dd859c7d29487cbdb5c1c",
+      "tracked": true,
+      "sourceRoot": "fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/scenarios/anchor-event-speaker/recordings/atlas/fare_rules/rec_b176d2da07c8efe6e9fefc7347e2d803.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/scenario-anchor-event-speaker/atlas/fare_rules/rec_b176d2da07c8efe6e9fefc7347e2d803.json",
+      "size": 1190,
+      "sha256": "f20681dc513fbc215857a8fc1213754d8164e8c022ba15f8d4e1a3b3ecb4d13b",
+      "tracked": true,
+      "sourceRoot": "scenario-anchor-event-speaker",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/scenarios/anchor-event-speaker/recordings/atlas/order_create/rec_b3726ea9cf6e5896e444ae7d9a9c5c4a.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/scenario-anchor-event-speaker/atlas/order_create/rec_b3726ea9cf6e5896e444ae7d9a9c5c4a.json",
+      "size": 571,
+      "sha256": "0ac52d10bcbfc72dfb156a744b76648c47d58f0c69e209fad0e5f262fd1db6ef",
+      "tracked": true,
+      "sourceRoot": "scenario-anchor-event-speaker",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/scenarios/anchor-event-speaker/recordings/atlas/order_pay/rec_e756e532d1b07adc94a5c43cde81c32b.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/scenario-anchor-event-speaker/atlas/order_pay/rec_e756e532d1b07adc94a5c43cde81c32b.json",
+      "size": 296,
+      "sha256": "937317ef90e1118adb879110a938e546ee71ed82d79c007515313c99d5ee3e20",
+      "tracked": true,
+      "sourceRoot": "scenario-anchor-event-speaker",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/scenarios/anchor-event-speaker/recordings/atlas/order_retrieve/rec_c374f62e2ae0224cb086075bb362bef3.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/scenario-anchor-event-speaker/atlas/order_retrieve/rec_c374f62e2ae0224cb086075bb362bef3.json",
+      "size": 592,
+      "sha256": "4ac809aac3d0bfd0945f13bebbb59a7381c5a8424981e5b1c655d3aa898e574f",
+      "tracked": true,
+      "sourceRoot": "scenario-anchor-event-speaker",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/scenarios/anchor-event-speaker/recordings/atlas/search/rec_8b0f8f000568e58980b5544e41b53f93.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/scenario-anchor-event-speaker/atlas/search/rec_8b0f8f000568e58980b5544e41b53f93.json",
+      "size": 3181,
+      "sha256": "3d601bf1ae51d9f6bd8c3359b8c8e20678315e3b5310735d8aecd10cbe101de7",
+      "tracked": true,
+      "sourceRoot": "scenario-anchor-event-speaker",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/scenarios/anchor-event-speaker/recordings/atlas/verify/rec_dc593b2527329a2635ec27f810c64fdd.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/scenario-anchor-event-speaker/atlas/verify/rec_dc593b2527329a2635ec27f810c64fdd.json",
+      "size": 1186,
+      "sha256": "1d3c0db08e0140930416094747d0f20c0e0e418bbd3226695597892ef07d0266",
+      "tracked": true,
+      "sourceRoot": "scenario-anchor-event-speaker",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/scenarios/corporate-tmc/recordings/atlas/fare_rules/rec_974c0af8e15fc22d0357d8f50ad89ad8.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/scenario-corporate-tmc/atlas/fare_rules/rec_974c0af8e15fc22d0357d8f50ad89ad8.json",
+      "size": 1189,
+      "sha256": "4a9a91b81c8c251d5cc0ef636d9066477baa764d981f10888006f3cbcb762438",
+      "tracked": true,
+      "sourceRoot": "scenario-corporate-tmc",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/scenarios/corporate-tmc/recordings/atlas/search/rec_2c1356f3e2b9d36619062c6b65d8a997.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/scenario-corporate-tmc/atlas/search/rec_2c1356f3e2b9d36619062c6b65d8a997.json",
+      "size": 3171,
+      "sha256": "b0baa0845cc23d0f85e048d9f63a30712eaf791c053ba0aff1e3e081fe05d643",
+      "tracked": true,
+      "sourceRoot": "scenario-corporate-tmc",
+      "action": "copied"
+    },
+    {
+      "originalPath": "fixtures/scenarios/corporate-tmc/recordings/atlas/verify/rec_d8dece8bcf8093aad08c6d8ecf2fa6db.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/scenario-corporate-tmc/atlas/verify/rec_d8dece8bcf8093aad08c6d8ecf2fa6db.json",
+      "size": 1185,
+      "sha256": "03c94df6427c7538f0b11b43e91f06dbbc5d4ccc85471ee62a555575de7c0b15",
+      "tracked": true,
+      "sourceRoot": "scenario-corporate-tmc",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/cancel_quote/rec_036cb3ceafd407be89a94dc97b8fb77b.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/cancel_quote/rec_036cb3ceafd407be89a94dc97b8fb77b.json",
+      "size": 1680,
+      "sha256": "c75dee22f57f949e6bca520c13bbb45afc61a554e2e45e832777f448c32a0a98",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/cancel_quote/rec_0a6ef75a06873e7b65c481defb0c4ae5.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/cancel_quote/rec_0a6ef75a06873e7b65c481defb0c4ae5.json",
+      "size": 651,
+      "sha256": "09bb889cc67225587490e372cf6d9ac9553e6162a06bf3962fbd43560bfb8b07",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/cancel_quote/rec_53bc8c88c21e9ccec2bff2adcdbee475.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/cancel_quote/rec_53bc8c88c21e9ccec2bff2adcdbee475.json",
+      "size": 1673,
+      "sha256": "b54718ca2481b411e1af06bc4e60f979c99103dd1d35e7dbbbfdaf166ef51b40",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/cancel_quote/rec_dd81ce9a3ad5723dd9e0d3b33484d249.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/cancel_quote/rec_dd81ce9a3ad5723dd9e0d3b33484d249.json",
+      "size": 1673,
+      "sha256": "83f931d8e0b7aaf2dadde4796a5aa99c9adc5446ef2e9d801941f65cef8c2e61",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/cancel_quote/rec_e0aff8cde1d551cd84a598361333d8ae.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/cancel_quote/rec_e0aff8cde1d551cd84a598361333d8ae.json",
+      "size": 641,
+      "sha256": "e869112e135b65934f2de571862a45343d6691b4033cf15c6edfac95ec0a5baa",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/cancel_status/rec_1de62a0dd026825820f01bc2aa143303.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/cancel_status/rec_1de62a0dd026825820f01bc2aa143303.json",
+      "size": 769,
+      "sha256": "f18ee6baf1b54c853cd2ee69eec0808b80a35f35eb4072fc6d6642e89b60a33c",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/cancel_status/rec_4250c3f63396698309aaef71cf01fe26.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/cancel_status/rec_4250c3f63396698309aaef71cf01fe26.json",
+      "size": 769,
+      "sha256": "1d6ebefa0dee7901b7a6991028c17dcaad966dde84e4de12d9c24e52bb7f20f5",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/cancel_status/rec_a7265d54cb4082cb4814422998c3bd60.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/cancel_status/rec_a7265d54cb4082cb4814422998c3bd60.json",
+      "size": 769,
+      "sha256": "a963d565f5c5b6b97eb1cf6391a2e1f1679c7a17280d0a83dd1d11ae965bee74",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/cancel_status/rec_c88ebd8c5ca5c1ac305d56af978a7fe8.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/cancel_status/rec_c88ebd8c5ca5c1ac305d56af978a7fe8.json",
+      "size": 771,
+      "sha256": "5f0ff0c8640fb521b4eb4166af702794459237bdd0a5dd19da0e16b14d7fd2ae",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/cancel_submit/rec_7c359e7e508006148b0b255156eae29d.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/cancel_submit/rec_7c359e7e508006148b0b255156eae29d.json",
+      "size": 354,
+      "sha256": "d864fc77cb796bd9953dc47cd62af51e0a19816e970ea80524dcec7454e684e3",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/cancel_submit/rec_7e0c74fa29297934ba921891d6616797.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/cancel_submit/rec_7e0c74fa29297934ba921891d6616797.json",
+      "size": 354,
+      "sha256": "9bcdca5957d35e434902003936be8d55e3e7b950fbc8ec0fc05a39d6d59b1a87",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/cancel_submit/rec_ac4faf7baaa962ebcdfde2e1292ee326.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/cancel_submit/rec_ac4faf7baaa962ebcdfde2e1292ee326.json",
+      "size": 354,
+      "sha256": "d415ac3e0e13961d79008c01e407ca3bf06d756be4be6c174fe8e1f18a00eced",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/cancel_submit/rec_fb660165cff60bbaaf3972251702f661.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/cancel_submit/rec_fb660165cff60bbaaf3972251702f661.json",
+      "size": 354,
+      "sha256": "2fb068fb0d1ec30f1cbd062fb3ced52967f9d0cae9ed81a1a1efd263424d1d14",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/fare_rules/rec_081cfda554040d38aa5c20cff52ec5f6.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/fare_rules/rec_081cfda554040d38aa5c20cff52ec5f6.json",
+      "size": 6204,
+      "sha256": "1ada62f74c706ff238d19fe11869bf5c4a26112a6d5b6bc849cb40a3b2f32206",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/fare_rules/rec_1089435d5cf3a7318e483ca5026753c2.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/fare_rules/rec_1089435d5cf3a7318e483ca5026753c2.json",
+      "size": 5790,
+      "sha256": "d3390cb917606fe6ac80ed6c6989dbeecc42806552447f1dd1122f4d7d5b79d5",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/fare_rules/rec_12bd6966bf5f8af8f56c795f38dfe210.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/fare_rules/rec_12bd6966bf5f8af8f56c795f38dfe210.json",
+      "size": 6839,
+      "sha256": "33ef46f05c7527ceb5973c46f83944fceba16f2204b154112f7929f2b0551ff5",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/fare_rules/rec_2888f9419fc27d8273e3a532d21726b7.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/fare_rules/rec_2888f9419fc27d8273e3a532d21726b7.json",
+      "size": 6204,
+      "sha256": "4a362d90932750143dcd48279c15433f17a0e7fb62ac3e2127ae455613c7b55e",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/fare_rules/rec_33f45048a097de60b98eedc5c1e2cc27.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/fare_rules/rec_33f45048a097de60b98eedc5c1e2cc27.json",
+      "size": 5790,
+      "sha256": "f690756982fe9ad3e18833269e789c14431c4da99cc7218f09c440ce9058f73f",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/fare_rules/rec_44f341683028f6400bc063c720d99dfa.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/fare_rules/rec_44f341683028f6400bc063c720d99dfa.json",
+      "size": 6440,
+      "sha256": "00ccd728293deec41f8e93090d23e2a834a9d8502bf317347a54f6631b08e7cf",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/fare_rules/rec_586bc1c051871792f60dacb9a3d0faf2.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/fare_rules/rec_586bc1c051871792f60dacb9a3d0faf2.json",
+      "size": 6210,
+      "sha256": "c7dad7dbe5440980afa49a385f25027f51ec37c00c8f9effd8081a600fa1b38e",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/fare_rules/rec_616b147bb937f54b1e87e06f3d8d01de.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/fare_rules/rec_616b147bb937f54b1e87e06f3d8d01de.json",
+      "size": 6206,
+      "sha256": "e89d2796dd8721ce4a8f9a2c2451216b44885233ca0cadce99df930772fa368f",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/fare_rules/rec_628f88f8092c2ee226da0a30890ce30f.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/fare_rules/rec_628f88f8092c2ee226da0a30890ce30f.json",
+      "size": 6839,
+      "sha256": "05babbf8280f05fadf6e34a73edc7037cecce381209ec661a82b8425e785d752",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/fare_rules/rec_77b05c68e2106c6d0e9a91d45346d127.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/fare_rules/rec_77b05c68e2106c6d0e9a91d45346d127.json",
+      "size": 6206,
+      "sha256": "0040e4677a9cbe0d99ea990996dba8f33942f044363b059982bff5f40ba27448",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/fare_rules/rec_bb85b6d6d24d39151a87cac9b4c920fc.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/fare_rules/rec_bb85b6d6d24d39151a87cac9b4c920fc.json",
+      "size": 6210,
+      "sha256": "f7fc4d65ea70325ee3161f56bb08eb92c373e3073431370b74a05949a5aecdc4",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/fare_rules/rec_dc8631ff4f63727dfb15e748b4725efb.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/fare_rules/rec_dc8631ff4f63727dfb15e748b4725efb.json",
+      "size": 6206,
+      "sha256": "86328381d906d16bcbe405b9447d931c20c143b08300d4505d160d9057b85fe6",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/flight_state_query/rec_2dcc7b763337184df6b7612bd06bcc3a.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/flight_state_query/rec_2dcc7b763337184df6b7612bd06bcc3a.json",
+      "size": 716,
+      "sha256": "047e275baf086ad5eda89b67eb194d6a656ae398c6f165fda49bc442ab4c0107",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/flight_state_query/rec_5f81ddd9260942bfccbb6bb3accfce38.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/flight_state_query/rec_5f81ddd9260942bfccbb6bb3accfce38.json",
+      "size": 238,
+      "sha256": "d2cd270ff0d8f67f4fed91188c98052dab8cb2a0f093984d78fc4e11540155de",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/flight_state_query/rec_61a8c1ec175d8969edb7b50abce7c7c1.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/flight_state_query/rec_61a8c1ec175d8969edb7b50abce7c7c1.json",
+      "size": 716,
+      "sha256": "17bdd8d19abd6cf899cc660befc85613e36c283ee251b1504548494dfc9b1d29",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/flight_state_query/rec_79ad15c4d11a33a8af385736c69e6029.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/flight_state_query/rec_79ad15c4d11a33a8af385736c69e6029.json",
+      "size": 716,
+      "sha256": "a037b1b4d5189c40a937c74ef099c3ea94110ddbd122913aafa839a1f213f23f",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/flight_state_query/rec_a8bbaddb49dae0822d0a1f665b4c812f.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/flight_state_query/rec_a8bbaddb49dae0822d0a1f665b4c812f.json",
+      "size": 716,
+      "sha256": "0143b0a1b03347457efaa669de0e181b15f09827d74c5973d280a8a19d98b179",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/flight_state_query/rec_e4f21be12d15ec25aa2f2aae971a6689.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/flight_state_query/rec_e4f21be12d15ec25aa2f2aae971a6689.json",
+      "size": 238,
+      "sha256": "17928c62d2e215791386ed1d5fdba93b00223577725b0d57729b05fdac3d91e4",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/flight_state_query/rec_ff13fd1220f67a3413ac5c3fa58d837a.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/flight_state_query/rec_ff13fd1220f67a3413ac5c3fa58d837a.json",
+      "size": 720,
+      "sha256": "88b97990147e76775550e728559dc862ee149deb7a37fe04c5e50fabbf57c830",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_create/rec_0278b5be81de9be306af3b5038f8c13b.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_create/rec_0278b5be81de9be306af3b5038f8c13b.json",
+      "size": 589,
+      "sha256": "55b6bf757d49d06e4cbc60d910e7c8d51aab7cb3b72a4d43bc1b804f651704b9",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_create/rec_171f47c897405bad744dfbbc39a6ec58.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_create/rec_171f47c897405bad744dfbbc39a6ec58.json",
+      "size": 627,
+      "sha256": "60daa6a7dd5ddc21c1613e8fb695b348c7b894187477c713b8a5bbcbc9079f04",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_create/rec_2077a9e4b1c4424d9b39f65ac014c713.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_create/rec_2077a9e4b1c4424d9b39f65ac014c713.json",
+      "size": 589,
+      "sha256": "dfc4145eca97d68a2584d3241dc875e9a4618987ff439f3dd67d18550dcd947f",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_create/rec_56f1a50d472180dedf6e948ab861d742.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_create/rec_56f1a50d472180dedf6e948ab861d742.json",
+      "size": 1074,
+      "sha256": "46770f82b8ed4aef3faa0f5b076a62f51fb75d3122098b7cce2ea4aac3269aff",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_create/rec_5f99e1f65c8a40bd911dc054efb731e7.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_create/rec_5f99e1f65c8a40bd911dc054efb731e7.json",
+      "size": 588,
+      "sha256": "056ae0bc1a5236af8156fa574ced93cad2b7da2a5e248457638c705e514b57db",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_create/rec_62f9e48b74e9d122f547d51dfca3bb42.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_create/rec_62f9e48b74e9d122f547d51dfca3bb42.json",
+      "size": 627,
+      "sha256": "a748539d7a98a4be3be4270aacfae985a965fd02f9aacc719fa6b5b68cd03fa4",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_create/rec_6a4f1899223e88422973500cbfaba249.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_create/rec_6a4f1899223e88422973500cbfaba249.json",
+      "size": 567,
+      "sha256": "02a9b8509e73f856662fd92ceefe5ffa88d5aeb18c5ee98358f4553fcdf0c277",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_create/rec_b2cbe6f0a37689ad283891c029616036.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_create/rec_b2cbe6f0a37689ad283891c029616036.json",
+      "size": 589,
+      "sha256": "78be4af3041b616324bcfbd8d9b2cbc4afce9b63e43de79fcf903b6ff4bfc643",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_create/rec_cb7e7637b27fa832773f741f2ad98224.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_create/rec_cb7e7637b27fa832773f741f2ad98224.json",
+      "size": 627,
+      "sha256": "02f6b2456b2a4e838595d13f909d3300ce0ea568670d753a7677c0e7ff028888",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_create/rec_cd27d9d360aa1a814bb8e5f08a756308.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_create/rec_cd27d9d360aa1a814bb8e5f08a756308.json",
+      "size": 590,
+      "sha256": "81f0e122c22fa36eddf0eeab1d88d170de7069c633fdd87fac2c2e11ab5b6b4e",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_create/rec_ceddec55b909d2a4b5489e43a70e27bd.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_create/rec_ceddec55b909d2a4b5489e43a70e27bd.json",
+      "size": 566,
+      "sha256": "27b58912eaba56fff10faadce5a609081dd58fc3b12771f7c9dc7ee561d7a071",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_create/rec_e76aea034f073f3d233d0be2975cb33d.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_create/rec_e76aea034f073f3d233d0be2975cb33d.json",
+      "size": 589,
+      "sha256": "b3d316638f383d4c37978fd7b9cbbbc5b13f5b69ba5f3acd29c4e30db9bbd9e8",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_pay/rec_5478da4a415be9a1b417897987d3c29c.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_pay/rec_5478da4a415be9a1b417897987d3c29c.json",
+      "size": 301,
+      "sha256": "82430f67f090cfc267ab7f5803286e4f2162dd29c34046763b75357e2815f67c",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_pay/rec_588e6055bb10b427d7f0c45d1a0718ce.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_pay/rec_588e6055bb10b427d7f0c45d1a0718ce.json",
+      "size": 301,
+      "sha256": "d923b4044d636f91cdc7be1f2eb9dd8ecfa813306a7f24b6e86ee512e5a5c5a8",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_pay/rec_59df95138b4596c4f2e418ff25014c51.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_pay/rec_59df95138b4596c4f2e418ff25014c51.json",
+      "size": 301,
+      "sha256": "8ced956d9a7bd83c94abd0c36d96afc8ec16c7509c35caf3dcc1f0fd6243c0cc",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_pay/rec_b2d3728951892f364bad9fdeaedabdbf.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_pay/rec_b2d3728951892f364bad9fdeaedabdbf.json",
+      "size": 301,
+      "sha256": "7ee7797a38c07f38b3ada095784cac813c0a29965a1814326bf6f54db1a72803",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_pay/rec_c2462f86277d62aee05b15d5e13ba966.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_pay/rec_c2462f86277d62aee05b15d5e13ba966.json",
+      "size": 301,
+      "sha256": "5660824f917c6369da3103b4c4bb887296ff05c610fb7e79b1cafa8993faaeee",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_pay/rec_d9e4209d6e55e214fbaac4bee363a907.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_pay/rec_d9e4209d6e55e214fbaac4bee363a907.json",
+      "size": 301,
+      "sha256": "f770b15779bcf656ba23601f53cedbe9ebfc0bd22ee311299dd8d8ee85c180f1",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_pay/rec_e565b2534b5e9c6e2e8245c4193292f6.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_pay/rec_e565b2534b5e9c6e2e8245c4193292f6.json",
+      "size": 301,
+      "sha256": "e43abc8e2e14f99d4cff290401c85630d8d8ec263549bdfe583e74507667cb8b",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_retrieve/rec_0fa9ae2eddefcbfedf26a9b6423c0184.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_retrieve/rec_0fa9ae2eddefcbfedf26a9b6423c0184.json",
+      "size": 1078,
+      "sha256": "acd89e8b34331bf384515c84c3dbff61414491257887ded485883e8e1bd6de70",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_retrieve/rec_10d970d12d1abd38ba31fadfdb23c3a3.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_retrieve/rec_10d970d12d1abd38ba31fadfdb23c3a3.json",
+      "size": 1537,
+      "sha256": "4d162f22f21287477e1f6d9bf4dcecafc92242282d2535d6f57445b0eecf1eef",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_retrieve/rec_1fb2eabfaaae64c147544a31bb2abd68.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_retrieve/rec_1fb2eabfaaae64c147544a31bb2abd68.json",
+      "size": 1078,
+      "sha256": "7dc0f1f821cb19eb1a48398572cdb4d04554df98f85f3d6d6f44f7ceb856ffef",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_retrieve/rec_44af45545a880514537440a5240129d7.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_retrieve/rec_44af45545a880514537440a5240129d7.json",
+      "size": 1051,
+      "sha256": "0a92ce34e6f26b219e5cae5fa6813df78b1181ed07a9578ca8afe9e59af4410f",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_retrieve/rec_4e1e3def145b1c35dec45eaf4ecfbb54.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_retrieve/rec_4e1e3def145b1c35dec45eaf4ecfbb54.json",
+      "size": 1537,
+      "sha256": "207eee559f419a594eb52e1f97f8d9689af639c68cfb7c59724644b11790aa15",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_retrieve/rec_5ba10135da5a8aa5e1503828c10a0bea.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_retrieve/rec_5ba10135da5a8aa5e1503828c10a0bea.json",
+      "size": 1482,
+      "sha256": "979deaf79d62133323a1d5e087cc9a58e1b628af0500dc1b631ab98b664578db",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_retrieve/rec_c3cf57d71ffa6a9af6b3502a2d2a7f77.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_retrieve/rec_c3cf57d71ffa6a9af6b3502a2d2a7f77.json",
+      "size": 1079,
+      "sha256": "38a0c519920bac51675082be78b0f72d2554b5bc273b7c6c7393564822a58ee9",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/order_retrieve/rec_fdb75ae23bdc7b2f999ded519af1831d.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/order_retrieve/rec_fdb75ae23bdc7b2f999ded519af1831d.json",
+      "size": 1078,
+      "sha256": "e2633fa26dacec822d52e150094ea9e879e7df651e77802e0318c1efa27df70a",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/search/rec_121126f5a5f55c846ca6cabc85ab8f01.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/search/rec_121126f5a5f55c846ca6cabc85ab8f01.json",
+      "size": 14438,
+      "sha256": "e6c88f93e0a222781879c6c1f1dbe635d9dc7e8a49fa4435ffbf376a48cafe9e",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/search/rec_1c2f6ca24e946f5497380574db3588e4.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/search/rec_1c2f6ca24e946f5497380574db3588e4.json",
+      "size": 103990,
+      "sha256": "7d8d99fcf78e9624a4687fe0fd94cd1cf2d9dded00e98d280151d72c954517ba",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/search/rec_34518610b59c2573957a762d8df8c752.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/search/rec_34518610b59c2573957a762d8df8c752.json",
+      "size": 38595,
+      "sha256": "748052e44548f042bb55d0313e3be74221341ebb9ebfa9f42f9a9b97e1f987d9",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/atlas/search/rec_380259dd966cb796810e664cb24906d6.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/search/rec_380259dd966cb796810e664cb24906d6.json",
+      "size": 103990,
+      "sha256": "65cc51bbcc94f9d2a0f6b02aa762315851ec239609fe9331fa9911289e3e75b9",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/search/rec_3c4f529437c4d92f0b44d28692abd02d.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/search/rec_3c4f529437c4d92f0b44d28692abd02d.json",
+      "size": 103990,
+      "sha256": "e872952919f701aed120d541c1def6f65db800dd76fa07bc51fb254d70ce0039",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/search/rec_51f3b0aea7a6f03c5abd4eab1291ed06.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/search/rec_51f3b0aea7a6f03c5abd4eab1291ed06.json",
+      "size": 24667,
+      "sha256": "6e2609d950f4120846818625248c7d20c9042adcbe4cf9e7803d8d86c9538879",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/search/rec_59f56c1b226487e6392bb03db62ac30c.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/search/rec_59f56c1b226487e6392bb03db62ac30c.json",
+      "size": 11810,
+      "sha256": "be6e29cb3a39a5492767d53bb989b4f206ef87032f296fdf25972da6fc386ca3",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/search/rec_5f901f693d2ea7dd8fb71de6047ee555.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/search/rec_5f901f693d2ea7dd8fb71de6047ee555.json",
+      "size": 106011,
+      "sha256": "c645b9ffc089fab1d21203e49855592c0649c172ae6ea136cb869d989dd30963",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/search/rec_678b3eb803c900d2ef37b76373f88b75.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/search/rec_678b3eb803c900d2ef37b76373f88b75.json",
+      "size": 14268,
+      "sha256": "29a716f775576b1b2db61eb522420f4b4990b589cf2fc1312de75787f2826ee7",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/search/rec_71d6274a2afd9394033fa18642e20e97.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/search/rec_71d6274a2afd9394033fa18642e20e97.json",
+      "size": 41474,
+      "sha256": "c19b4705ae37795260fa00e911071e1471cc73a02228b0ba8163c0125828d441",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/atlas/search/rec_7412b6a4a3e9839adaef9642ba983e4d.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/search/rec_7412b6a4a3e9839adaef9642ba983e4d.json",
+      "size": 248906,
+      "sha256": "20dc9dbf8b7341da1409a67e5336639f1935d8165bb653e6112cf4bc8830c61f",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/search/rec_7d63ee69a297b5b9b0026ae56f4d40d6.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/search/rec_7d63ee69a297b5b9b0026ae56f4d40d6.json",
+      "size": 24673,
+      "sha256": "a9552783ff9dd887ddc8afbe3b330bbe54f6ddaf220cd9fde8665fd62d356981",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/search/rec_7f93d9c9362c617e3e686d7f4e6c73aa.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/search/rec_7f93d9c9362c617e3e686d7f4e6c73aa.json",
+      "size": 163234,
+      "sha256": "be5e81657385de73db1441fdd9c9ee7ee57378ea44b3def5390758a08e313e1b",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/search/rec_8527677b94d4464ea528d3d9d4783d9b.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/search/rec_8527677b94d4464ea528d3d9d4783d9b.json",
+      "size": 24666,
+      "sha256": "6a76145b7bcd5076436c4860b0441768a20bab447da99cc437cb85256e642d6a",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/search/rec_b615f4f1bca688f781fe2ee3cdc39720.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/search/rec_b615f4f1bca688f781fe2ee3cdc39720.json",
+      "size": 228764,
+      "sha256": "4fbf8f167bc4d6386f11c924ada1a3326c2398fff15be39c73fb01cff105c239",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/search/rec_b92e556a48e8776d8211605aaeefa27d.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/search/rec_b92e556a48e8776d8211605aaeefa27d.json",
+      "size": 235,
+      "sha256": "9ebcc2a83b6bc42bc5660ef3ebe6382b4139e3d5eae13f459485de45aaee5580",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/atlas/search/rec_d40b625e84e68b27deab3fbb52e27c2e.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/search/rec_d40b625e84e68b27deab3fbb52e27c2e.json",
+      "size": 246843,
+      "sha256": "8b3399e22797f91f76bb3a6f8675fb35a7e73724658ec4ab3f1e0c0fc1c25453",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/search/rec_f1ac354481236b79fc72db5b0d5283bb.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/search/rec_f1ac354481236b79fc72db5b0d5283bb.json",
+      "size": 89659,
+      "sha256": "a6613d7e34c8587fb629f8bb6ac93496901b46db0bbcdba2cd0f69ef97e4898e",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/search/rec_f23d573b0c20beedac2e831573ea3058.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/search/rec_f23d573b0c20beedac2e831573ea3058.json",
+      "size": 11940,
+      "sha256": "a32993b9a5340e8cba81023d2e00def6e695417cd17f3839a09e07e6c1c1e81d",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/verify/rec_2cfcd6e05d4cbc62647cd27fba837fdc.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/verify/rec_2cfcd6e05d4cbc62647cd27fba837fdc.json",
+      "size": 6199,
+      "sha256": "637251f25089a561a010f2bf6c48dfc87152bd44743a907afa96524cf32803fc",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/verify/rec_4963f0855b4f03f17fe289550216820b.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/verify/rec_4963f0855b4f03f17fe289550216820b.json",
+      "size": 6202,
+      "sha256": "a39862048bb4a4aca9de5aeb358b5ee71e995a6706fd0e7dda8228b324cc2168",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/verify/rec_5c9c1e1225da710a010b88f9a15bd957.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/verify/rec_5c9c1e1225da710a010b88f9a15bd957.json",
+      "size": 5786,
+      "sha256": "a985a8103bd1942280d9f888c0d4fb74fc8de8a7d04722d257ee236e2a473187",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/verify/rec_64abf7c443c69b73997ad51ed90e228d.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/verify/rec_64abf7c443c69b73997ad51ed90e228d.json",
+      "size": 6206,
+      "sha256": "e4cbf2f17760f570de44472a03ce16c4a3a915472eab78171e4c861e291267dd",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/verify/rec_679fa13a0a3fd85c352f3deb8d25defe.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/verify/rec_679fa13a0a3fd85c352f3deb8d25defe.json",
+      "size": 5940,
+      "sha256": "960c21dc55ac80696c58404d74f47c65e470c3ff207231a5f31aa3220af3ec1c",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/verify/rec_8da8b29f92d1505ff822140c3f210bce.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/verify/rec_8da8b29f92d1505ff822140c3f210bce.json",
+      "size": 6202,
+      "sha256": "83be3ec8068b21c625e1f1b7bfd2c648b4bdaae2805c974441365392c88d6560",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/verify/rec_928557fa96c3d300ff6e8634ce3ebaf4.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/verify/rec_928557fa96c3d300ff6e8634ce3ebaf4.json",
+      "size": 6436,
+      "sha256": "a4280bdbd9ff8673eff1812294bfb1984c8c821005fe9a773ceb6b0c79227bcb",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/verify/rec_b34fa02827b877f460f889063e6a426d.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/verify/rec_b34fa02827b877f460f889063e6a426d.json",
+      "size": 6200,
+      "sha256": "61ab5a85473238c77536fbc1e97a44a6ce02a55908ce8d4a4060228731963aab",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/verify/rec_c096c2d6f1748595c7e369e24ec37e06.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/verify/rec_c096c2d6f1748595c7e369e24ec37e06.json",
+      "size": 6835,
+      "sha256": "bb683dd6d59fa58e8db7ee31a38f87a84c46b2cad6dbf719312dbe4247c0be56",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/verify/rec_c840364f229e2051208a3a8256b0d732.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/verify/rec_c840364f229e2051208a3a8256b0d732.json",
+      "size": 6200,
+      "sha256": "37ca2b78be7f7c3e63385f7872e1c1cf1fc6f6551a6518e08eec17fb608fc563",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/verify/rec_cb79d91f71c8fd0a305124eaa0f0326b.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/verify/rec_cb79d91f71c8fd0a305124eaa0f0326b.json",
+      "size": 6205,
+      "sha256": "2c8e53e34cdd7cdac77e4ad51875693eb0c46f1e4b0c60938f392d4bf18ffd7d",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/verify/rec_d00348fdda3ea033704ca1d947de57cd.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/verify/rec_d00348fdda3ea033704ca1d947de57cd.json",
+      "size": 6202,
+      "sha256": "6e123818377f35467532b85289970e08e5096480858e2cc5485b54b3ac251fba",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/verify/rec_d0fb198f9fb1a68b100b5efac572738e.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/verify/rec_d0fb198f9fb1a68b100b5efac572738e.json",
+      "size": 6436,
+      "sha256": "52e14244692764d5d320fe9d51ecbbfd3fb2e0a03416e88c47cfbbc1291edd9c",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/verify/rec_d96045d627fa21a38169ddb74d5c0b92.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/verify/rec_d96045d627fa21a38169ddb74d5c0b92.json",
+      "size": 6202,
+      "sha256": "28a6762982960fef59abbded3f5e0aee273d1a864cf611426b30594bed190bb4",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/verify/rec_db850f13f3d95d0991facbf26da4c97f.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/verify/rec_db850f13f3d95d0991facbf26da4c97f.json",
+      "size": 6205,
+      "sha256": "08e7e8e75e8f5dd74040f0918c187868ab09b2da1188bba930a37388f0ce1854",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/verify/rec_df337daa1a7d4b64a58a5700bf03c690.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/verify/rec_df337daa1a7d4b64a58a5700bf03c690.json",
+      "size": 6835,
+      "sha256": "bbe7dedbae72be7b0d24fbc4d968dbe32c7742c31e72e38fbbb805d7d5a90bca",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/verify/rec_df9cb8118456a5995e5ceb83608e1e0b.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/verify/rec_df9cb8118456a5995e5ceb83608e1e0b.json",
+      "size": 5930,
+      "sha256": "6818f7a8994e007a0cb1619a3170efc763b97fe86d5b2d837db90fe13055af51",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/verify/rec_e04b0b8df792baeb9b262a6bdf2c1fd8.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/verify/rec_e04b0b8df792baeb9b262a6bdf2c1fd8.json",
+      "size": 5786,
+      "sha256": "49cc57268cd3f986a3bbb9711aa30e01cdadf3f4283c137de8b930c622da55a2",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/verify/rec_e16252f553709a9d8002670853414ba6.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/verify/rec_e16252f553709a9d8002670853414ba6.json",
+      "size": 6206,
+      "sha256": "42a9e834c192242bbf0564cb7a2ba175a54a964e080e568dbefe7ece7ab9c185",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/verify/rec_ebac75033ed424612e2c608da8353b25.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/verify/rec_ebac75033ed424612e2c608da8353b25.json",
+      "size": 5930,
+      "sha256": "c626206d8c75f14b2ddcade5e8cc5ab0a4b95c742c2c8edbf90c3deed35de2b2",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/verify/rec_eec8ffde13c2cf5679951c892b4b63bb.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/verify/rec_eec8ffde13c2cf5679951c892b4b63bb.json",
+      "size": 6202,
+      "sha256": "2e8d31214305bf828d457bbb50b722f91f967091479950bffab5f66531fd7e58",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/atlas/verify/rec_f42bd2e155b9db068f7b7e2cf9c1e319.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/atlas/verify/rec_f42bd2e155b9db068f7b7e2cf9c1e319.json",
+      "size": 6205,
+      "sha256": "cacdaf1ee955fbae9f2ff5951e00c4928341c1809320a194c2b9eed30795e672",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/frankfurter/fx.latest/rec_138389729047ecd0db14ba1f5fbe5df3.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/frankfurter/fx.latest/rec_138389729047ecd0db14ba1f5fbe5df3.json",
+      "size": 294,
+      "sha256": "50ae8137f40b1e1b1b2dff8c6d3e4bc98fc95e176556cb1cd26f11e0dd02984d",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/google-routes/route_context/rec_42f7cdb0a1d16a9bddd234f84447a89a.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/google-routes/route_context/rec_42f7cdb0a1d16a9bddd234f84447a89a.json",
+      "size": 347,
+      "sha256": "5409afa44513c7e96d150c095b311a888988938f600cd90dff5f8d206876e6a9",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/nuitee/book/rec_3d76fefccef01d58fe7ce49739b5c5aa.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/book/rec_3d76fefccef01d58fe7ce49739b5c5aa.json",
+      "size": 7413,
+      "sha256": "14b2e9af10636aa44f8e3452805ffcc9be3d11fd333a81062cb5469c1e95e8f0",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/nuitee/book/rec_595632b491374593e6d759fb35d9945e.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/book/rec_595632b491374593e6d759fb35d9945e.json",
+      "size": 8376,
+      "sha256": "4131087f41123ca6ce22d753f9fd0ab4e25a605ba943f7a709bd19cd556e411c",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/nuitee/book/rec_7811637ae890a57429c9b4a08cd31729.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/book/rec_7811637ae890a57429c9b4a08cd31729.json",
+      "size": 6643,
+      "sha256": "7cabd1a5abfe8856be2ac0fad540d0fd02dcdb889a852dc27137b0388d94089b",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/nuitee/book/rec_82496e06f84a7248e1884e04993781e7.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/book/rec_82496e06f84a7248e1884e04993781e7.json",
+      "size": 8376,
+      "sha256": "ae8288f6fd32e1d2700787d0ebce7b8d5d878b5ae40d70253e61881a6c8c5559",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/nuitee/book/rec_f8253ea48c6558fe16ae2a662e4bd483.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/book/rec_f8253ea48c6558fe16ae2a662e4bd483.json",
+      "size": 7413,
+      "sha256": "4f95d58b214d05b978a3d7ec27f0e916302df6e41b04a829f794d319edb6dde6",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/nuitee/booking_lookup/rec_013305930df5ffacb505ecd70a6ebbca.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/booking_lookup/rec_013305930df5ffacb505ecd70a6ebbca.json",
+      "size": 206,
+      "sha256": "b579dfd5278f5cc33316f4e6655f81dd8c61cf611b9a71c5c197183f9e2c27c4",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/nuitee/cancel/rec_0166f79a961b726dc527ac92d5489afa.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/cancel/rec_0166f79a961b726dc527ac92d5489afa.json",
+      "size": 386,
+      "sha256": "85e0a499b2be3b4fb700e670badd18268d4de2ce3b0b274ccc0599e28131c1d6",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/nuitee/cancel/rec_043d8d5c0263570ee7d5c8b02a6f0bd6.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/cancel/rec_043d8d5c0263570ee7d5c8b02a6f0bd6.json",
+      "size": 386,
+      "sha256": "fe130efb6e424658850a71fa6da15d794433dff5b0271611084b8dc4236d20f5",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/nuitee/cancel/rec_26d95a3771d4f5c064b7a5b1632b6d9d.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/cancel/rec_26d95a3771d4f5c064b7a5b1632b6d9d.json",
+      "size": 386,
+      "sha256": "00a72d308a4fe79b86e7f5d21c4225dc2bd3d4cffd8dd31f5433a7b91f26bb71",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/nuitee/cancel/rec_f76a2be2ef549ef42b9f893ed8eba50b.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/cancel/rec_f76a2be2ef549ef42b9f893ed8eba50b.json",
+      "size": 386,
+      "sha256": "760adce23f273f4f8eaa19f3a6d3baeb22987126dc304cd84cdb7ec0b5ccce9c",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/nuitee/quote/rec_05a8bf4230eb9ab04f42eb4d9b7aa870.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/quote/rec_05a8bf4230eb9ab04f42eb4d9b7aa870.json",
+      "size": 6321,
+      "sha256": "77afdaa908c56e72fdb253aa103e534e372973f883c49f3258920860409385a2",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/nuitee/quote/rec_07aba5d055b2a1791f8c7943c408f544.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/quote/rec_07aba5d055b2a1791f8c7943c408f544.json",
+      "size": 5818,
+      "sha256": "c2317dbfc7c05552d515461f1fec55df512215cb996d6542f7ed1ca5dd503425",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/nuitee/quote/rec_16021c59a51e0938702a6619081e0d8c.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/quote/rec_16021c59a51e0938702a6619081e0d8c.json",
+      "size": 4787,
+      "sha256": "649596627ef7498b11d1f347ee8e74e6f2e3e90f5eadefc6c25d2c30e6e796a3",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/nuitee/quote/rec_2974e3a847f956e6d746ef105288366f.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/quote/rec_2974e3a847f956e6d746ef105288366f.json",
+      "size": 6330,
+      "sha256": "8ae506a3a24385923d25690571f2f1225d18a44ea4c2eabee00daaffbac2dfa0",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/nuitee/quote/rec_2e7cb79099f548aff4d2b96a79803d64.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/quote/rec_2e7cb79099f548aff4d2b96a79803d64.json",
+      "size": 6305,
+      "sha256": "e44970e2742cd464d424560b688bc4ba1a97939b19cefdd40a768a7b1c9af589",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/nuitee/quote/rec_2f7fa013f41f448ac70956653a1f5950.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/quote/rec_2f7fa013f41f448ac70956653a1f5950.json",
+      "size": 5864,
+      "sha256": "9073b4953c80eaa2b8ab4fb681c0ad067d8f5b44506f5ad29ca05ea4028c2446",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/nuitee/quote/rec_3ce8bb4fe2d08b1d8c774f5adbed805e.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/quote/rec_3ce8bb4fe2d08b1d8c774f5adbed805e.json",
+      "size": 5341,
+      "sha256": "17a84030d8981951db955384aef95ddad8b093dfc76d64a571551fbef1203896",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/nuitee/quote/rec_471da1dff0950e1324270296eac50ef3.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/quote/rec_471da1dff0950e1324270296eac50ef3.json",
+      "size": 5824,
+      "sha256": "ee596177da3bfa334c1c1dbe23a195adacea8cf6a2c36c8772a7e3c9673067de",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/nuitee/quote/rec_4f5f2430d5494d8f45e4b85f558e43e2.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/quote/rec_4f5f2430d5494d8f45e4b85f558e43e2.json",
+      "size": 5153,
+      "sha256": "3ab0ed6e0cfb23edb686adadba0542b97f56ce122fb5db6e943906fa41a830cf",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/nuitee/quote/rec_7167a48b3a9002c1b9a577bf6017ce83.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/quote/rec_7167a48b3a9002c1b9a577bf6017ce83.json",
+      "size": 6321,
+      "sha256": "4aec8e3404f52497552d2d4b361db73cc12b833d84190e2c4380b5c811803105",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/nuitee/quote/rec_8da90224593b2ebbca25f3af8f5d9904.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/quote/rec_8da90224593b2ebbca25f3af8f5d9904.json",
+      "size": 8846,
+      "sha256": "9bf87e1c278719be6d75da30b181fa50581904aaa44e47347f220bf57637941e",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/nuitee/quote/rec_936cd09f2dc24037df98050de854154d.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/quote/rec_936cd09f2dc24037df98050de854154d.json",
+      "size": 8921,
+      "sha256": "525b25c9cfed223caf8a0d9086b192f2c37cffa36fcb34f2dd9b552722ad10d9",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/nuitee/quote/rec_aa4cd59aaa8ca96a856bc90850f5f9e5.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/quote/rec_aa4cd59aaa8ca96a856bc90850f5f9e5.json",
+      "size": 5108,
+      "sha256": "24089f8d7f5e84fee86934a7c496d6d4fc9c4547080d4bd4f67de5104330084c",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/nuitee/quote/rec_b2f81f6cc52341c70d97e8bb7e298330.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/quote/rec_b2f81f6cc52341c70d97e8bb7e298330.json",
+      "size": 5864,
+      "sha256": "b0f63a878b174f5f725895f8d9c9d8dd06b13c73d6e000b2bcc9699545cca4ce",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/nuitee/quote/rec_ca9778f69a98a5257707bc5ca4833033.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/quote/rec_ca9778f69a98a5257707bc5ca4833033.json",
+      "size": 6305,
+      "sha256": "56947d5a2de88220a2ff585c8b9adcf8a768b8c5059a9a832ae0b45c93cff515",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/nuitee/quote/rec_cb156e3b2e49bec91529af87a45010f8.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/quote/rec_cb156e3b2e49bec91529af87a45010f8.json",
+      "size": 5818,
+      "sha256": "e7a9d1874415701109694d7d508c2cd9b1deeb5dba30a6542ff95baab7434041",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/nuitee/quote/rec_d0b8d482cb9de2a526cd7463e6b215e2.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/quote/rec_d0b8d482cb9de2a526cd7463e6b215e2.json",
+      "size": 8846,
+      "sha256": "6d2f87b7c959c525314f202fe055643996b5f8d838e2ac3b6bc8442dc3d0be80",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/nuitee/quote/rec_d92c5ca0b4388a420ee20a5036a81c9c.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/quote/rec_d92c5ca0b4388a420ee20a5036a81c9c.json",
+      "size": 5153,
+      "sha256": "2ead42cd891ed0e575a5663b1c1fb6a531e37d7a4f97f94f1b9bc296505cf077",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/nuitee/quote/rec_f28643f37ad0d8814fd6cbd542684e23.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/quote/rec_f28643f37ad0d8814fd6cbd542684e23.json",
+      "size": 5108,
+      "sha256": "00324c4798d2ce084c6186baac7f7c8dfe4efb5db6c1661150e89058be6dbd8b",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/nuitee/retrieve/rec_1a0ff4f01090b336d0bee80578e21e84.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/retrieve/rec_1a0ff4f01090b336d0bee80578e21e84.json",
+      "size": 7889,
+      "sha256": "a518031f32aeec9137197e12d2ce9e9bb5986008ae77a83d5e1d0d1ade5feb2e",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/nuitee/retrieve/rec_36e7ee6cb7e6e5bc34294e8112c0b06e.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/retrieve/rec_36e7ee6cb7e6e5bc34294e8112c0b06e.json",
+      "size": 7889,
+      "sha256": "7f6d6278930917389bae62252018ca8513a1cbb2034a58201437d00e9213d8f5",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/nuitee/retrieve/rec_a4ab441f8de02fc009b8d73a09fc6ff2.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/retrieve/rec_a4ab441f8de02fc009b8d73a09fc6ff2.json",
+      "size": 6954,
+      "sha256": "e5a6851ad8677c1570f629d3924974bd605f5857f825dabe5c7c20392e8fb616",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/nuitee/retrieve/rec_ddcac942e03e5225229b28544b810f09.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/retrieve/rec_ddcac942e03e5225229b28544b810f09.json",
+      "size": 6954,
+      "sha256": "d2e1188eb4f57cbd06f1ba0852c8b440609932abe7b6f1c08fa735d1516f3d39",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/nuitee/search/rec_1b93b06751de490f642638fdfce8408f.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/search/rec_1b93b06751de490f642638fdfce8408f.json",
+      "size": 2620317,
+      "sha256": "0dabfdde08f12259fb06726113c36fc927e16eff8c98f0c1e3e4e4e7f9172e54",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/nuitee/search/rec_3453274e073bba4809e874155b28bd8e.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/search/rec_3453274e073bba4809e874155b28bd8e.json",
+      "size": 19083,
+      "sha256": "fb32efc748c26b14e0b270508f0031d837c15965f36bc88e519835f7c3c75aad",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/nuitee/search/rec_643f03e481a67eee0a887239ce9a8fcb.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/search/rec_643f03e481a67eee0a887239ce9a8fcb.json",
+      "size": 15515,
+      "sha256": "8c4f92a3094495b3c3d46b7b53b36714e8a4468a5e93041cb7314f8428da8e7f",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/nuitee/search/rec_9a78f5e6cd8b3bf5eebafaba32406977.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/search/rec_9a78f5e6cd8b3bf5eebafaba32406977.json",
+      "size": 2595484,
+      "sha256": "a474d657c7a61c7c16d2de1fbfcda80f2d26588136f1120ccd73c62b6ba018c4",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/nuitee/search/rec_b70375b4bc57065714c8ffe497dd593a.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/search/rec_b70375b4bc57065714c8ffe497dd593a.json",
+      "size": 15573,
+      "sha256": "29c7234a1f177894bc141730d29f31de425382c7bb88a8c550b3c92d14de3f67",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/nuitee/search/rec_d78b2446148690673e494029c9245719.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/search/rec_d78b2446148690673e494029c9245719.json",
+      "size": 15820,
+      "sha256": "72634d53dd299c1b3f2cfe0d6bb0722a3cdc43f5d813f2ccb5af493b2e949cdc",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/nuitee/stay_context/rec_6c19286f42baf52cc1f52ba92685393c.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/stay_context/rec_6c19286f42baf52cc1f52ba92685393c.json",
+      "size": 6753,
+      "sha256": "bd301c019c4adda85c0f8ec35009f771fce2bb22ad5180cd885d28a55abeeb34",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/nuitee/stay_context/rec_90f019777a2ae8c099191e1e4176e70d.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/nuitee/stay_context/rec_90f019777a2ae8c099191e1e4176e70d.json",
+      "size": 5999,
+      "sha256": "4ef741b13b3d623e117969088d06b1f0ed6529dd7d0b0651121d2b868ba842d6",
+      "tracked": true,
+      "sourceRoot": "runtime-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "recordings/official-documents/document.read/rec_0abb537c656cca8583075a57b4902d1e.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/official-documents/document.read/rec_0abb537c656cca8583075a57b4902d1e.json",
+      "size": 23611,
+      "sha256": "c7dad8d0c6ea0210870b3a68d5e6e6002909ecdee333f9410dfbe0737c158157",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/official-documents/document.read/rec_6138e044e19a373a56b5275180251b6a.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/official-documents/document.read/rec_6138e044e19a373a56b5275180251b6a.json",
+      "size": 39002,
+      "sha256": "a37a0438251d92de32f90923a37e48632fa12da08038b38c264f22451b5d4bcf",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/official-documents/document.read/rec_7591219d4d645507002e55bab00c3cee.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/official-documents/document.read/rec_7591219d4d645507002e55bab00c3cee.json",
+      "size": 28872,
+      "sha256": "44e3a3038563098399435062e42eba347734168f82f98799babc13e5c7145230",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/official-documents/document.read/rec_cf7dd6ccdc037a01d32d3c07bd910245.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/official-documents/document.read/rec_cf7dd6ccdc037a01d32d3c07bd910245.json",
+      "size": 49293,
+      "sha256": "3026578e52e6271b69c5b2ac1fb802f154eb3808b7e02306b38ba197a1f7a31e",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "recordings/official-documents/document.read/rec_e6ebf93a063abcce0e9cc534de296f20.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/runtime-recordings/official-documents/document.read/rec_e6ebf93a063abcce0e9cc534de296f20.json",
+      "size": 49510,
+      "sha256": "b042d95d4a3396ddbc94992ce787e86230d0a8d7453ec3b432bc36f244434a87",
+      "tracked": false,
+      "sourceRoot": "runtime-recordings",
+      "action": "moved"
+    },
+    {
+      "originalPath": "test/fixtures/recordings/atlas/fare_rules/rec_9f6356909defef63669c598d9e7b810e.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/test-fixtures-recordings/atlas/fare_rules/rec_9f6356909defef63669c598d9e7b810e.json",
+      "size": 3303,
+      "sha256": "9987625cc4f411e93bd817dfb02217979aaab2317d2353f07ee71ab6ce306d8f",
+      "tracked": true,
+      "sourceRoot": "test-fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "test/fixtures/recordings/atlas/search/rec_118cab1de595baabc40eba494fabbfbc.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/test-fixtures-recordings/atlas/search/rec_118cab1de595baabc40eba494fabbfbc.json",
+      "size": 2412,
+      "sha256": "6a893bb0b4284a5dc63ef5c3d332828a62e3b1f655de7598f8960ea5e476b3ef",
+      "tracked": true,
+      "sourceRoot": "test-fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "test/fixtures/recordings/atlas/search/rec_4f6d05a8cccad1bd5afec5b255e2e3a6.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/test-fixtures-recordings/atlas/search/rec_4f6d05a8cccad1bd5afec5b255e2e3a6.json",
+      "size": 2386,
+      "sha256": "5b8b8bc319c880502b431736f32d8d479743015c51ebfe86459e8b1953232a42",
+      "tracked": true,
+      "sourceRoot": "test-fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "test/fixtures/recordings/atlas/search/rec_56fe192e09857c10e85f4ff5fed66853.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/test-fixtures-recordings/atlas/search/rec_56fe192e09857c10e85f4ff5fed66853.json",
+      "size": 2388,
+      "sha256": "465d15d24eb7f283275d8f78154e7b03ff107620ebf775c1f986404d58b04fef",
+      "tracked": true,
+      "sourceRoot": "test-fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "test/fixtures/recordings/atlas/search/rec_7733e7e0e318aee78ca1c322a0f0c214.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/test-fixtures-recordings/atlas/search/rec_7733e7e0e318aee78ca1c322a0f0c214.json",
+      "size": 2412,
+      "sha256": "efb6663df73aaf5d15588e0a2ca395f146c12355aa9e25cfa9151d2cf4ef7fff",
+      "tracked": true,
+      "sourceRoot": "test-fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "test/fixtures/recordings/atlas/search/rec_8d5d8cd256e3e08ac77c966968f7643c.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/test-fixtures-recordings/atlas/search/rec_8d5d8cd256e3e08ac77c966968f7643c.json",
+      "size": 2383,
+      "sha256": "68803af046c6b60851d80b79eb100041b574a7cdd365a7e58086cbbf1e5c6659",
+      "tracked": true,
+      "sourceRoot": "test-fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "test/fixtures/recordings/atlas/search/rec_9264391029661095b896ba4198ac716b.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/test-fixtures-recordings/atlas/search/rec_9264391029661095b896ba4198ac716b.json",
+      "size": 2412,
+      "sha256": "b0bcfb5d52c9adad6ba95ea4904034913f4f6886bac2d50e69655daefbbcf855",
+      "tracked": true,
+      "sourceRoot": "test-fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "test/fixtures/recordings/atlas/search/rec_947a3b3f3955c0e5e03c601c391605f5.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/test-fixtures-recordings/atlas/search/rec_947a3b3f3955c0e5e03c601c391605f5.json",
+      "size": 2412,
+      "sha256": "170faab288796745c39ff1fa98d9b9239aa934788055ed53f9d5fd3b267800c0",
+      "tracked": true,
+      "sourceRoot": "test-fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "test/fixtures/recordings/atlas/search/rec_9f9dc9328a949af2a3f560a25a33dbc1.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/test-fixtures-recordings/atlas/search/rec_9f9dc9328a949af2a3f560a25a33dbc1.json",
+      "size": 2412,
+      "sha256": "193dd35e1cc9f1f6271c9d7f8b42ee78ed8720665c2c644275f97e39e8ca5966",
+      "tracked": true,
+      "sourceRoot": "test-fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "test/fixtures/recordings/atlas/search/rec_ac9fd89bb364d688bbeadef62be55aa5.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/test-fixtures-recordings/atlas/search/rec_ac9fd89bb364d688bbeadef62be55aa5.json",
+      "size": 2651,
+      "sha256": "b0201a4a9884da9640e467f21a41a258eeb233739883d5a1c306ce401bad08dc",
+      "tracked": true,
+      "sourceRoot": "test-fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "test/fixtures/recordings/atlas/search/rec_bc497145c65543b803e624c9b497b911.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/test-fixtures-recordings/atlas/search/rec_bc497145c65543b803e624c9b497b911.json",
+      "size": 2412,
+      "sha256": "f5ab97aff2df10e282678599e9b636f0f544dc09848a6109d9863562a2add6f7",
+      "tracked": true,
+      "sourceRoot": "test-fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "test/fixtures/recordings/atlas/search/rec_d8ecc00731e58b29792c7fd44e3e3a04.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/test-fixtures-recordings/atlas/search/rec_d8ecc00731e58b29792c7fd44e3e3a04.json",
+      "size": 2412,
+      "sha256": "14f8f9f718ce5892e7abd691c5d9331c494004bcc60f778f506bc39cea27e0f2",
+      "tracked": true,
+      "sourceRoot": "test-fixtures-recordings",
+      "action": "copied"
+    },
+    {
+      "originalPath": "test/fixtures/recordings/atlas/verify/rec_6e9d600ae04e047e7099d3207ef75538.json",
+      "quarantinePath": "recordings-quarantine/pre-2026-09-23-jordan-reset/test-fixtures-recordings/atlas/verify/rec_6e9d600ae04e047e7099d3207ef75538.json",
+      "size": 3299,
+      "sha256": "2c41380dad75d288c2db3f5765bbf1b57e46a5e5fdbaae4d359368a3ae52a480",
+      "tracked": true,
+      "sourceRoot": "test-fixtures-recordings",
+      "action": "copied"
+    }
+  ]
+}
