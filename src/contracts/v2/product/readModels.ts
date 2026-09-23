@@ -438,8 +438,10 @@ export const OperatorOverviewSchema = z.strictObject({
    *
    * `RECONCILING` means at least one in-scope subject currently reports
    * `PENDING_REASSESSMENT` — open scheduled reassessment work, not a guessed
-   * timer. Presentation may hold the last SETTLED snapshot while this is
-   * RECONCILING; it must not invent readiness, blast radius or affected set.
+   * timer. Presentation may hold derived readiness/attention at the last
+   * SETTLED snapshot while this is RECONCILING, while still painting CURRENT
+   * transport-service and affected-traveller facts. It must not invent
+   * readiness, blast radius or present an unsettled recovery verdict as final.
    */
   populationAssessmentLifecycle: z.strictObject({
     state: z.enum(['SETTLED', 'RECONCILING']),

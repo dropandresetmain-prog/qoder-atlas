@@ -27,6 +27,9 @@ import {
 } from './progressiveDelayTimeline.ts';
 import type { DemoControlCatalog, DemoControlDefinition } from './demoControlCatalog.ts';
 
+/** Demo-boundary hold between displaced bookings and airline reprotection. */
+export const DEMO_DISRUPTION_STAGE_HOLD_MS = 10_000;
+
 export interface DemoControlApplyDeps {
   pool: Pool;
   workspaceId: string;
@@ -200,8 +203,10 @@ async function applyConfiguredAirlineRebooking(
     // One public trigger, two provider facts. The pause is only so a polling
     // overview can show the displaced service while reassessment is still
     // pending. It is not part of viability, authority, or execution.
+    // ~10s so founders can see Stage A (five travellers checking) before
+    // airline reprotection lands as Stage B.
     afterDisruptionReceived: () => new Promise((resolve) => {
-      setTimeout(resolve, 2500);
+      setTimeout(resolve, DEMO_DISRUPTION_STAGE_HOLD_MS);
     }),
   });
   if (!ingress.ok) {

@@ -115,6 +115,27 @@ class StubElement {
     this.parent = null;
   }
 
+  remove(): void {
+    if (!this.parent) return;
+    const idx = this.parent.children.indexOf(this);
+    if (idx >= 0) this.parent.children.splice(idx, 1);
+    this.parent = null;
+  }
+
+  cloneNode(deep = false): StubElement {
+    const copy = new StubElement(this.tagName.toLowerCase());
+    for (const [k, v] of this.attrs) copy.attrs.set(k, v);
+    for (const c of this.classes) copy.classes.add(c);
+    copy.text = this.text;
+    copy.disabled = this.disabled;
+    copy.value = this.value;
+    copy.scrollTop = this.scrollTop;
+    if (deep) {
+      for (const child of this.children) copy.appendChild(child.cloneNode(true));
+    }
+    return copy;
+  }
+
   get classList() {
     return {
       add: (c: string) => { this.classes.add(c); },
@@ -242,6 +263,8 @@ function responseHTML(opts: {
   pendingCount?: number;
   revision?: string;
   readyCount?: string;
+  graphHealth?: string;
+  rosterNote?: string;
 } = {}): string {
   const openAttr = opts.disclosureOpen ? ' open' : '';
   const statusText = opts.statusText ?? '';
@@ -249,8 +272,10 @@ function responseHTML(opts: {
   const pending = opts.pendingCount ?? 0;
   const revision = opts.revision ?? '1';
   const ready = opts.readyCount ?? '50';
+  const graphHealth = opts.graphHealth ?? 'green';
+  const rosterNote = opts.rosterNote ?? 'all clear';
   const reconcilingHidden = lifecycle === 'RECONCILING' ? '' : ' hidden';
-  return `<main data-test="product-operator-overview" data-assessment-lifecycle="${lifecycle}" data-assessment-pending-count="${pending}" data-stable-revision="${revision}"><p data-test="overview-reconciling"${reconcilingHidden}>Reconciling changes…</p><div data-test="ready-count">${ready}</div><details data-test="simulated-airline-update" data-configured="true"${openAttr}><span data-test="simulated-airline-update-status">${statusText}</span><button data-test="simulated-airline-update-apply" data-action="trigger-disruption">Apply</button></details></main>`;
+  return `<main data-test="product-operator-overview" data-assessment-lifecycle="${lifecycle}" data-assessment-pending-count="${pending}" data-stable-revision="${revision}"><p data-test="overview-reconciling"${reconcilingHidden}>Checking the impact…</p><div data-poll-region="overview-summary" data-test="ready-count">${ready}</div><section data-poll-region="overview-graph" data-test="overview-graph" data-graph-health="${graphHealth}">graph:${graphHealth}</section><section data-poll-region="overview-roster" data-test="overview-roster">${rosterNote}</section><section data-poll-region="overview-attention" data-test="overview-attention">attention-settled</section><details data-test="simulated-airline-update" data-configured="true"${openAttr}><span data-test="simulated-airline-update-status">${statusText}</span><button data-test="simulated-airline-update-apply" data-action="trigger-disruption">Apply</button></details></main>`;
 }
 
 interface Env {
@@ -267,6 +292,8 @@ function createEnv(domOpts: {
   pendingCount?: number;
   revision?: string;
   readyCount?: string;
+  graphHealth?: string;
+  rosterNote?: string;
 } = {}): Env {
   const doc = new StubElement('document');
   for (const n of parse(responseHTML(domOpts))) doc.appendChild(n);
@@ -343,6 +370,33 @@ test('RECONCILING holds settled ready count (no 0 rebuild)', async () => {
   const indicator = env.doc.querySelector('[data-test="overview-reconciling"]');
   assert.ok(indicator);
   assert.equal(indicator.hasAttribute('hidden'), false);
+});
+
+test('RECONCILING paints CURRENT graph/roster while holding ready count and attention', async () => {
+  const env = createEnv({
+    revision: '10',
+    readyCount: '50',
+    lifecycle: 'SETTLED',
+    graphHealth: 'green',
+    rosterNote: 'all clear',
+  });
+  env.setOverviewHTML(responseHTML({
+    lifecycle: 'RECONCILING',
+    pendingCount: 5,
+    revision: '11',
+    readyCount: '0',
+    graphHealth: 'amber',
+    rosterNote: 'five checking',
+  }));
+  await env.window.__northstarRefreshOverview!();
+  await flush();
+  assert.equal(env.doc.querySelector('[data-test="ready-count"]')?.textContent, '50');
+  assert.equal(env.doc.querySelector('[data-test="overview-attention"]')?.textContent, 'attention-settled');
+  const graph = env.doc.querySelector('[data-test="overview-graph"]');
+  assert.ok(graph);
+  assert.equal(graph.getAttribute('data-graph-health'), 'amber');
+  assert.equal(env.doc.querySelector('[data-test="overview-roster"]')?.textContent, 'five checking');
+  assert.equal(env.doc.querySelector('[data-test="overview-reconciling"]')?.hasAttribute('hidden'), false);
 });
 
 test('SETTLED result replaces held content once', async () => {

@@ -468,7 +468,15 @@ function northstarShellRuntime(config: { intervalMs: number }): void {
     document.dispatchEvent(new CustomEvent('northstar:patched', { detail: { regions: names } }));
   }
 
-  function applyFresh(doc: any): void {
+  // During RECONCILING, still show CURRENT world-state (changed services,
+  // directly affected travellers / checking membership). Hold derived
+  // readiness counts and attention verdicts at the last SETTLED paint.
+  var RECONCILE_WORLD_REGIONS: any = {
+    'overview-graph': true,
+    'overview-roster': true,
+  };
+
+  function applyFresh(doc: any, allowRegions?: any): void {
     var liveMain = document.querySelector('main');
     var freshMain = doc.querySelector('main');
     if (!liveMain || !freshMain) return;
@@ -477,10 +485,18 @@ function northstarShellRuntime(config: { intervalMs: number }): void {
     var freshRegions = collect(doc);
     var patched: string[] = [];
     var graphChanged = false;
+    function allowed(name: string): boolean {
+      return !allowRegions || !!allowRegions[name];
+    }
 
     if (Object.keys(liveRegions).length === 0) {
       // Backwards-compatible path: no regions declared. Patch main's CHILDREN
       // only (never the <main> element itself), and only if content changed.
+      // Selective reconcile has no meaning without named regions — hold paint.
+      if (allowRegions) {
+        syncMainAttributes(liveMain, freshMain);
+        return;
+      }
       var fallbackHash = hashString(freshMain.innerHTML);
       if (mainHash !== null && mainHash === fallbackHash) return;
       var ui = captureUi(liveMain);
@@ -498,7 +514,7 @@ function northstarShellRuntime(config: { intervalMs: number }): void {
       var i: number;
       for (i = 0; i < plan.patch.length; i += 1) {
         var pn: string = plan.patch[i];
-        if (!liveRegions[pn]) continue;
+        if (!liveRegions[pn] || !allowed(pn)) continue;
         replaceRegion(liveRegions[pn], freshRegions[pn]);
         appliedMeta[pn] = freshMeta[pn];
         if (freshMeta[pn].graph) graphChanged = true;
@@ -506,6 +522,7 @@ function northstarShellRuntime(config: { intervalMs: number }): void {
       }
       for (i = 0; i < plan.add.length; i += 1) {
         var an: string = plan.add[i];
+        if (!allowed(an)) continue;
         var existing = collect(document)[an];
         if (existing) replaceRegion(existing, freshRegions[an]);
         else insertRegion(an, doc, freshRegions[an], collect(document));
@@ -515,13 +532,18 @@ function northstarShellRuntime(config: { intervalMs: number }): void {
       }
       for (i = 0; i < plan.remove.length; i += 1) {
         var rn: string = plan.remove[i];
+        if (!allowed(rn)) continue;
         if (liveRegions[rn]) liveRegions[rn].remove();
         delete appliedMeta[rn];
         patched.push(rn);
       }
       // Held graph regions keep their DOM; still record the applied hash so a
-      // later scene change is compared against the freshest marker.
-      for (i = 0; i < plan.heldGraph.length; i += 1) { var hn: string = plan.heldGraph[i]; appliedMeta[hn] = freshMeta[hn]; }
+      // later scene change is compared against the freshest marker — but only
+      // for regions we are allowed to advance during this paint.
+      for (i = 0; i < plan.heldGraph.length; i += 1) {
+        var hn: string = plan.heldGraph[i];
+        if (allowed(hn)) appliedMeta[hn] = freshMeta[hn];
+      }
       syncMainAttributes(liveMain, freshMain);
     }
     if (patched.length > 0 && Math.abs(window.scrollY - scrollY) > 1) window.scrollTo(window.scrollX, scrollY);
@@ -581,6 +603,9 @@ function northstarShellRuntime(config: { intervalMs: number }): void {
         if (attr(freshMain, 'data-assessment-lifecycle') === 'RECONCILING') {
           setReconciling(true);
           if (cur.classList.contains('is-stale')) cur.classList.remove('is-stale');
+          // Presentation-only: paint CURRENT service/traveller facts while
+          // holding derived readiness/attention at last SETTLED.
+          applyFresh(doc, RECONCILE_WORLD_REGIONS);
           return;
         }
         setReconciling(false);
