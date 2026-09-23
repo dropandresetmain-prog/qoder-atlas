@@ -15,6 +15,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { loadConfig, mergeEnvWithDotenvFiles, type AppConfig } from '../config/config.ts';
+import { isDemoPlaybackActive } from '../config/demoPlayback.ts';
 import { composeTargetEndpoints, type TargetEndpoints } from './target/composeTargetEndpoints.ts';
 import { provisionConfiguredDataset } from './demo/provisionDataset.ts';
 import { provisionDatasetSandboxInputsIfEnabled } from './demo/sandboxExecutionInputs.ts';
@@ -184,7 +185,12 @@ export async function composeTargetBoot(
     );
   }
   const datasetDirectory = datasetDirectoryFromEnv(resolved);
-  if (!demoSession && datasetDirectory && provisioning.status !== 'NOT_CONFIGURED') {
+  const adapterConfig = loadConfig(resolved, options.cwd ?? process.cwd());
+  const provisionSandboxInputs =
+    datasetDirectory
+    && provisioning.status !== 'NOT_CONFIGURED'
+    && (!demoSession || isDemoPlaybackActive(adapterConfig, resolved));
+  if (provisionSandboxInputs) {
     const sandboxInputs = await provisionDatasetSandboxInputsIfEnabled({
       pool: endpoints.app.pool,
       uow: () => endpoints.app.unitOfWork(),
@@ -307,7 +313,6 @@ export async function composeTargetBoot(
   // constant anywhere in boot. The SAME instance is exposed to the product
   // HTTP planning trigger through `runtimeHooks` so the product path and C4
   // cannot diverge on planning truth.
-  const adapterConfig = loadConfig(resolved);
   const families = composeTransportFamilies(
     adapterConfig,
     options.cwd ?? process.cwd(),

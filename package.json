@@ -12,6 +12,7 @@
     "start": "node dist/main.js",
     "dev": "node src/main.ts",
     "demo:record": "node scripts/demo-record.mjs",
+    "demo:playback": "node scripts/demo-playback.mjs",
     "test": "npm run gate:test-boundary && node scripts/run-suite.mjs current",
     "test:current": "node scripts/run-suite.mjs current",
     "test:migration": "node scripts/run-suite.mjs migration",

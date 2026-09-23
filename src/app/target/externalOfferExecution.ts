@@ -54,6 +54,11 @@ import {
 import { AtlasFlightAdapter } from '../../providers/atlas/adapter.ts';
 import { createAppRecordingStore } from '../../providers/recordingStoreFactory.ts';
 import { hasLiveCredentials, type AppConfig } from '../../config/config.ts';
+import {
+  DEMO_PLAYBACK_PLACEHOLDER_CREDENTIAL,
+  DEMO_PLAYBACK_SANDBOX_BASE_URL,
+  isDemoPlaybackActive,
+} from '../../config/demoPlayback.ts';
 import type { CapabilityStatement } from '../../resolution/planning/compiler.ts';
 import { validateExistingOrder, type ExpectedOrderTerms } from './existingOrderValidation.ts';
 import type { FlightOrderStatus } from '../../contracts/capabilities.ts';
@@ -698,8 +703,47 @@ export { ATLAS_SANDBOX_BALANCE_PAYMENT_REF };
  * RECORD persists sanitized provider results under the recordings dir so REPLAY
  * keeps a fallback corpus.
  */
+function composeOfferExecutionDemoPlayback(config: AppConfig, cwd: string): ExternalOfferExecutionDeps {
+  const store = createAppRecordingStore({
+    recordingsDir: config.recordingsDir,
+    fixturesDir: config.fixturesDir,
+    cwd,
+    adapterMode: 'REPLAY',
+  });
+  const baseUrl = config.providers.atlas.baseUrl ?? DEMO_PLAYBACK_SANDBOX_BASE_URL;
+  const common = {
+    mode: 'REPLAY' as const,
+    store,
+    baseUrl,
+    clientId: config.providers.atlas.clientId ?? DEMO_PLAYBACK_PLACEHOLDER_CREDENTIAL,
+    clientSecret: config.providers.atlas.clientSecret ?? DEMO_PLAYBACK_PLACEHOLDER_CREDENTIAL,
+  };
+  const aliasResolution = resolveAtlasSandboxPassengerAlias({
+    configured: config.providers.atlas.sandboxPassengerAlias,
+    baseUrl,
+    mode: 'REPLAY',
+  });
+  const alias =
+    aliasResolution.status === 'APPLIED' ? aliasResolution.alias : undefined;
+  const speed = config.demoPlaybackSpeed > 0 ? config.demoPlaybackSpeed : 1;
+  const ticketingDelayMs = Math.max(500, Math.round(1000 / speed));
+  return {
+    flight: new AtlasFlightAdapter(common),
+    transactions: new AtlasFlightTransactionAdapter({
+      ...common,
+      ...(alias ? { sandboxPassengerAlias: alias } : {}),
+    }),
+    mode: 'REPLAY',
+    paymentRef: ATLAS_SANDBOX_BALANCE_PAYMENT_REF,
+    ...(alias ? { sandboxPassengerAlias: alias } : {}),
+    ticketingPoll: { attempts: 7, delayMs: ticketingDelayMs },
+  };
+}
+
 export function composeOfferExecution(config: AppConfig, cwd: string): ExternalOfferExecutionDeps | undefined {
-  if (config.adapterMode === 'REPLAY') return undefined;
+  if (config.adapterMode === 'REPLAY') {
+    return isDemoPlaybackActive(config) ? composeOfferExecutionDemoPlayback(config, cwd) : undefined;
+  }
   const atlas = config.providers.atlas;
   if (!hasLiveCredentials(config, 'atlas') || !atlas.baseUrl) return undefined;
   let host: string;

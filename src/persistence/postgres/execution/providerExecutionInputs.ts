@@ -19,6 +19,8 @@ import type { Pool, PoolClient } from '../pool.ts';
 import type { RecoveryStrategy } from '../../../contracts/v2/scenario/recoveryStrategy.ts';
 import type { WTransportService } from '../../../resolution/world/world.ts';
 import type { ResolvedOffer } from '../../../resolution/scenarios/overlay.ts';
+import { loadConfig } from '../../../config/config.ts';
+import { researchModeAllowsProtectedExecution } from '../../../config/demoPlayback.ts';
 
 type Queryable = Pick<Pool | PoolClient, 'query'>;
 
@@ -213,7 +215,8 @@ export async function resolveOfferExecutionInputsForStrategy(
   if (!bound) {
     return { ready: false, reason: 'OFFER_BINDING_MISSING', detail: 'no protected provider offer binding was recorded for this option' };
   }
-  if (!LIVE_RESEARCH_MODES.includes(bound.research_mode)) {
+  const config = loadConfig();
+  if (!researchModeAllowsProtectedExecution(bound.research_mode, config)) {
     return {
       ready: false, reason: 'FRESH_PROVIDER_QUOTE_REQUIRED',
       detail: `the option was priced from ${bound.research_mode} research, not from the provider; a fresh live provider quote is required before anything is booked`,

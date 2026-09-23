@@ -6,6 +6,12 @@
  */
 import { ATLAS_SANDBOX_HOST } from '../providers/atlas/transactionAdapter.ts';
 import { hasLiveCredentials, type AppConfig } from './config.ts';
+import {
+  DEFAULT_JORDAN_VIDEO_PLAYBACK_CORPUS,
+  DEMO_PLAYBACK_PLACEHOLDER_CREDENTIAL,
+  DEMO_PLAYBACK_SANDBOX_BASE_URL,
+  NORTHSTAR_DEMO_PLAYBACK_ENV,
+} from './demoPlayback.ts';
 
 export const NORTHSTAR_DEMO_PROFILE_ENV = 'NORTHSTAR_DEMO_PROFILE';
 
@@ -16,15 +22,34 @@ export const RECORD_DEMO_PROFILE_OVERLAY: Readonly<Record<string, string>> = {
   NORTHSTAR_SYNTHETIC_SANDBOX_INPUTS: '1',
 };
 
-const RECORD_PROFILE_FORCED_KEYS = Object.keys(RECORD_DEMO_PROFILE_OVERLAY) as (keyof typeof RECORD_DEMO_PROFILE_OVERLAY)[];
+/** Env keys for founder Jordan video playback (REPLAY execution of CP6 staging corpus). */
+export const PLAYBACK_DEMO_PROFILE_OVERLAY: Readonly<Record<string, string>> = {
+  [NORTHSTAR_DEMO_PLAYBACK_ENV]: '1',
+  ADAPTER_MODE: 'REPLAY',
+  ATLAS_ENV: 'sandbox',
+  RECORDINGS_DIR: DEFAULT_JORDAN_VIDEO_PLAYBACK_CORPUS,
+  ATLAS_BASE_URL: DEMO_PLAYBACK_SANDBOX_BASE_URL,
+  ATLAS_CLIENT_ID: DEMO_PLAYBACK_PLACEHOLDER_CREDENTIAL,
+  ATLAS_CLIENT_SECRET: DEMO_PLAYBACK_PLACEHOLDER_CREDENTIAL,
+  NUITEE_API_KEY: DEMO_PLAYBACK_PLACEHOLDER_CREDENTIAL,
+  MODEL_STUDIO_API_KEY: '',
+  OPENROUTER_API_KEY: '',
+  NORTHSTAR_SYNTHETIC_SANDBOX_INPUTS: '1',
+  ATLAS_SANDBOX_PASSENGER_ALIAS_GIVEN_NAME: 'CpSix',
+  ATLAS_SANDBOX_PASSENGER_ALIAS_FAMILY_NAME: 'Aliasbffb',
+};
 
-export type NorthstarDemoProfile = 'record';
+const RECORD_PROFILE_FORCED_KEYS = Object.keys(RECORD_DEMO_PROFILE_OVERLAY) as (keyof typeof RECORD_DEMO_PROFILE_OVERLAY)[];
+const PLAYBACK_PROFILE_FORCED_KEYS = Object.keys(PLAYBACK_DEMO_PROFILE_OVERLAY) as (keyof typeof PLAYBACK_DEMO_PROFILE_OVERLAY)[];
+
+export type NorthstarDemoProfile = 'record' | 'playback';
 
 export function resolveNorthstarDemoProfile(
   env: Record<string, string | undefined>,
 ): NorthstarDemoProfile | undefined {
   const raw = env[NORTHSTAR_DEMO_PROFILE_ENV]?.trim().toLowerCase();
   if (raw === 'record') return 'record';
+  if (raw === 'playback') return 'playback';
   return undefined;
 }
 
@@ -36,12 +61,15 @@ export function resolveNorthstarDemoProfile(
 export function applyDemoProfileToEnv(
   env: Record<string, string | undefined>,
 ): Record<string, string | undefined> {
-  if (resolveNorthstarDemoProfile(env) !== 'record') {
+  const profile = resolveNorthstarDemoProfile(env);
+  if (profile !== 'record' && profile !== 'playback') {
     return { ...env };
   }
   const out: Record<string, string | undefined> = { ...env };
-  for (const key of RECORD_PROFILE_FORCED_KEYS) {
-    out[key] = RECORD_DEMO_PROFILE_OVERLAY[key];
+  const overlay = profile === 'record' ? RECORD_DEMO_PROFILE_OVERLAY : PLAYBACK_DEMO_PROFILE_OVERLAY;
+  const keys = profile === 'record' ? RECORD_PROFILE_FORCED_KEYS : PLAYBACK_PROFILE_FORCED_KEYS;
+  for (const key of keys) {
+    out[key] = overlay[key];
   }
   return out;
 }

@@ -60,6 +60,7 @@
       "test/changeRequestInterpretation.test.ts",
       "test/config-env-local.test.ts",
       "test/demo-profiles.test.ts",
+      "test/demo-playback.test.ts",
       "test/connection-feasibility.test.ts",
       "test/contracts.test.ts",
       "test/domain.test.ts",

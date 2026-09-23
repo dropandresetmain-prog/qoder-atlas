@@ -33,6 +33,10 @@ import {
   loadNextSelectedPlanIntents,
 } from '../../persistence/postgres/execution/selectedPlanContinuation.ts';
 import { hasLiveCredentials, type AppConfig } from '../../config/config.ts';
+import {
+  DEMO_PLAYBACK_PLACEHOLDER_CREDENTIAL,
+  isDemoPlaybackActive,
+} from '../../config/demoPlayback.ts';
 import { NuiteeAdapter } from '../../providers/hotel/nuiteeAdapter.ts';
 import { createAppRecordingStore } from '../../providers/recordingStoreFactory.ts';
 import type { CapabilityStatement } from '../../resolution/planning/compiler.ts';
@@ -931,9 +935,29 @@ export async function runExternalStayExecutionCycle(
   }
 }
 
+function composeStayExecutionDemoPlayback(config: AppConfig, cwd: string): ExternalStayExecutionDeps {
+  const store = createAppRecordingStore({
+    recordingsDir: config.recordingsDir,
+    fixturesDir: config.fixturesDir,
+    cwd,
+    adapterMode: 'REPLAY',
+  });
+  const nuitee = config.providers.nuitee;
+  const hotel = new NuiteeAdapter({
+    mode: 'REPLAY',
+    store,
+    ...(nuitee.searchBaseUrl ? { searchBaseUrl: nuitee.searchBaseUrl } : {}),
+    ...(nuitee.bookingBaseUrl ? { bookingBaseUrl: nuitee.bookingBaseUrl } : {}),
+    apiKey: nuitee.apiKey ?? DEMO_PLAYBACK_PLACEHOLDER_CREDENTIAL,
+  });
+  return { hotel, mode: 'REPLAY' };
+}
+
 /** Compose Nuitée stay mutation only when LIVE/RECORD credentials are honest. */
 export function composeStayExecution(config: AppConfig, cwd: string): ExternalStayExecutionDeps | undefined {
-  if (config.adapterMode === 'REPLAY') return undefined;
+  if (config.adapterMode === 'REPLAY') {
+    return isDemoPlaybackActive(config) ? composeStayExecutionDemoPlayback(config, cwd) : undefined;
+  }
   if (!hasLiveCredentials(config, 'nuitee')) return undefined;
   const nuitee = config.providers.nuitee;
   if (!nuitee.apiKey) return undefined;

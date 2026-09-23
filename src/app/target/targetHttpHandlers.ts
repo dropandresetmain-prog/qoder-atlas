@@ -517,6 +517,8 @@ export async function handleTargetProductHttp(
         { caseId, strategyId, approverPrincipalId: principal.principalId },
       );
       if (outcome.ok) {
+        const { sleepDemoPlaybackMs, DEMO_PLAYBACK_AUTHORITY_PREP_MS } = await import('../../providers/demoPlaybackLatency.ts');
+        await sleepDemoPlaybackMs(DEMO_PLAYBACK_AUTHORITY_PREP_MS);
         // Execute now rather than on the next idle poll; the pass is idempotent.
         await ctx.app.runtimeHooks?.afterApproval?.();
       }
@@ -712,6 +714,8 @@ export async function handleTargetProductHttp(
         sendJson(res, 409, { error: result.code, message: result.message });
         return true;
       }
+      const { sleepDemoPlaybackControlStage } = await import('../../providers/demoPlaybackLatency.ts');
+      await sleepDemoPlaybackControlStage(controlId);
       sendJson(res, 200, {
         ok: true,
         controlId: result.controlId,

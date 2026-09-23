@@ -81,6 +81,10 @@ export const AppConfigSchema = z.object({
   environment: z.enum(['local', 'dev', 'demo']).default('local'),
   logLevel: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   adapterMode: AdapterModeSchema.default('REPLAY'),
+  /** Founder video playback — REPLAY execution of recorded sandbox outcomes (demo/local only). */
+  demoPlayback: z.boolean().default(false),
+  /** Scales demo playback pacing (`NORTHSTAR_DEMO_PLAYBACK_SPEED`). */
+  demoPlaybackSpeed: z.coerce.number().positive().default(1),
   httpPort: z.coerce.number().int().positive().max(65535).default(8787),
   sqlitePath: z.string().default('data/app.sqlite'),
   recordingsDir: z.string().default('recordings'),
@@ -208,6 +212,8 @@ function mapEnv(env: Record<string, string | undefined>): Record<string, unknown
     environment: optional(env.APP_ENVIRONMENT),
     logLevel: optional(env.LOG_LEVEL),
     adapterMode: optional(env.ADAPTER_MODE),
+    demoPlayback: optional(env.NORTHSTAR_DEMO_PLAYBACK) === '1',
+    demoPlaybackSpeed: optional(env.NORTHSTAR_DEMO_PLAYBACK_SPEED),
     // Host PORT (Railway, etc.) wins over HTTP_PORT so the proxy health check matches.
     // Empty/whitespace HTTP_PORT must not displace PORT or force the local 8787 default.
     httpPort: optional(env.PORT) ?? optional(env.HTTP_PORT),

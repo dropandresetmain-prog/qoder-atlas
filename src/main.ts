@@ -18,6 +18,11 @@
  */
 import { createServer, type Server } from 'node:http';
 import { loadConfig } from './config/config.ts';
+import {
+  evaluateDemoPlaybackPreflight,
+  formatDemoPlaybackPreflightReport,
+  isDemoPlaybackRequested,
+} from './config/demoPlayback.ts';
 import { composeTargetBoot } from './app/composeTargetBoot.ts';
 import { createTargetAppServer } from './server/targetHttp.ts';
 
@@ -71,6 +76,15 @@ async function main(): Promise<void> {
   // `loadConfig` reads env only (zod parsing) — it never opens the SQLite
   // path it happens to also resolve; that field is simply unused here.
   const config = loadConfig(process.env);
+  if (isDemoPlaybackRequested(process.env)) {
+    const playbackPreflight = evaluateDemoPlaybackPreflight(config, process.env);
+    if (!playbackPreflight.ok) {
+      throw new Error(formatDemoPlaybackPreflightReport(playbackPreflight));
+    }
+    console.log(
+      `[atlas] demo video playback armed corpus=${config.recordingsDir} speed=${process.env.NORTHSTAR_DEMO_PLAYBACK_SPEED ?? '1'}`,
+    );
+  }
   const listenPort = resolveListenPort(config.httpPort);
 
   if (process.env.RAILWAY_ENVIRONMENT && !process.env.PORT?.trim()) {

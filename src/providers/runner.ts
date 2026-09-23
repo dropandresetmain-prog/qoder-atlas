@@ -19,6 +19,7 @@ import {
 import type { RecordingStore } from './recordingStore.ts';
 import { recordingIdFor } from './recordingStore.ts';
 import { sanitizeRaw } from './sanitize.ts';
+import { sleepDemoPlaybackProviderOperation } from './demoPlaybackLatency.ts';
 
 /** Structured provider failure thrown by adapters instead of raw errors. */
 export class CapabilityFailure extends Error {
@@ -88,6 +89,7 @@ export async function runAdapter<Request, Raw, Normalized>(
     }
     meta.recordingId = recordingId;
     raw = recording.raw as Raw;
+    await sleepDemoPlaybackProviderOperation(adapter.providerId, options.operation);
   } else {
     try {
       raw = await adapter.obtainRaw(request);

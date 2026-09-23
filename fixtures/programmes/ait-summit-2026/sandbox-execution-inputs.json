@@ -25,5 +25,15 @@
       }
     }
   ],
-  "budgets": []
+  "budgets": [
+    {
+      "organisationSourceRef": "SOURCE_ORGANISATION:org-ait-organiser",
+      "budget": {
+        "id": "6f1c0a2e-7b44-4c1a-9d3e-2a8b5c6d7e99",
+        "purpose": "sandbox recovery execution budget",
+        "amount": { "amount": "100000.00", "currency": "USD" }
+      },
+      "idempotencyKey": "ait-summit-sandbox-recovery-budget"
+    }
+  ]
 }
