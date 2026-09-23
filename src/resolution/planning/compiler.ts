@@ -24,6 +24,14 @@ import { typedConflict, type TypedResult, ok, conflict } from '../../domain/v2/s
 import type { TypedRef } from '../../domain/v2/shared/identity.ts';
 import { assessManifestCurrentness, type CurrentState } from '../world/currentness.ts';
 import type { Instant } from '../../domain/v2/shared/time.ts';
+import type { ExactMoney } from '../../domain/v2/shared/money.ts';
+
+/** action_intents_cost_shape requires cost_amount > 0 when set; zero penalty is "no spend". */
+function costEstimateIfPositive(money: ExactMoney): { costEstimate: ExactMoney } | Record<string, never> {
+  const amount = Number(money.amount);
+  if (!Number.isFinite(amount) || amount <= 0) return {};
+  return { costEstimate: money };
+}
 
 /** Declared capability truth supplied by the caller — never invented here. */
 export interface CapabilityStatement {
@@ -228,8 +236,8 @@ function intentForEffect(
         expectedObservations: ['EXTERNAL_PROVIDER:stay_cancellation_confirmation'],
         // This cost estimate is the evidenced cancellation-policy ceiling for
         // authority review. It does not state a charge, refund, payment, or
-        // supplier-observed financial outcome.
-        costEstimate: effect.cancellationPenalty,
+        // supplier-observed financial outcome. Zero penalty omits cost (DB shape).
+        ...costEstimateIfPositive(effect.cancellationPenalty),
       });
     }
     case 'PROPOSE_ALLOCATION': {
