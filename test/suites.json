@@ -107,6 +107,7 @@
       "test/northstar-v2-m8-checkpoint0-money.test.ts",
       "test/overviewPollingSwap.test.ts",
       "test/overviewPopulationLifecycle.test.ts",
+      "test/sarah-programme-alternative-ui.test.ts",
       "test/presentation-lane.test.ts",
       "test/postgres-fast-suite-contract.test.ts",
       "test/providerDisruptionValidation.test.ts",

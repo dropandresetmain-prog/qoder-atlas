@@ -418,6 +418,23 @@ export const OPERATOR_WORKSPACE_STYLES = `<style data-operator-workspace-styles>
   display: flex; align-items: center; gap: 10px; margin: 0 0 12px;
   font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-soft);
 }
+
+/* Programme alternative: distinct from ordinary travel option cards. */
+.case-workspace .v5-programme-alternative {
+  margin-top: 18px; border: 1px dashed var(--line-soft); border-radius: 12px; padding: 0;
+  background: var(--surface-2, var(--paper-warm));
+}
+.case-workspace .v5-programme-alternative > summary {
+  cursor: pointer; list-style: none; padding: 14px 18px; font-weight: 600; font-size: 14px;
+}
+.case-workspace .v5-programme-alternative > summary::-webkit-details-marker { display: none; }
+.case-workspace .v5-programme-alternative[open] > summary { border-bottom: 1px solid var(--line-soft); }
+.case-workspace .cw-programme-alt { border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+.case-workspace .v5-programme-changes { display: grid; gap: 14px; }
+.case-workspace .v5-programme-change-row { padding: 10px 0; border-top: 1px solid var(--line-soft); }
+.case-workspace .v5-programme-change-row:first-child { border-top: 0; padding-top: 0; }
+.case-workspace .v5-programme-approve { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
+
 .case-workspace .v5-rec-step > h4::before {
   content: ""; display: grid; place-items: center;
   width: 20px; height: 20px; border-radius: 50%; flex: none;

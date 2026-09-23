@@ -18,7 +18,7 @@ import { presentAssessment } from '../semantics/adapter.ts';
 import {
   authorityLabel, candidateFor, changeSummary, decisionActionState, decisionCosts,
   decisionMoney, decisionOptions, decisionText, decisionTime, decisionTitle,
-  groupedResearch, rejectionSummary,
+  groupedResearch, partitionRecoveryOptions, rejectionSummary,
 } from '../caseDecisionPresentation.ts';
 
 const e = escapeHtml;
@@ -300,22 +300,16 @@ function recommendationGlanceHtml(strategy: RecoveryStrategyView, candidate: Pla
 }
 
 /** Dominant recommendation card — same strategy/candidate as the decision panel. */
-function recommendationHtml(view: RecoveryCaseView): string {
-  const options = decisionOptions(view);
-  if (options.issue && !options.recommended) {
-    return `<section class="section" id="cw-recommendation" data-test="recovery-controls"><div class="callout tone-watch" data-test="recommendation-unavailable"><p>${e(options.issue)}</p></div></section>`;
-  }
-  const strategy = options.recommended;
-  if (!strategy) return '';
+function travelOptionCardHtml(strategy: RecoveryStrategyView, view: RecoveryCaseView, recommended: boolean): string {
   const candidate = candidateFor(view, strategy);
   const outcomes = strategy.resolves.map((person) => `${decisionText(person.personLabel, 'Traveller')} — ${person.projectedVerdict === 'PASS' ? 'trip outcome passes under this proposal' : person.projectedVerdict === 'FAIL' ? 'trip outcome fails under this proposal' : 'trip outcome remains unconfirmed'}.`);
   const basis = (view.planningEvidence?.recommendation?.basis ?? [])
     .map((b) => decisionText(b.summary, '')).filter((text) => text.length > 0 && text.length <= 240).slice(0, 3);
   const reasons = [...outcomes, ...basis].slice(0, 3);
   const unresolved = view.uncertainty.map((text) => decisionText(text, '')).filter((text) => text.length > 0).slice(0, 3);
-  return `<article class="cw-card cw-rec option-card is-recommended" id="cw-recommendation" data-test="recovery-strategy" data-strategy-ref="${e(strategy.strategyRef)}" data-option-number="${strategy.optionNumber}">
+  return `<article class="cw-card cw-rec option-card${recommended ? ' is-recommended' : ''}" data-test="recovery-strategy" data-strategy-kind="travel" data-strategy-ref="${e(strategy.strategyRef)}" data-option-number="${strategy.optionNumber}">
     <div class="v5-rec-head">
-      <p class="cw-kicker">Proposed — not yet applied</p>
+      <p class="cw-kicker">${recommended ? 'Proposed — not yet applied' : `Travel option ${strategy.optionNumber}`}</p>
       <h3>${e(decisionTitle(strategy))}</h3>
       <p class="v5-rec-verdict">${e(recommendationVerdict(strategy))}</p>
     </div>
@@ -335,6 +329,130 @@ function recommendationHtml(view: RecoveryCaseView): string {
   </article>`;
 }
 
+function programmeSpendLabel(candidate: PlanningCandidateView | undefined): string {
+  const cost = decisionCosts(candidate?.costComparison);
+  if (cost.unavailable) return '$0 potential new spend';
+  return cost.newSpend?.join(' + ') ?? 'SGD 0';
+}
+
+function programmeChangeRowsHtml(strategy: RecoveryStrategyView): string {
+  const moves = strategy.changes.filter((change) => change.effectKind === 'CHANGE_PROGRAMME_ITEM_TIME' && change.proposedWindow);
+  if (!moves.length) return '<p class="cw-muted">No programme time changes were recorded on this strategy.</p>';
+  return `<div class="v5-programme-changes" data-test="programme-what-changes">${moves.map((change) => {
+    const title = decisionText(change.subjectLabel, 'Programme item');
+    const zone = change.timeZone;
+    const before = change.currentWindow
+      ? `${decisionTime(change.currentWindow.start, zone)} → ${decisionTime(change.currentWindow.end, zone)}`
+      : 'Current window not supplied';
+    const after = `${decisionTime(change.proposedWindow!.start, zone)} → ${decisionTime(change.proposedWindow!.end, zone)}`;
+    return `<div class="v5-programme-change-row" data-test="programme-change-row">
+      <strong>${e(title)}</strong>
+      <p class="cw-muted">${e(before)}</p>
+      <p data-test="programme-change-after"><span class="cw-kicker">After</span> ${e(after)}</p>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function programmeAlternativePanelHtml(view: RecoveryCaseView, strategy: RecoveryStrategyView, travelComparators: readonly RecoveryStrategyView[]): string {
+  const candidate = candidateFor(view, strategy);
+  const blast = candidate?.blastRadius;
+  const directPeople = (blast?.directlyAffected ?? []).map((item) => decisionText(item.label, 'Participant')).filter(Boolean);
+  const directItems = (blast?.changed ?? []).map((item) => decisionText(item.label, 'Changed item')).filter(Boolean);
+  const reassessed = (blast?.reassessed ?? []).map((item) => decisionText(item.label, 'Rechecked')).filter(Boolean);
+  const peopleCount = directPeople.length;
+  const itemCount = Math.max(directItems.length, strategy.changes.filter((c) => c.effectKind === 'CHANGE_PROGRAMME_ITEM_TIME').length);
+  const spend = decisionCosts(candidate?.costComparison);
+  const programmeSpend = spend.unavailable ? 'Not compared' : (spend.newSpend?.join(' + ') ?? 'SGD 0');
+  const travelCompare = travelComparators
+    .map((travel) => {
+      const cost = decisionCosts(candidateFor(view, travel)?.costComparison);
+      if (cost.unavailable || !cost.newSpend?.length) return null;
+      return cost.newSpend.join(' + ');
+    })
+    .find((value): value is string => Boolean(value));
+  const basis = (view.planningEvidence?.recommendation?.basis ?? [])
+    .map((b) => decisionText(b.summary, ''))
+    .filter((text) => text.length > 0 && text.length <= 240)
+    .slice(0, 4);
+  const why = [
+    ...strategy.resolves
+      .filter((person) => person.currentVerdict !== 'PASS' && person.projectedVerdict === 'PASS')
+      .map((person) => `Restores ${decisionText(person.personLabel, 'the affected traveller')}'s required commitment`),
+    programmeSpend === 'SGD 0' || programmeSpend === 'Not compared' ? 'No new spend on this programme change' : `New spend ${programmeSpend}`,
+    peopleCount || itemCount
+      ? `Bounded direct blast radius · ${peopleCount || '—'} ${peopleCount === 1 ? 'person' : 'people'} · ${itemCount || '—'} programme ${itemCount === 1 ? 'item' : 'items'}`
+      : 'Direct blast radius recorded on the candidate',
+    strategy.projectedSummary.fail === 0
+      ? 'No new failing trips after reassessment'
+      : `${strategy.projectedSummary.fail} projected failure${strategy.projectedSummary.fail === 1 ? '' : 's'} remain after reassessment`,
+    ...basis,
+  ].slice(0, 5);
+  // Approve only this programme strategy through the existing recover action.
+  let approve = '';
+  if (view.status === 'AWAITING_AUTHORITY' || view.status === 'OPEN') {
+    if (strategy.executionBlocker) {
+      approve = `<p class="cw-muted" data-test="programme-approve-blocked">${e(executionBlockerLine(strategy.executionBlocker))}</p>
+        <button type="button" class="btn btn-primary" data-test="approve-programme-change" disabled>Approve programme change</button>`;
+    } else {
+      approve = `<button type="button" class="btn btn-primary" data-action="recover" data-test="approve-programme-change" data-strategy-ref="${e(strategy.strategyRef)}" data-case-ref="${e(view.caseRef)}" data-busy-label="Approving…">Approve programme change</button>`;
+    }
+  }
+  const ctaSpend = programmeSpendLabel(candidate);
+  return `<details class="v5-programme-alternative" data-test="programme-alternative" data-region-key="programme-alternative">
+    <summary data-test="programme-alternative-cta">Consider programme change · ${e(ctaSpend)}</summary>
+    <article class="cw-card cw-programme-alt" data-test="programme-alternative-panel" data-strategy-ref="${e(strategy.strategyRef)}" data-strategy-kind="programme">
+      <p class="cw-kicker">Programme alternative</p>
+      <h3>Change the programme — not another flight purchase</h3>
+      <section data-test="programme-panel-what-changes"><h4>What changes</h4>${programmeChangeRowsHtml(strategy)}</section>
+      <section data-test="programme-panel-who"><h4>Who is directly affected</h4>
+        <p><strong>${peopleCount || '—'} ${peopleCount === 1 ? 'person' : 'people'}</strong> · <strong>${itemCount || '—'} programme ${itemCount === 1 ? 'item' : 'items'}</strong></p>
+        ${directPeople.length ? list(directPeople) : '<p class="cw-muted">Direct participants were not named on this candidate.</p>'}
+      </section>
+      <section data-test="programme-panel-economics"><h4>Economics</h4>
+        <div class="cw-metrics" data-test="programme-cost-compare">
+          <div class="cw-metric" data-test="programme-new-spend"><small>PROGRAMME CHANGE</small><strong>${e(programmeSpend)}</strong><span class="cw-metric-note">New spend</span></div>
+          ${travelCompare
+            ? `<div class="cw-metric" data-test="travel-compare-spend"><small>TRAVEL ALTERNATIVE</small><strong>${e(travelCompare)}</strong><span class="cw-metric-note">Provider-derived comparable</span></div>`
+            : '<p class="cw-muted">No priced travel alternative is available to compare.</p>'}
+        </div>
+      </section>
+      <section data-test="programme-panel-why"><h4>Why Northstar surfaced this</h4>${list(why)}</section>
+      <section data-test="programme-panel-blast">${details('programme-blast-radius', 'View blast radius', `
+        <div data-test="programme-blast-direct"><h5>Direct change</h5>
+          ${directItems.length || directPeople.length
+            ? list([...directItems.map((label) => `Programme item · ${label}`), ...directPeople.map((label) => `Participant · ${label}`)])
+            : '<p class="cw-muted">No direct change set was recorded.</p>'}
+        </div>
+        <div data-test="programme-blast-reassess"><h5>Reassessment</h5>
+          ${reassessed.length
+            ? `<p class="cw-muted">Broader journeys/trips Northstar rechecked to ensure nothing else broke.</p>${list(reassessed)}`
+            : '<p class="cw-muted">No broader reassessment set was recorded.</p>'}
+        </div>`)}
+      </section>
+      <section class="v5-programme-approve" data-test="programme-panel-approve">${approve}
+        <p data-test="recovery-controls-status" data-action-status role="status"></p>
+      </section>
+    </article>
+  </details>`;
+}
+
+function recommendationHtml(view: RecoveryCaseView): string {
+  const partitioned = partitionRecoveryOptions(view);
+  if (partitioned.issue && !partitioned.travel.length && !partitioned.programmeAlternative) {
+    return `<section class="section" id="cw-recommendation" data-test="recovery-controls"><div class="callout tone-watch" data-test="recommendation-unavailable"><p>${e(partitioned.issue)}</p></div></section>`;
+  }
+  const travelCards = partitioned.travel.slice(0, 3).map((strategy) =>
+    travelOptionCardHtml(strategy, view, strategy === partitioned.recommendedTravel));
+  const programme = partitioned.programmeAlternative
+    ? programmeAlternativePanelHtml(view, partitioned.programmeAlternative, partitioned.travel)
+    : '';
+  if (!travelCards.length && !programme) return '';
+  return `<section class="section" id="cw-recommendation" data-test="recovery-options-split">
+    ${travelCards.length ? `<div data-test="normal-recovery-options">${travelCards.join('')}</div>` : ''}
+    ${programme}
+  </section>`;
+}
+
 function findRecoveryHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
   const chunks: string[] = [];
   if (m.showFindRecovery) chunks.push(`<div class="cw-card" data-test="find-recovery"><h3>${e(CASE_COPY.findRecovery)}</h3><p>${e(CASE_COPY.findRecoveryHint)}</p>
@@ -346,14 +464,16 @@ function findRecoveryHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string
 }
 
 function alternativesHtml(view: RecoveryCaseView): string {
-  const options = decisionOptions(view);
-  if (!options.alternatives.length) return '';
-  return details('viable-alternatives', `${options.alternatives.length} other viable ${options.alternatives.length === 1 ? 'alternative' : 'alternatives'}`,
-    `<p class="cw-muted">Concise comparison first. Open an option for its full evaluation.</p>` + options.alternatives.map((strategy) => {
+  const partitioned = partitionRecoveryOptions(view);
+  // Programme strategies render in the distinct programme-alternative panel.
+  const travelAlts = partitioned.travel.filter((s) => s !== partitioned.recommendedTravel);
+  if (!travelAlts.length) return '';
+  return details('viable-alternatives', `${travelAlts.length} other viable travel ${travelAlts.length === 1 ? 'alternative' : 'alternatives'}`,
+    `<p class="cw-muted">Concise comparison first. Open an option for its full evaluation.</p>` + travelAlts.map((strategy) => {
       const candidate = candidateFor(view, strategy);
       const cost = decisionCosts(candidate?.costComparison);
       const spend = cost.newSpend?.join(' + ') ?? (cost.unavailable ? 'Cost not compared' : 'Not supplied');
-      return `<article class="cw-card cw-alt option-card" data-test="recovery-strategy" data-strategy-ref="${e(strategy.strategyRef)}" data-option-number="${strategy.optionNumber}">
+      return `<article class="cw-card cw-alt option-card" data-test="recovery-strategy" data-strategy-kind="travel" data-strategy-ref="${e(strategy.strategyRef)}" data-option-number="${strategy.optionNumber}">
         <p class="cw-kicker">Alternative ${strategy.optionNumber}</p><h3>${e(decisionTitle(strategy))}</h3>
         <p class="cw-muted">Estimated new spend: ${e(spend)}</p>
         ${details(`alt-eval-${strategy.strategyRef}`, 'Full evaluation', `${proposalHtml(candidate)}${changesHtml(strategy)}${costBreakdownHtml(candidate, `alt-${strategy.strategyRef}`)}`)}
@@ -495,11 +615,19 @@ function technicalHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
 }
 
 function recommendSheet(view: RecoveryCaseView): string {
-  const strategy = decisionOptions(view).recommended;
-  const title = strategy ? decisionTitle(strategy) : 'Recommendation not ready';
+  const partitioned = partitionRecoveryOptions(view);
+  const strategy = partitioned.programmeAlternative ?? partitioned.recommendedTravel ?? decisionOptions(view).recommended;
+  const title = strategy
+    ? (partitioned.programmeAlternative && strategy === partitioned.programmeAlternative
+      ? 'Consider programme change'
+      : decisionTitle(strategy))
+    : 'Recommendation not ready';
+  const href = partitioned.programmeAlternative && strategy === partitioned.programmeAlternative
+    ? '#cw-recommendation'
+    : '#cw-recommendation';
   return `<section class="v5-recommend-sheet" data-test="recommend-sheet"><p class="cw-kicker">Recommended recovery</p>
     <h2>${e(title)}</h2>
-    <a class="btn btn-primary" href="#cw-recommendation">Review recommendation →</a></section>`;
+    <a class="btn btn-primary" href="${href}">Review recommendation →</a></section>`;
 }
 function caseActivityRail(view: RecoveryCaseView, feed: ActivityFeed | undefined, m: CaseWorkspaceModel): string {
   if (!feed) return compactActivity(m);

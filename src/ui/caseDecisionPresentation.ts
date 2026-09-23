@@ -122,6 +122,42 @@ export function decisionTitle(strategy: RecoveryStrategyView): string {
   return 'Proposed whole-trip recovery';
 }
 
+/** True when persisted effects change programme items — not name/title keyed. */
+export function isProgrammeStrategy(strategy: RecoveryStrategyView): boolean {
+  return strategy.changes.some((change) => change.effectKind === 'CHANGE_PROGRAMME_ITEM_TIME');
+}
+
+/** Split viable options into ordinary travel cards vs programme alternatives. */
+export function partitionRecoveryOptions(view: RecoveryCaseView): {
+  travel: RecoveryStrategyView[];
+  programme: RecoveryStrategyView[];
+  recommendedTravel?: RecoveryStrategyView;
+  programmeAlternative?: RecoveryStrategyView;
+  issue?: string;
+} {
+  const options = decisionOptions(view);
+  const all = [
+    ...(options.recommended ? [options.recommended] : []),
+    ...options.alternatives,
+  ];
+  const travel = all.filter((s) => !isProgrammeStrategy(s));
+  const programme = all.filter(isProgrammeStrategy);
+  const recommendedTravel = options.recommended && !isProgrammeStrategy(options.recommended)
+    ? options.recommended
+    : undefined;
+  // Prefer the recorded recommendation when it is programme; else first viable programme.
+  const programmeAlternative = options.recommended && isProgrammeStrategy(options.recommended)
+    ? options.recommended
+    : programme[0];
+  return {
+    travel,
+    programme,
+    ...(recommendedTravel ? { recommendedTravel } : {}),
+    ...(programmeAlternative ? { programmeAlternative } : {}),
+    ...(options.issue ? { issue: options.issue } : {}),
+  };
+}
+
 export function changeSummary(change: RecoveryStrategyView['changes'][number]): string {
   const label = plain(change.subjectLabel);
   const vocabulary = CASE_EFFECT_PHRASE[change.effectKind];
