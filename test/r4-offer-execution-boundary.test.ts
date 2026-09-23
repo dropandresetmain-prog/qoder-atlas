@@ -25,6 +25,8 @@ const CONSEQUENTIAL = /\bawait\s+[\w.]+\.(createOrder|payOrder|submitCancellatio
 const ALLOWED = new Set([
   'src/app/target/externalOfferExecution.ts',
   'src/app/target/externalStayExecution.ts',
+  // Explicit operator stay bootstrap (never ordinary boot); books once for a working clone.
+  'src/app/demo/providerStayBaseline.ts',
 ]);
 // The retired SQLite-root composition keeps its own executor; it is not reachable from the PG target boot.
 const LEGACY = new Set(['src/app/providerExecution.ts', 'src/app/compose.ts', 'src/providers/atlas/transactionAdapter.ts']);

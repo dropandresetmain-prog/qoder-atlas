@@ -44,6 +44,13 @@ import {
 import { createHash } from 'node:crypto';
 import { deterministicUuid, RUNTIME_ID_NAMESPACES } from './deterministicId.ts';
 import { ATLAS_SANDBOX_BALANCE_PAYMENT_REF, ATLAS_SANDBOX_HOST, AtlasFlightTransactionAdapter } from '../../providers/atlas/transactionAdapter.ts';
+import {
+  applySandboxPassengerAliasToPassengers,
+  resolveAtlasSandboxPassengerAlias,
+  sandboxPassengerAliasRefuseMessage,
+  SANDBOX_TEST_ALIAS_PROVENANCE,
+  type AtlasSandboxPassengerAliasConfig,
+} from '../../providers/atlas/sandboxPassengerAlias.ts';
 import { AtlasFlightAdapter } from '../../providers/atlas/adapter.ts';
 import { createAppRecordingStore } from '../../providers/recordingStoreFactory.ts';
 import { hasLiveCredentials, type AppConfig } from '../../config/config.ts';
@@ -65,6 +72,11 @@ export interface ExternalOfferExecutionDeps {
   mode: AdapterMode;
   /** Opaque sandbox payment handle. The adapter accepts only its approved sandbox handle. */
   paymentRef?: string;
+  /**
+   * Sandbox-only synthetic passenger names transmitted to Atlas. Stable for one
+   * disposable execution world. Never canonical traveller truth.
+   */
+  sandboxPassengerAlias?: AtlasSandboxPassengerAliasConfig;
   ticketingPoll?: { attempts: number; delayMs: number };
   sleep?: (ms: number) => Promise<void>;
   /**
@@ -178,6 +190,9 @@ export function buildAtlasOfferDispatcher(
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const poll = deps.ticketingPoll ?? DEFAULT_POLL;
   const clientReference = clientReferenceFor(intentId);
+  const providerPassengers = deps.sandboxPassengerAlias
+    ? applySandboxPassengerAliasToPassengers(inputs.passengers, deps.sandboxPassengerAlias)
+    : inputs.passengers;
   return async (_claim: ExecutionClaim, control: DispatchControl) => {
     const fault = deps.faultInjection ?? (async () => undefined);
     if (!deps.paymentRef) return { kind: 'FAILURE', error: 'payment_handle_unavailable: no sandbox payment handle composed' };
@@ -189,10 +204,11 @@ export function buildAtlasOfferDispatcher(
     if (verify.data.status === 'PRICE_CHANGED') return { kind: 'FAILURE', error: 'offer_price_changed: re-enter viability/authority' };
 
     // 2. Mutation #1: create the order (hold, no money moves).
+    // Passenger names may be SANDBOX_TEST_ALIAS at the Atlas wire only; inputs.passengers stay canonical.
     counters.create += 1;
     const create = await deps.transactions.createOrder({
       offerId: inputs.binding.providerOfferRef,
-      passengers: inputs.passengers.map((p) => ({
+      passengers: providerPassengers.map((p) => ({
         givenName: p.givenName, familyName: p.familyName, gender: p.gender,
         ...(p.dateOfBirth ? { dateOfBirth: p.dateOfBirth } : {}),
         ...(p.nationality ? { nationality: p.nationality } : {}),
@@ -270,7 +286,15 @@ export function buildAtlasOfferDispatcher(
           await fault('BEFORE_FINAL_WRITE');
           return {
             kind: 'SUCCESS', responseRef: orderMarker, externalRecordId: externalRecordIdForOrder(orderRef),
-            sourceOwnedFields: { providerOrderRef: orderRef, orderStatus: 'TICKETED', ...(seen.data.totalPrice ? { totalPrice: seen.data.totalPrice } : {}), provenance: seen.data.provenance },
+            sourceOwnedFields: {
+              providerOrderRef: orderRef,
+              orderStatus: 'TICKETED',
+              ...(seen.data.totalPrice ? { totalPrice: seen.data.totalPrice } : {}),
+              provenance: seen.data.provenance,
+              ...(deps.sandboxPassengerAlias
+                ? { passengerIdentityProvenance: SANDBOX_TEST_ALIAS_PROVENANCE }
+                : {}),
+            },
           };
         }
         if (seen.data.status === 'CANCELLED' || seen.data.status === 'FAILED') return { kind: 'FAILURE', error: `order_failed_after_payment:${seen.data.status}` };
@@ -285,9 +309,17 @@ export function buildAtlasOfferDispatcher(
  * The approved terms an existing order must match, resolved from persisted truth only (binding +
  * protected identities + place IATA refs/time zones). Undefined when any piece is missing: a
  * duplicate order then fails closed instead of being adopted.
+ *
+ * When a sandbox passenger alias is active, provider-facing passenger names in these terms match
+ * what was transmitted to Atlas (SANDBOX_TEST_ALIAS) so retry/duplicate validation can MATCH an
+ * order this intent created. Canonical traveller rows are not modified.
  */
 export async function loadExpectedOrderTerms(
-  pool: Pool, workspaceId: string, inputs: Extract<OfferExecutionInputs, { ready: true }>, ceiling: { amount: number; currency: string },
+  pool: Pool,
+  workspaceId: string,
+  inputs: Extract<OfferExecutionInputs, { ready: true }>,
+  ceiling: { amount: number; currency: string },
+  sandboxPassengerAlias?: AtlasSandboxPassengerAliasConfig,
 ): Promise<ExpectedOrderTerms | undefined> {
   const b = inputs.binding;
   // Same airport-code vocabulary as transport research timezone resolution:
@@ -305,8 +337,11 @@ export async function loadExpectedOrderTerms(
   const origin = rows.find((r) => r.id === b.itinerary.originPlaceId);
   const destination = rows.find((r) => r.id === b.itinerary.destinationPlaceId);
   if (!origin || !destination) return undefined;
+  const providerPassengers = sandboxPassengerAlias
+    ? applySandboxPassengerAliasToPassengers(inputs.passengers, sandboxPassengerAlias)
+    : inputs.passengers;
   return {
-    passengers: inputs.passengers.map((p) => ({
+    passengers: providerPassengers.map((p) => ({
       givenName: p.givenName, familyName: p.familyName, gender: p.gender,
       ...(p.dateOfBirth ? { dateOfBirth: p.dateOfBirth } : {}), ...(p.nationality ? { nationality: p.nationality } : {}),
     })),
@@ -572,7 +607,9 @@ export async function runExternalOfferExecutionPass(ctx: ExternalExecutionContex
     if (!claim) { outcome.result = 'DEFERRED'; outcome.detail = 'attempt not claimable'; report.deferred += 1; continue; }
     const counters: ExternalDispatchCounters = { verify: 0, create: 0, pay: 0 };
     const ceiling = { amount: Number(stored.costAmount), currency: stored.costCurrency };
-    const expected = await loadExpectedOrderTerms(ctx.pool, ctx.workspaceId, inputs, ceiling);
+    const expected = await loadExpectedOrderTerms(
+      ctx.pool, ctx.workspaceId, inputs, ceiling, ctx.external.sandboxPassengerAlias,
+    );
     const dispatcher = buildAtlasOfferDispatcher(ctx.external, inputs, ceiling, intentId, counters, expected);
     const dispatched = await worker.dispatchClaimed(claim, {
       principalId: ctx.executorPrincipalId, now, observed: { capabilityKind: 'SERVICE', supported: true } /* external:offer.select maps to SERVICE in externalCapabilityKindFromRef */, dispatcher,
@@ -667,18 +704,44 @@ export function composeOfferExecution(config: AppConfig, cwd: string): ExternalO
   if (!hasLiveCredentials(config, 'atlas') || !atlas.baseUrl) return undefined;
   let host: string;
   try { host = new URL(atlas.baseUrl).hostname; } catch { return undefined; }
-  if (host !== ATLAS_SANDBOX_HOST) return undefined;
+  if (host !== ATLAS_SANDBOX_HOST) {
+    // Alias against production/unknown must fail closed — never silently omit.
+    if (atlas.sandboxPassengerAlias) {
+      throw new Error(sandboxPassengerAliasRefuseMessage('non_sandbox_host'));
+    }
+    return undefined;
+  }
+  const aliasResolution = resolveAtlasSandboxPassengerAlias({
+    configured: atlas.sandboxPassengerAlias,
+    baseUrl: atlas.baseUrl,
+    mode: config.adapterMode,
+  });
+  if (aliasResolution.status === 'REFUSED') {
+    throw new Error(sandboxPassengerAliasRefuseMessage(aliasResolution.reason));
+  }
   const store = createAppRecordingStore({
     recordingsDir: config.recordingsDir,
     fixturesDir: config.fixturesDir,
     cwd,
     adapterMode: config.adapterMode,
   });
-  const common = { mode: config.adapterMode, store, baseUrl: atlas.baseUrl, clientId: atlas.clientId, clientSecret: atlas.clientSecret };
+  const common = {
+    mode: config.adapterMode,
+    store,
+    baseUrl: atlas.baseUrl,
+    clientId: atlas.clientId,
+    clientSecret: atlas.clientSecret,
+  };
+  const alias =
+    aliasResolution.status === 'APPLIED' ? aliasResolution.alias : undefined;
   return {
     flight: new AtlasFlightAdapter(common),
-    transactions: new AtlasFlightTransactionAdapter(common),
+    transactions: new AtlasFlightTransactionAdapter({
+      ...common,
+      ...(alias ? { sandboxPassengerAlias: alias } : {}),
+    }),
     mode: config.adapterMode,
     paymentRef: ATLAS_SANDBOX_BALANCE_PAYMENT_REF,
+    ...(alias ? { sandboxPassengerAlias: alias } : {}),
   };
 }

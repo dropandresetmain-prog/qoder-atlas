@@ -70,9 +70,21 @@ import {
   type AtlasVoidQuotationBody,
 } from './types.ts';
 import { ATLAS_PROVIDER_ID } from './adapter.ts';
+import { ATLAS_SANDBOX_HOST, isAtlasSandboxBaseUrl } from './atlasSandboxHost.ts';
+import {
+  applySandboxPassengerAliasToPassengers,
+  resolveAtlasSandboxPassengerAlias,
+  sandboxPassengerAliasRefuseMessage,
+  SANDBOX_TEST_ALIAS_PROVENANCE,
+  type AtlasSandboxPassengerAliasConfig,
+} from './sandboxPassengerAlias.ts';
 
-/** The only Atlas environment this adapter may execute transactions against. */
-export const ATLAS_SANDBOX_HOST = 'sandbox.atriptech.com';
+export { ATLAS_SANDBOX_HOST, isAtlasSandboxBaseUrl } from './atlasSandboxHost.ts';
+export {
+  SANDBOX_TEST_ALIAS_PROVENANCE,
+  resolveAtlasSandboxPassengerAlias,
+  applySandboxPassengerAliasToPassengers,
+} from './sandboxPassengerAlias.ts';
 
 /**
  * The approved opaque sandbox payment reference. It maps INSIDE this adapter
@@ -93,6 +105,12 @@ export interface AtlasTransactionAdapterOptions {
   clientSecret?: string;
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
+  /**
+   * Explicit sandbox-only synthetic passenger name for Atlas wire transmission.
+   * Never canonical traveller truth. Applied only when base URL is the verified
+   * sandbox host and mode is LIVE/RECORD; otherwise createOrder fails closed.
+   */
+  sandboxPassengerAlias?: AtlasSandboxPassengerAliasConfig;
 }
 
 type TransactionProvenance = 'LIVE' | 'REPLAY';
@@ -116,6 +134,7 @@ export class AtlasFlightTransactionAdapter implements FlightTransactionCapabilit
   private readonly clientSecret?: string;
   private readonly timeoutMs?: number;
   private readonly fetchImpl?: typeof fetch;
+  private readonly sandboxPassengerAlias?: AtlasSandboxPassengerAliasConfig;
 
   constructor(options: AtlasTransactionAdapterOptions) {
     this.mode = options.mode;
@@ -125,6 +144,7 @@ export class AtlasFlightTransactionAdapter implements FlightTransactionCapabilit
     this.clientSecret = options.clientSecret;
     this.timeoutMs = options.timeoutMs;
     this.fetchImpl = options.fetchImpl;
+    this.sandboxPassengerAlias = options.sandboxPassengerAlias;
     this.descriptor = {
       family: 'FLIGHT',
       providerId: ATLAS_PROVIDER_ID,
@@ -149,6 +169,23 @@ export class AtlasFlightTransactionAdapter implements FlightTransactionCapabilit
     const problem = validateCreateQuery(query);
     if (problem) return this.invalidRequest(problem);
 
+    const aliasResolution = resolveAtlasSandboxPassengerAlias({
+      configured: this.sandboxPassengerAlias,
+      baseUrl: this.baseUrl,
+      mode: this.mode,
+    });
+    if (aliasResolution.status === 'REFUSED') {
+      return this.invalidRequest(sandboxPassengerAliasRefuseMessage(aliasResolution.reason));
+    }
+    const wirePassengers =
+      aliasResolution.status === 'APPLIED'
+        ? applySandboxPassengerAliasToPassengers(query.passengers, aliasResolution.alias)
+        : query.passengers;
+    const wireProblem = validatePassengerNames(wirePassengers);
+    if (wireProblem) return this.invalidRequest(wireProblem);
+    const aliasProvenance =
+      aliasResolution.status === 'APPLIED' ? aliasResolution.provenance : undefined;
+
     const sessionId = typeof query.workflowState?.['sessionId'] === 'string'
       ? (query.workflowState['sessionId'] as string)
       : undefined;
@@ -163,9 +200,12 @@ export class AtlasFlightTransactionAdapter implements FlightTransactionCapabilit
       providerId: ATLAS_PROVIDER_ID,
       mode: this.mode,
       obtainRaw: async (request) => {
+        // Wire passengers may carry a SANDBOX_TEST_ALIAS; request.passengers stay
+        // canonical for recording-key projection (PII-free counts/refs only).
+        void request;
         const body = await this.post('/order.do', {
           sessionId,
-          passengers: request.passengers.map((passenger) => ({
+          passengers: wirePassengers.map((passenger) => ({
             name: `${passenger.familyName}/${passenger.givenName}`,
             // The generic seam carries no passenger-type vocabulary; the
             // documented deterministic adapter default is adult.
@@ -177,16 +217,25 @@ export class AtlasFlightTransactionAdapter implements FlightTransactionCapabilit
             ...(passenger.nationality === undefined ? {} : { nationality: passenger.nationality }),
           })),
           contact: {
-            name: request.contact.name,
-            ...(request.contact.email === undefined ? {} : { email: request.contact.email }),
-            ...(request.contact.phone !== undefined && ATLAS_MOBILE.test(request.contact.phone)
-              ? { mobile: request.contact.phone }
+            name: query.contact.name,
+            ...(query.contact.email === undefined ? {} : { email: query.contact.email }),
+            ...(query.contact.phone !== undefined && ATLAS_MOBILE.test(query.contact.phone)
+              ? { mobile: query.contact.phone }
               : {}),
           },
         });
         return AtlasOrderBodySchema.parse(body);
       },
-      normalize: (raw) => normalizeOrderCreate(raw, provenance),
+      normalize: (raw) => {
+        const outcome = normalizeOrderCreate(raw, provenance);
+        if (!aliasProvenance) return outcome;
+        return {
+          ...outcome,
+          detail: outcome.detail
+            ? `${outcome.detail}; ${SANDBOX_TEST_ALIAS_PROVENANCE}`
+            : SANDBOX_TEST_ALIAS_PROVENANCE,
+        };
+      },
     };
     // PII-free recording key: identity counts and refs only, never names.
     return runAdapter(
@@ -543,28 +592,29 @@ function formatMoney(money: Money): string {
   return `${money.amount} ${money.currency}`;
 }
 
-/** True only when the base URL's host is unambiguously the Atlas sandbox. */
-export function isAtlasSandboxBaseUrl(baseUrl: string): boolean {
-  try {
-    return new URL(baseUrl).hostname === ATLAS_SANDBOX_HOST;
-  } catch {
-    return false;
-  }
-}
-
 function validateCreateQuery(query: FlightOrderCreateQuery): string | undefined {
   if (!query.clientReference) return 'createOrder requires clientReference (idempotency key)';
   if (query.passengers.length === 0) return 'createOrder requires at least one passenger';
+  const names = validatePassengerNames(query.passengers);
+  if (names) return names;
   for (const passenger of query.passengers) {
-    if (!LATIN_NAME.test(passenger.familyName) || !LATIN_NAME.test(passenger.givenName)) {
-      return `passenger name must be Latin letters for provider wire format: ${passenger.familyName}/${passenger.givenName}`;
-    }
     if (passenger.gender !== 'MALE' && passenger.gender !== 'FEMALE') {
       return 'provider requires a mappable passenger gender (MALE/FEMALE); refusing to invent one';
     }
   }
   if (!FAMILY_GIVEN_NAME.test(query.contact.name)) {
     return 'contact.name must use the provider Family/Given Latin format';
+  }
+  return undefined;
+}
+
+function validatePassengerNames(
+  passengers: ReadonlyArray<{ givenName: string; familyName: string }>,
+): string | undefined {
+  for (const passenger of passengers) {
+    if (!LATIN_NAME.test(passenger.familyName) || !LATIN_NAME.test(passenger.givenName)) {
+      return `passenger name must be Latin letters for provider wire format: ${passenger.familyName}/${passenger.givenName}`;
+    }
   }
   return undefined;
 }

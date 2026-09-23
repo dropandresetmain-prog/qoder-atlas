@@ -21,6 +21,17 @@ const AtlasConfigSchema = z.object({
   baseUrl: z.string().optional(),
   clientId: z.string().optional(),
   clientSecret: z.string().optional(),
+  /**
+   * Sandbox-only synthetic Atlas passenger name for disposable transaction tests.
+   * Both given + family required when either env var is set. Never applied against
+   * a non-sandbox host (fail closed at the execution boundary).
+   */
+  sandboxPassengerAlias: z
+    .object({
+      givenName: z.string().min(1),
+      familyName: z.string().min(1),
+    })
+    .optional(),
 });
 
 const ModelStudioConfigSchema = z.object({
@@ -214,6 +225,15 @@ function mapEnv(env: Record<string, string | undefined>): Record<string, unknown
         baseUrl: optional(env.ATLAS_BASE_URL),
         clientId: optional(env.ATLAS_CLIENT_ID),
         clientSecret: optional(env.ATLAS_CLIENT_SECRET),
+        ...(optional(env.ATLAS_SANDBOX_PASSENGER_ALIAS_GIVEN_NAME) ||
+        optional(env.ATLAS_SANDBOX_PASSENGER_ALIAS_FAMILY_NAME)
+          ? {
+              sandboxPassengerAlias: {
+                givenName: optional(env.ATLAS_SANDBOX_PASSENGER_ALIAS_GIVEN_NAME) ?? '',
+                familyName: optional(env.ATLAS_SANDBOX_PASSENGER_ALIAS_FAMILY_NAME) ?? '',
+              },
+            }
+          : {}),
       },
       modelStudio: {
         baseUrl: optional(env.MODEL_STUDIO_BASE_URL),

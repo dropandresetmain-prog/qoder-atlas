@@ -161,6 +161,7 @@ Needed only for LIVE flight capability.
 - `ATLAS_BASE_URL`
 - `ATLAS_CLIENT_ID`
 - `ATLAS_CLIENT_SECRET`
+- `ATLAS_SANDBOX_PASSENGER_ALIAS_GIVEN_NAME` / `ATLAS_SANDBOX_PASSENGER_ALIAS_FAMILY_NAME` (optional; sandbox-only synthetic Atlas passenger for disposable transaction tests. Applied only against the verified Atlas sandbox host in LIVE/RECORD. Fail closed if configured against any other host. Not canonical traveller identity.)
 
 Authoritative capability docs live in `dropandresetmain-prog/atlas-hackathon-lab`. Do not treat sandbox Search data as real market evidence.
 

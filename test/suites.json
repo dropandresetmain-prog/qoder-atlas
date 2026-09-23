@@ -161,6 +161,7 @@
       "test/r3-causal-spine-layout.test.ts",
       "test/r3-import-guard.test.ts",
       "test/r4-offer-execution-boundary.test.ts",
+      "test/a5-atlas-sandbox-passenger-alias.test.ts",
       "test/a3-sandbox-execution-inputs.test.ts",
       "test/r4-existing-order-validation.test.ts",
       "test/r3-transport-research-composition.test.ts",
