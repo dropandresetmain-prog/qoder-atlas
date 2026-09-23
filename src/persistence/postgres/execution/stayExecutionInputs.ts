@@ -4,6 +4,8 @@ import type { Pool, PoolClient } from '../pool.ts';
 import type { RecoveryStrategy } from '../../../contracts/v2/scenario/recoveryStrategy.ts';
 import type { CapturedHotelQuote } from '../../../app/targetHotelCompanionPlanning.ts';
 import type { ApprovedVisitInput } from '../commands/observedStayCommands.ts';
+import { loadConfig } from '../../../config/config.ts';
+import { researchModeAllowsProtectedExecution } from '../../../config/demoPlayback.ts';
 
 type Queryable = Pick<Pool | PoolClient, 'query'>;
 
@@ -428,7 +430,11 @@ export async function resolveStayExecutionInputs(
   }
 
   if (action === 'BOOK') {
-    if (!binding.quoteHandle || !LIVE_STAY_RESEARCH_MODES.includes(binding.researchMode as (typeof LIVE_STAY_RESEARCH_MODES)[number])) {
+    const researchMode = binding.researchMode ?? 'UNKNOWN';
+    if (
+      !binding.quoteHandle
+      || !researchModeAllowsProtectedExecution(researchMode, loadConfig())
+    ) {
       return { ready: false, reason: 'STALE_STAY_QUOTE', detail: 'book action has no protected LIVE/RECORD quote handle' };
     }
     if (

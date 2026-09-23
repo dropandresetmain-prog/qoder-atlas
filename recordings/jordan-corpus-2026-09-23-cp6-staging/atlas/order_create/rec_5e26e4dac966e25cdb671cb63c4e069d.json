@@ -1,0 +1,44 @@
+{
+  "id": "rec_5e26e4dac966e25cdb671cb63c4e069d",
+  "providerId": "atlas",
+  "operation": "order_create",
+  "recordedAt": "2026-09-23T18:15:09.797Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": null,
+    "sessionId": "e1c907ef-f549-44e9-8d97-1a9f66efbe62",
+    "orderNo": "TESTA20260924021509634",
+    "pnrCode": "T78QAT",
+    "totalPrice": 186.31,
+    "totalTransactionFee": 0,
+    "currency": "USD",
+    "tktLimitTime": "2026-09-24 02:45:09",
+    "paxTicketInfos": [
+      {
+        "ticketNos": [],
+        "name": "[REDACTED]",
+        "gender": "M",
+        "birthday": "",
+        "nationality": "SG",
+        "contactEmails": [
+          "[REDACTED]"
+        ]
+      }
+    ],
+    "routing": {
+      "fromSegments": [
+        {
+          "carrier": "TR",
+          "flightNumber": "TR875",
+          "depAirport": "NRT",
+          "depTime": "202609292115",
+          "arrAirport": "SIN",
+          "arrTime": "202609300520"
+        }
+      ],
+      "retSegments": []
+    },
+    "duplicateOrders": null
+  }
+}

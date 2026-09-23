@@ -1,5 +1,5 @@
 {
-  "id": "rec_702cb63ec8fe18e355a5b665ced24c5c",
+  "id": "rec_470a78522d3d102482134dec6938d6bb",
   "providerId": "atlas",
   "operation": "verify",
   "recordedAt": "2026-09-23T18:15:09.668Z",
@@ -11,14 +11,14 @@
     "maxSeats": 2,
     "priceChange": {
       "isPriceChange": false,
-      "newAdultPrice": 167.72,
-      "newAdultTax": 55.61,
+      "newAdultPrice": 160.74,
+      "newAdultTax": 37.45,
       "newChildPrice": 167.72,
       "newChildTax": 55.61,
       "newInfantPrice": 51.33,
       "newInfantTax": 0,
-      "originalAdultPrice": 167.72,
-      "originalAdultTax": 55.61,
+      "originalAdultPrice": 160.74,
+      "originalAdultTax": 37.45,
       "originalChildPrice": 167.72,
       "originalChildTax": 55.61,
       "originalInfantPrice": 51.33,
@@ -65,31 +65,31 @@
       }
     },
     "routing": {
-      "routingIdentifier": "VFlPX1NJTl8xXzIwMjYwOTI5X18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDIyMy4zM18yMjMuMzNfNTEuMzNfMC4wMF80OTcuOTlfVVNEfFRZT19TSU5fMV8yMDI2MDkyOV9fMV8wXzBeTlJULVRSODc1LUgtU0lOLTIwMjYwOTI5MjExNS0yMDI2MDkzMDA1MjAtRmx5LTEtXjIyMy4zM18yMjMuMzNfNTEuMzNfMC4wMF80OTcuOTleQVRSTkRDQUdfQVRSTkRDXl5BVFJOREMxVFlPU0lOMjAwMjAyNjA5MjleSlBZXjM0ODc2LjMyXjM0ODc2LjMyXjgwMTUuMjheMXwwfDIwMjYwOTI0MDIyMDA5fDB8MTc5MDE4NzYwOTEyNWI4MGY4YTI5fHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDktMjQgMDI6MTM6MjR8.mIs0IglOggm1vWpRrBVI2KAPG02stEByj9PZKUlLoEY=",
-      "fid": "WLyx93FI1fVUwn81q5Eu54tfR9G9Hl5tqWwd0H971KQXnvVohtux9vUYSZPlO2FN",
+      "routingIdentifier": "VFlPX1NJTl8xXzIwMjYwOTI5X18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDE5OC4xOV8xOTguMTlfMC4wMF8wLjAwXzM5Ni4zOF9VU0R8VFlPX1NJTl8xXzIwMjYwOTI5X18xXzBfMF5OUlQtWkcwNTMtLVNJTi0yMDI2MDkyOTE2NTAtMjAyNjA5MjkyMzAwLVNUQU5EQVJELTEtXjE5OC4xOV8xOTguMTlfMC4wMF8wLjAwXzM5Ni4zOF5BWkdfQVpHXl5BWkcxVFlPU0lOMjAwMjAyNjA5MjleSlBZXjMxMDI3LjgwXjMxMDI3LjgwXjAuMDBeMXwxfDIwMjYwOTI0MDIyMDA5fDB8MTc5MDE4NzYwOTEyNWI4MGY4YTI5fHx8fHwwLjAwfDN8MHx8bm9ybWFsfGZhbHNlfDIwMjYtMDktMjQgMDI6MDA6Mzd8.Hqlfmabd4PFOUH91vjcwpAVQxKVO/bMh7gMApkJvXfM=",
+      "fid": "bU6wvu7-rleEh3K1Ov8_wUG0QVZfW5knqWwd0H971KSi4rMYXMR-RPUYSZPlO2FN",
       "currency": "USD",
-      "adultPrice": 167.72,
-      "adultTax": 55.61,
-      "childPrice": 167.72,
-      "childTax": 55.61,
-      "infantPrice": 51.33,
+      "adultPrice": 160.74,
+      "adultTax": 37.45,
+      "childPrice": 160.74,
+      "childTax": 37.45,
+      "infantPrice": 0,
       "infantTax": 0,
       "expireTime": "2026-09-23T18:21:09Z",
-      "refreshTime": "2026-09-23T18:13:24Z",
+      "refreshTime": "2026-09-23T18:00:37Z",
       "fromSegments": [
         {
-          "carrier": "TR",
+          "carrier": "ZG",
           "operatingCarrier": "",
-          "flightNumber": "TR875",
+          "flightNumber": "ZG053",
           "depAirport": "NRT",
           "arrAirport": "SIN",
-          "depTime": "202609292115",
-          "arrTime": "202609300520",
-          "duration": 545,
-          "cabin": "H",
+          "depTime": "202609291650",
+          "arrTime": "202609292300",
+          "duration": 430,
+          "cabin": "",
           "cabinClass": 1,
-          "fareFamily": "Fly",
-          "seatCount": 2,
+          "fareFamily": "STANDARD",
+          "seatCount": 6,
           "segmentIndex": 1
         }
       ],
@@ -100,27 +100,20 @@
           {
             "changesFee": 0,
             "changesStatus": "T",
-            "currency": "SGD",
+            "currency": "JPY",
             "revNoshow": "T",
             "revNoshowFee": 0,
             "ruleDetailList": [
               {
-                "amount": 130,
-                "currency": "SGD",
-                "status": "H",
-                "startMinute": 525600,
-                "endMinute": 240
-              },
-              {
                 "amount": 0,
-                "currency": "SGD",
+                "currency": "JPY",
                 "status": "T",
-                "startMinute": 240,
+                "startMinute": 525600,
                 "endMinute": 0
               },
               {
                 "amount": 0,
-                "currency": "SGD",
+                "currency": "JPY",
                 "status": "T",
                 "startMinute": 0,
                 "endMinute": -525600
@@ -130,13 +123,28 @@
         ],
         "refundRules": [
           {
-            "refundFee": 0,
-            "refundStatus": "T",
+            "refundFee": 25164.5,
+            "refundStatus": "H",
             "refundMethod": null,
-            "currency": "USD",
-            "refNoshow": "T",
-            "refNoshowFee": 0,
-            "ruleDetailList": []
+            "currency": "JPY",
+            "refNoshow": "H",
+            "refNoshowFee": 25164.5,
+            "ruleDetailList": [
+              {
+                "amount": 25164.5,
+                "currency": "JPY",
+                "status": "H",
+                "startMinute": 525600,
+                "endMinute": 0
+              },
+              {
+                "amount": 25164.5,
+                "currency": "JPY",
+                "status": "H",
+                "startMinute": 0,
+                "endMinute": -525600
+              }
+            ]
           }
         ],
         "baggageElements": [
@@ -166,16 +174,16 @@
           },
           {
             "baggagePiece": 1,
-            "baggageWeight": 10,
-            "baggageSize": "54*38*23cm",
+            "baggageWeight": 7,
+            "baggageSize": "*40*25",
             "baggageType": "CabinBaggageOverheadLocker",
             "passengerType": 0,
             "segmentNo": 1
           },
           {
             "baggagePiece": 1,
-            "baggageWeight": 10,
-            "baggageSize": "54*38*23cm",
+            "baggageWeight": 7,
+            "baggageSize": "*40*25",
             "baggageType": "CabinBaggageOverheadLocker",
             "passengerType": 1,
             "segmentNo": 1
@@ -183,7 +191,7 @@
           {
             "baggagePiece": 0,
             "baggageWeight": 0,
-            "baggageSize": "54*38*23cm",
+            "baggageSize": "*40*25",
             "baggageType": "CabinBaggageOverheadLocker",
             "passengerType": 2,
             "segmentNo": 1

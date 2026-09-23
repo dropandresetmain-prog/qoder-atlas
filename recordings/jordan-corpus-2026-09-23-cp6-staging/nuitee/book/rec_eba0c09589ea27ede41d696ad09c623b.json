@@ -1,8 +1,8 @@
 {
-  "id": "rec_27cb16638dc176369db835181c11f7c1",
+  "id": "rec_eba0c09589ea27ede41d696ad09c623b",
   "providerId": "nuitee",
-  "operation": "retrieve",
-  "recordedAt": "2026-09-23T18:21:26.965Z",
+  "operation": "book",
+  "recordedAt": "2026-09-23T18:21:22.556Z",
   "sanitized": true,
   "raw": {
     "data": {
@@ -32,10 +32,10 @@
           "adults": 1,
           "children": 0,
           "rate": {
-            "rateId": "",
+            "rateId": "I5MTIVCNLJFFOR2RGNCFGTS2K5DVSNCUJVHEEWCHKUZUIQ2OKRCEOSKZIRHU2USXJVMTGR2NJZKEKR2JLFCE2WSSK5GVKM2EJNGVEUKHLFNEITKOJJLUOURWIRBUSWSTI5AVURCNJVBFUR2NLFEFSTKSKFDUSM2EINGUEUKHJY3EOSZTKM3UWVSKLBMVKMSIKBJEWVSHKJCDIR2GIFKECUJTGRDVCMSUIVHUYNCOIZEUOT2WJNEVAUKZKRHU6SSRI5CTIRCPJZJFER2FGRKECTSUINHUMWKXIVEVUVKHKE2EIQ2NKJLEKTKZKREU4SSSIZKTERCJJ5BFER2JGJMFSVKTI5FFUNSEIVGUEU2HLFMUIU2NKJMUORKZIRAU2RBUI5FDMRSFJVFFER2VLFEFSTS2KJDVCM2UJFETEU2KGRJFMRKSKNHUKTK2IRAU2USXIZKVSRCTJRFFGSCBKFCEGTKCGJDUCWKDI56DOMJUFY3TI7BSGAZDMLJQHEWTEOBAGEYDUMBQHIYDA7CSJ56HY7D4JFXGI2LWNFSHKYLMEBZG633NEBXW4ZJAMJSWI7BQFYYDA7BQFYYDA7D4GAXDAMD4GAXDAMA",
             "retailRate": {
               "total": {
-                "amount": 714.74,
+                "amount": 721.17,
                 "currency": "USD"
               },
               "suggestedSellingPrice": {
@@ -70,14 +70,14 @@
               "refundableTag": "RFN"
             },
             "maxOccupancy": 1,
-            "boardType": "RO",
-            "boardName": "Room Only",
+            "boardType": "Room Only",
+            "boardName": "RO",
             "remarks": "",
             "perks": []
           },
           "firstName": "Jordan",
           "lastName": "Hale",
-          "childrenAges": [],
+          "childrenAges": null,
           "board": "Room Only",
           "boardCode": "RO",
           "cancellationPolicies": {
@@ -117,7 +117,7 @@
         "email": "[REDACTED]",
         "phone": "[REDACTED]"
       },
-      "createdAt": "2026-09-23T18:21:27",
+      "createdAt": "2026-09-23T18:21:23",
       "updatedAt": "",
       "cancellationPolicies": {
         "cancelPolicyInfos": [
@@ -132,10 +132,10 @@
         "hotelRemarks": [],
         "refundableTag": "RFN"
       },
-      "specialRemarks": "",
-      "optionalFees": "",
-      "mandatoryFees": "",
-      "knowBeforeYouGo": "",
+      "specialRemarks": "Example special remarks",
+      "optionalFees": "Optional fees",
+      "mandatoryFees": "Mandatory fees",
+      "knowBeforeYouGo": "Know before you go",
       "price": 714.74,
       "sellingPriceToUser": 714.74,
       "commission": 0,
@@ -188,6 +188,8 @@
       "compensationAmount": 0,
       "hotelRemarks": "<br/><br/>From 2026/09/30 to 2026/10/03: Important notices: In case of any amendment please contact us to check the rates and conditions as these could change - Hotel will invoice the total amount of this booking in case of no show / En caso de modificacion, por favor contacten con nosotros para verificar las tarifas y condiciones de la reserva ya que podrian ser diferentes - En caso de no show el hotel se reserva el derecho de aplicar gastos del 100%<br/>From 2026/09/30 to 2026/10/03: These hotel rates are only available when sold as part of a package i.e. combined with one or more transport components (flight, train or car) && sold as one price to the customer. In addition, at no time should the hotel rate be disclosed to the customer or marked-up in any way.<br/>From 2026/09/30 to 2026/10/03: Check-in from 3:00 PM to anytime<br/>From 2026/09/30 to 2026/10/03: Check-out time: 12:00 PM<br/>From 2026/09/30 to 2026/10/03: CHECK-IN INSTRUCTIONS  Extra-person charges may apply and vary depending on property policyGovernment-issued photo identification and a credit card, debit card, or cash deposit may be required at check-in for incidental chargesSpecial requests are subject to availability upon check-in and may incur additional charges; special requests cannot be guaranteedThe name on the credit card used at check-in to pay for incidentals must be the primary name on the guestroom reservationThis property accepts credit cards, debit cards, and cashThis property reserves the right to pre-authorize the guest's credit card prior to arrival.Cashless transactions are availableNoise-free guestrooms cannot be guaranteedSafety features at this property include a fire extinguisher  To make arrangements for check-in please contact the property at least 72 hours before arrival using the information on the booking confirmation. Guests will receive an email within 72 hours before arrival with check-in instructions. Front desk staff will greet guests on arrival at the property. Information provided by the property may be translated using automated translation tools. All guests, including children, are required to present a valid government-issued ID card at check-in. All guests, including children, are required to present a valid passport or physical government-issued ID card at check-in<br/>From 2026/09/30 to 2026/10/03: MANDATORY CHARGES:You'll be asked to pay the following charges at the property. Fees may include applicable taxes: Deposit: SGD 50.00 per day We have included all charges provided to us by the property.<br/>From 2026/09/30 to 2026/10/03: OPTIONAL CHARGES: Covered self parking fee: SGD 15.30 per dayEarly check-in is available for a fee (subject to availability)Late check-out is available for a fee (subject to availability) The above list may not be comprehensive. Fees and deposits may not include tax and are subject to change.<br/>From 2026/09/30 to 2026/10/03: IMPORTANT INFORMATION:   One child 7 years old or younger stays free when occupying the parent or guardian's room, using existing bedding. Only registered guests are allowed in the guestrooms.  No pets and no service animals are allowed at this property. Parking height restrictions apply. Cashless payment methods are available for all transactions.Contactless check-out is available.<br/>From 2026/09/30 to 2026/10/03: There are areas in which the hotels charge a tourist tax. Normally this tax is not included in the price of the booking.The client will be responsible for paying such a tax.<br/>Any cancellation with less than 1 day(s) before of the arrival of the client   the hotel will charge 34 % of the stay. <br/>Cancellation after 0:00 hours on the arrival date of the client   the hotel will charge 100 % of the stay. <br/>",
       "payLaterDeadline": null
-    }
+    },
+    "guestLevel": 0,
+    "sandbox": true
   }
 }

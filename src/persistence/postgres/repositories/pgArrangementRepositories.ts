@@ -867,8 +867,13 @@ export class PgArrangementRepositories implements ArrangementRepositories {
   async createOrObserveExternalRecord(params: { record: ExternalRecordRecord; actor: ActorContext }): Promise<'APPLIED' | 'STALE'> {
     const workspaceId = this.scope(params.actor.workspaceId);
     const r = params.record;
-    const existing = await this.client().query<{ id: string; source_sequence: string | null; observed_at: Date | null }>(
-      `SELECT id, source_sequence, observed_at FROM external_records
+    const existing = await this.client().query<{
+      id: string;
+      identity_state: string;
+      source_sequence: string | null;
+      observed_at: Date | null;
+    }>(
+      `SELECT id, identity_state, source_sequence, observed_at FROM external_records
         WHERE workspace_id = $1 AND connection_id = $2 AND record_type = $3 AND external_id = $4`,
       [workspaceId, r.connectionId, r.recordType, r.externalId],
     );
@@ -885,11 +890,23 @@ export class PgArrangementRepositories implements ArrangementRepositories {
       this.assertInserted(result.rowCount, `external record ${r.id}`);
       return 'APPLIED';
     }
+    let identityState = r.identityState;
+    if (old.identity_state === 'LINKED' && identityState !== 'LINKED') {
+      const liveLinks = await this.client().query<{ n: string }>(
+        `SELECT '1' AS n FROM external_record_links
+          WHERE workspace_id = $1 AND external_record_id = $2 AND superseded_at IS NULL
+          LIMIT 1`,
+        [workspaceId, old.id],
+      );
+      if (liveLinks.rows[0]) {
+        identityState = 'LINKED';
+      }
+    }
     const result = await this.client().query(
       `UPDATE external_records SET identity_state = $5, quarantine_reason = $6,
          source_sequence = $7, source_version = $8, observed_at = $9, payload_hash = $10, updated_at = now()
        WHERE workspace_id = $1 AND id = $2 AND connection_id = $3 AND record_type = $4`,
-      [workspaceId, old.id, r.connectionId, r.recordType, r.identityState, r.quarantineReason ?? null, r.sourceSequence ?? null, r.sourceVersion ?? null, r.observedAt ?? null, r.payloadHash ?? null],
+      [workspaceId, old.id, r.connectionId, r.recordType, identityState, r.quarantineReason ?? null, r.sourceSequence ?? null, r.sourceVersion ?? null, r.observedAt ?? null, r.payloadHash ?? null],
     );
     this.assertInserted(result.rowCount, `external record observation ${old.id}`);
     return 'APPLIED';

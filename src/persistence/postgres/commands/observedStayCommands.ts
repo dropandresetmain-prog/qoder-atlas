@@ -396,7 +396,65 @@ export async function attachObservedStay(
       }
       const actualExternalRecordId = observedRecord.id;
       const liveLinks = await arrangements.external.findLiveCanonicalSubjects(params.workspaceId, actualExternalRecordId);
-      if (liveLinks.length > 0) return { ok: false, conflict: typedConflict('DUPLICATE_REGISTRATION', 'provider booking is already linked to a canonical subject', [externalRecordRef]) };
+      if (liveLinks.length > 0) {
+        const linkedToThisAttach = liveLinks.some(
+          (link) => link.kind === 'RESERVATION' && link.id === reservationId,
+        );
+        if (linkedToThisAttach) {
+          const existingItem = await journeys.loadItem(params.workspaceId, journeyItemId);
+          if (!existingItem) {
+            return {
+              ok: false,
+              conflict: typedConflict(
+                'VALIDATION_FAILED',
+                'provider booking is linked but the expected Journey item is missing',
+                [externalRecordRef, itemRef],
+              ),
+            };
+          }
+          const journeyAdvanced = await advance(params.workspaceId, journeyRef, lockedHeads);
+          if (!journeyAdvanced.ok) return journeyAdvanced;
+          advanced.push(journeyAdvanced.value);
+          const connectionAdvanced = await advance(params.workspaceId, connectionRef, lockedHeads);
+          if (!connectionAdvanced.ok) return connectionAdvanced;
+          advanced.push(connectionAdvanced.value);
+          const value: ObservedStayAttachmentValue = {
+            journeyItemId,
+            reservationId,
+            reservationLineId: lineId,
+            allocationId,
+            externalRecordId: actualExternalRecordId,
+            journeyRevision: journeyAdvanced.value.afterRevision,
+            reservationRevision: 1,
+            connectionRevision: connectionAdvanced.value.afterRevision,
+          };
+          if (params.canonicalApplication) {
+            const application = await recordSelectedPlanCanonicalApplication(currentTransactionClient(), {
+              workspaceId: params.workspaceId,
+              actorId: params.actorPrincipalId,
+              attemptId: params.canonicalApplication.attemptId,
+              actionPlanId: params.canonicalApplication.actionPlanId,
+              actionIntentId: params.canonicalApplication.actionIntentId,
+              commandNamespace: envelope.commandType,
+              idempotencyKey: envelope.idempotencyKey,
+              source: params.canonicalApplication.source,
+            });
+            if (!application.ok) {
+              return {
+                ok: false,
+                conflict: typedConflict(
+                  'VALIDATION_FAILED',
+                  `selected-plan canonical application rejected: ${application.reason}`,
+                  [journeyRef],
+                ),
+              };
+            }
+          }
+          await appendAuditTrail({ envelope, advanced, destinationKind: COMMAND_TYPE, payload: value });
+          return { ok: true, value, receipt: buildReceipt({ envelope, value, advanced }) };
+        }
+        return { ok: false, conflict: typedConflict('DUPLICATE_REGISTRATION', 'provider booking is already linked to a canonical subject', [externalRecordRef]) };
+      }
 
       const advanced: AdvancedRoot[] = [];
       await createRoot({ workspaceId: params.workspaceId, id: reservationId, kind: 'RESERVATION' });

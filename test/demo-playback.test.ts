@@ -11,7 +11,10 @@ import {
   researchModeAllowsProtectedExecution,
 } from '../src/config/demoPlayback.ts';
 import { applyDemoProfileToEnv, PLAYBACK_DEMO_PROFILE_OVERLAY } from '../src/config/demoProfiles.ts';
-import { composeOfferExecution } from '../src/app/target/externalOfferExecution.ts';
+import {
+  composeOfferExecution,
+  externalExecutorAllowsProviderMutation,
+} from '../src/app/target/externalOfferExecution.ts';
 import { composeStayExecution } from '../src/app/target/externalStayExecution.ts';
 import { FrankfurterFxAdapter } from '../src/providers/frankfurter/adapter.ts';
 import { createAppRecordingStore } from '../src/providers/recordingStoreFactory.ts';
@@ -69,6 +72,10 @@ test('demo playback composes sandbox REPLAY offer and stay execution', () => {
   assert.ok(stay);
   assert.equal(offer!.mode, 'REPLAY');
   assert.equal(stay!.mode, 'REPLAY');
+  assert.equal(offer!.replayDispatchPermitted, true);
+  assert.equal(stay!.replayDispatchPermitted, true);
+  assert.equal(externalExecutorAllowsProviderMutation(offer!), true);
+  assert.equal(externalExecutorAllowsProviderMutation({ mode: 'REPLAY' }), false);
 });
 
 test('demo playback allows REPLAY research bindings at approval probe', () => {

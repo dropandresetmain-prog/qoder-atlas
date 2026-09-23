@@ -1,0 +1,281 @@
+{
+  "id": "rec_f4a56c4260e6b1fea80664d25881bb9e",
+  "providerId": "atlas",
+  "operation": "verify",
+  "recordedAt": "2026-09-23T18:15:09.668Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": "success",
+    "sessionId": "e1c907ef-f549-44e9-8d97-1a9f66efbe62",
+    "maxSeats": 2,
+    "priceChange": {
+      "isPriceChange": false,
+      "newAdultPrice": 116.52,
+      "newAdultTax": 87.37,
+      "newChildPrice": 167.72,
+      "newChildTax": 55.61,
+      "newInfantPrice": 51.33,
+      "newInfantTax": 0,
+      "originalAdultPrice": 116.52,
+      "originalAdultTax": 87.37,
+      "originalChildPrice": 167.72,
+      "originalChildTax": 55.61,
+      "originalInfantPrice": 51.33,
+      "originalInfantTax": 0
+    },
+    "bookingRequirement": {
+      "passenger": {
+        "birthday": {
+          "required": true,
+          "type": "string"
+        },
+        "cardIssuePlace": {
+          "required": false,
+          "type": "string"
+        },
+        "cardNum": {
+          "required": false,
+          "type": "string"
+        },
+        "passengerType": {
+          "required": true,
+          "type": "int"
+        },
+        "gender": {
+          "required": true,
+          "type": "string"
+        },
+        "nationality": {
+          "required": false,
+          "type": "string"
+        },
+        "cardExpired": {
+          "required": false,
+          "type": "string"
+        },
+        "name": {
+          "required": true,
+          "type": "string"
+        },
+        "cardType": {
+          "required": false,
+          "type": "string"
+        }
+      }
+    },
+    "routing": {
+      "routingIdentifier": "VFlPX1NJTl8xXzIwMjYwOTMwX18xXzBfMHxOR1o2ODg1MV9hcGlfMXwxfDIwMy44OV8yMDMuODlfMC4wMF8wLjAwXzQwNy43OF9VU0R8VFlPX1NJTl8xXzIwMjYwOTMwX18xXzBfMF5OUlQtVko5MzMtSi1IQU4tMjAyNjA5MzAwOTMwLTIwMjYwOTMwMTMwNS1FQ08tMS0jSEFOLVZKOTE1LUotU0lOLTIwMjYxMDAxMDkzNS0yMDI2MTAwMTEzNTUtRUNPLTEtXjIwMy44OV8yMDMuODlfMC4wMF8wLjAwXzQwNy43OF5BVkpVU0RfQVZKXl5BVkoxVFlPU0lOMjAwMjAyNjA5MzBeVVNEXjIwMy44OV4yMDMuODleMC4wMF4xfDB8MjAyNjA5MjQwMjIwMDl8MHwxNzkwMTg3NjA5MjM0NTEwYmNiNWZ8fHx8fDAuMDB8M3wwfHxub3JtYWx8ZmFsc2V8MjAyNi0wOS0yNCAwMTo1NjozMnw=.ui8GffxxHQTqE3hs0s3f7xkbczWJjSda/bU5aod2hZ8=",
+      "fid": "JpQ2dCjPPLnkgRLJ_TfvnyiU42FdsRjRdAhhldsQTWe8b8qdx4mTMOg8NcqZSzdBOulfNw6nIA5ebozXZrVrxyvTl3DR5bF6",
+      "currency": "USD",
+      "adultPrice": 116.52,
+      "adultTax": 87.37,
+      "childPrice": 116.52,
+      "childTax": 87.37,
+      "infantPrice": 0,
+      "infantTax": 0,
+      "expireTime": "2026-09-23T18:21:09Z",
+      "refreshTime": "2026-09-23T17:56:32Z",
+      "fromSegments": [
+        {
+          "carrier": "VJ",
+          "operatingCarrier": "",
+          "flightNumber": "VJ933",
+          "depAirport": "NRT",
+          "arrAirport": "HAN",
+          "depTime": "202609300930",
+          "arrTime": "202609301305",
+          "duration": 335,
+          "cabin": "J",
+          "cabinClass": 1,
+          "fareFamily": "ECO",
+          "seatCount": 9,
+          "segmentIndex": 1
+        },
+        {
+          "carrier": "VJ",
+          "operatingCarrier": "",
+          "flightNumber": "VJ915",
+          "depAirport": "HAN",
+          "arrAirport": "SIN",
+          "depTime": "202610010935",
+          "arrTime": "202610011355",
+          "duration": 200,
+          "cabin": "J",
+          "cabinClass": 1,
+          "fareFamily": "ECO",
+          "seatCount": 9,
+          "segmentIndex": 2
+        }
+      ],
+      "retSegments": [],
+      "riskSellout": false,
+      "rule": {
+        "changesRules": [
+          {
+            "changesFee": 0,
+            "changesStatus": "T",
+            "currency": "VND",
+            "revNoshow": "T",
+            "revNoshowFee": 0,
+            "ruleDetailList": [
+              {
+                "amount": 1100000,
+                "currency": "VND",
+                "status": "H",
+                "startMinute": 525600,
+                "endMinute": 180
+              },
+              {
+                "amount": 0,
+                "currency": "VND",
+                "status": "T",
+                "startMinute": 180,
+                "endMinute": 0
+              },
+              {
+                "amount": 0,
+                "currency": "VND",
+                "status": "T",
+                "startMinute": 0,
+                "endMinute": -525600
+              }
+            ]
+          }
+        ],
+        "refundRules": [
+          {
+            "refundFee": 0,
+            "refundStatus": "T",
+            "refundMethod": "Voucher",
+            "currency": "VND",
+            "refNoshow": "T",
+            "refNoshowFee": 0,
+            "ruleDetailList": [
+              {
+                "amount": 1100000,
+                "currency": "VND",
+                "status": "H",
+                "startMinute": 525600,
+                "endMinute": 1440
+              },
+              {
+                "amount": 0,
+                "currency": "VND",
+                "status": "T",
+                "startMinute": 1440,
+                "endMinute": 0
+              },
+              {
+                "amount": 0,
+                "currency": "VND",
+                "status": "T",
+                "startMinute": 0,
+                "endMinute": -525600
+              }
+            ]
+          }
+        ],
+        "baggageElements": [
+          {
+            "baggagePiece": 0,
+            "baggageWeight": 0,
+            "baggageSize": "",
+            "baggageType": "StandardCheckInBaggage",
+            "passengerType": 0,
+            "segmentNo": 1
+          },
+          {
+            "baggagePiece": 0,
+            "baggageWeight": 0,
+            "baggageSize": "",
+            "baggageType": "StandardCheckInBaggage",
+            "passengerType": 1,
+            "segmentNo": 1
+          },
+          {
+            "baggagePiece": 0,
+            "baggageWeight": 0,
+            "baggageSize": "",
+            "baggageType": "StandardCheckInBaggage",
+            "passengerType": 2,
+            "segmentNo": 1
+          },
+          {
+            "baggagePiece": 0,
+            "baggageWeight": 0,
+            "baggageSize": "",
+            "baggageType": "StandardCheckInBaggage",
+            "passengerType": 0,
+            "segmentNo": 2
+          },
+          {
+            "baggagePiece": 0,
+            "baggageWeight": 0,
+            "baggageSize": "",
+            "baggageType": "StandardCheckInBaggage",
+            "passengerType": 1,
+            "segmentNo": 2
+          },
+          {
+            "baggagePiece": 0,
+            "baggageWeight": 0,
+            "baggageSize": "",
+            "baggageType": "StandardCheckInBaggage",
+            "passengerType": 2,
+            "segmentNo": 2
+          },
+          {
+            "baggagePiece": 1,
+            "baggageWeight": 7,
+            "baggageSize": "56*36*23cm",
+            "baggageType": "CabinBaggageOverheadLocker",
+            "passengerType": 0,
+            "segmentNo": 1
+          },
+          {
+            "baggagePiece": 1,
+            "baggageWeight": 7,
+            "baggageSize": "56*36*23cm",
+            "baggageType": "CabinBaggageOverheadLocker",
+            "passengerType": 1,
+            "segmentNo": 1
+          },
+          {
+            "baggagePiece": 0,
+            "baggageWeight": 0,
+            "baggageSize": "56*36*23cm",
+            "baggageType": "CabinBaggageOverheadLocker",
+            "passengerType": 2,
+            "segmentNo": 1
+          },
+          {
+            "baggagePiece": 1,
+            "baggageWeight": 7,
+            "baggageSize": "56*36*23cm",
+            "baggageType": "CabinBaggageOverheadLocker",
+            "passengerType": 0,
+            "segmentNo": 2
+          },
+          {
+            "baggagePiece": 1,
+            "baggageWeight": 7,
+            "baggageSize": "56*36*23cm",
+            "baggageType": "CabinBaggageOverheadLocker",
+            "passengerType": 1,
+            "segmentNo": 2
+          },
+          {
+            "baggagePiece": 0,
+            "baggageWeight": 0,
+            "baggageSize": "56*36*23cm",
+            "baggageType": "CabinBaggageOverheadLocker",
+            "passengerType": 2,
+            "segmentNo": 2
+          }
+        ],
+        "hasBaggage": 1
+      }
+    }
+  }
+}

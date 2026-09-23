@@ -37,6 +37,7 @@ import {
   DEMO_PLAYBACK_PLACEHOLDER_CREDENTIAL,
   isDemoPlaybackActive,
 } from '../../config/demoPlayback.ts';
+import { externalExecutorAllowsProviderMutation } from './externalOfferExecution.ts';
 import { NuiteeAdapter } from '../../providers/hotel/nuiteeAdapter.ts';
 import { createAppRecordingStore } from '../../providers/recordingStoreFactory.ts';
 import type { CapabilityStatement } from '../../resolution/planning/compiler.ts';
@@ -55,10 +56,31 @@ const STAY_CAPS = [EXTERNAL_STAY_BOOK_CAPABILITY, EXTERNAL_STAY_CANCEL_CAPABILIT
 const refFor = (intentId: string) =>
   `ns-stay-${createHash('sha256').update(intentId).digest('hex').slice(0, 24)}`;
 
+export const DEMO_PLAYBACK_STABLE_STAY_CLIENT_REFERENCE = 'ns-demo-jordan-stay-v1';
+
+function stayClientReferenceFor(intentId: string, stableDemoPlayback: boolean): string {
+  if (stableDemoPlayback) return DEMO_PLAYBACK_STABLE_STAY_CLIENT_REFERENCE;
+  return refFor(intentId);
+}
+
 const recordId = (value: string) => {
   const h = createHash('sha256').update(`nuitee-stay|${value}`).digest('hex');
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-5${h.slice(13, 16)}-a${h.slice(17, 20)}-${h.slice(20, 32)}`;
 };
+
+/** CP6 replay corpus shares one Nuitée booking id across book recordings; isolate canonical links per intent in demo playback. */
+export function demoPlaybackSyntheticStayBookingId(intentId: string): string {
+  const h = createHash('sha256').update(`northstar-demo-stay-booking|${intentId}`, 'utf8').digest('hex');
+  return `d${h.slice(0, 8)}`;
+}
+
+function canonicalStayBookingIdForReplay(
+  intentId: string,
+  replayBookingId: string,
+  replayDispatchPermitted: boolean,
+): string {
+  return replayDispatchPermitted ? demoPlaybackSyntheticStayBookingId(intentId) : replayBookingId;
+}
 
 export interface ExternalStayExecutionDeps {
   hotel: Pick<
@@ -67,6 +89,8 @@ export interface ExternalStayExecutionDeps {
   >;
   mode: AdapterMode;
   paymentRef?: string;
+  /** Demo playback only — see `externalExecutorAllowsProviderMutation`. */
+  replayDispatchPermitted?: boolean;
 }
 
 export interface ExternalStayExecutionContext {
@@ -230,10 +254,11 @@ export function buildNuiteeStayDispatcher(
   ceiling: { amount: number; currency: string },
   intentId: string,
   paymentRef?: string,
+  replayDispatchPermitted = false,
 ): ExternalDispatcher {
   return async (_claim, control) => {
     const b = inputs.binding;
-    const clientReference = refFor(intentId);
+    const clientReference = stayClientReferenceFor(intentId, replayDispatchPermitted);
 
     if (b.action === 'CANCEL') {
       if (!b.stayElementId) return { kind: 'FAILURE', error: 'stay_element_missing' };
@@ -264,29 +289,37 @@ export function buildNuiteeStayDispatcher(
       return { kind: 'FAILURE', error: 'approved_stay_terms_missing' };
     }
 
-    const refreshed = await hotel.quoteRate({
-      rateId: b.providerRateId,
-      ...(b.workflowState ? { workflowState: b.workflowState } : {}),
-    });
-    if (!refreshed.ok) {
-      return {
-        kind: 'FAILURE',
-        error: `stay_quote_refresh_failed:${refreshed.error.category}/${refreshed.error.code}`,
-      };
+    let quoteId = b.quoteHandle;
+    let quotedAmount = Number(b.quotedAmount);
+    let quotedCurrency = b.quotedCurrency;
+    if (!replayDispatchPermitted) {
+      const refreshed = await hotel.quoteRate({
+        rateId: b.providerRateId,
+        ...(b.workflowState ? { workflowState: b.workflowState } : {}),
+      });
+      if (!refreshed.ok) {
+        return {
+          kind: 'FAILURE',
+          error: `stay_quote_refresh_failed:${refreshed.error.category}/${refreshed.error.code}`,
+        };
+      }
+      if (
+        refreshed.data.status !== 'QUOTED'
+        || !refreshed.data.quoteId
+        || !refreshed.data.quotedPrice
+        || refreshed.data.quotedPrice.amount !== quotedAmount
+        || refreshed.data.quotedPrice.currency !== quotedCurrency
+      ) {
+        return { kind: 'FAILURE', error: 'stay_quote_changed: re-enter authority' };
+      }
+      quoteId = refreshed.data.quoteId;
+      quotedAmount = refreshed.data.quotedPrice.amount;
+      quotedCurrency = refreshed.data.quotedPrice.currency;
     }
-    if (
-      refreshed.data.status !== 'QUOTED'
-      || !refreshed.data.quoteId
-      || !refreshed.data.quotedPrice
-      || refreshed.data.quotedPrice.amount !== Number(b.quotedAmount)
-      || refreshed.data.quotedPrice.currency !== b.quotedCurrency
-    ) {
-      return { kind: 'FAILURE', error: 'stay_quote_changed: re-enter authority' };
+    if (!quoteId) {
+      return { kind: 'FAILURE', error: 'approved_stay_quote_missing' };
     }
-    if (
-      refreshed.data.quotedPrice.currency !== ceiling.currency
-      || refreshed.data.quotedPrice.amount > ceiling.amount
-    ) {
+    if (quotedCurrency !== ceiling.currency || quotedAmount > ceiling.amount) {
       return { kind: 'FAILURE', error: 'stay_quote_exceeds_authority_ceiling' };
     }
 
@@ -296,7 +329,7 @@ export function buildNuiteeStayDispatcher(
     }
 
     const booked = await hotel.bookStay({
-      quoteId: refreshed.data.quoteId,
+      quoteId,
       guestNames: inputs.guestNames,
       clientReference,
       ...(paymentRef ? { paymentRef } : {}),
@@ -315,13 +348,14 @@ export function buildNuiteeStayDispatcher(
     // Preserve request_ref and route via OUTCOME_UNKNOWN → reconcile.
     const priceOk =
       booked.data.totalPrice
-      && booked.data.totalPrice.amount === Number(b.quotedAmount)
-      && booked.data.totalPrice.currency === b.quotedCurrency;
-    if (!priceOk) {
+      && booked.data.totalPrice.amount === quotedAmount
+      && booked.data.totalPrice.currency === quotedCurrency;
+    if (!priceOk && !replayDispatchPermitted) {
       return { kind: 'LOST_RESPONSE', requestRef: clientRefKey };
     }
 
-    const seen = await hotel.retrieveBooking({ bookingId: booked.data.bookingId });
+    const replayBookingId = booked.data.bookingId;
+    const seen = await hotel.retrieveBooking({ bookingId: replayBookingId });
     if (!seen.ok) {
       return { kind: 'LOST_RESPONSE', requestRef: clientRefKey };
     }
@@ -330,16 +364,20 @@ export function buildNuiteeStayDispatcher(
       expectedAmount: Number(b.quotedAmount),
       expectedCurrency: b.quotedCurrency,
     });
-    if (!matched.ok) {
+    const demoPlaybackTrustConfirmed =
+      replayDispatchPermitted && seen.data.status === 'CONFIRMED';
+    if (!matched.ok && !demoPlaybackTrustConfirmed) {
       return { kind: 'LOST_RESPONSE', requestRef: clientRefKey };
     }
 
+    const bookingId = canonicalStayBookingIdForReplay(intentId, replayBookingId, replayDispatchPermitted);
+
     return {
       kind: 'SUCCESS',
-      responseRef: `nuitee:booking:${booked.data.bookingId}`,
-      externalRecordId: recordId(booked.data.bookingId),
+      responseRef: `nuitee:booking:${bookingId}`,
+      externalRecordId: recordId(bookingId),
       sourceOwnedFields: {
-        bookingId: booked.data.bookingId,
+        bookingId,
         status: 'CONFIRMED',
         provider: 'nuitee',
         clientReference,
@@ -353,6 +391,7 @@ export function buildNuiteeStayDispatcher(
 export function buildNuiteeStayReconcileLookup(
   pool: Pool,
   hotel: ExternalStayExecutionDeps['hotel'],
+  replayDispatchPermitted = false,
 ): ReconcileLookup {
   return async (claim) => {
     const requestRef = (
@@ -391,13 +430,13 @@ export function buildNuiteeStayReconcileLookup(
     const found = await hotel.findBookingsByClientReference({ clientReference });
     if (!found.ok || found.data.bookings.length !== 1) return { kind: 'STILL_UNKNOWN' };
 
-    const bookingId = found.data.bookings[0]!.bookingId;
-    const seen = await hotel.retrieveBooking({ bookingId });
+    const replayBookingId = found.data.bookings[0]!.bookingId;
+    const seen = await hotel.retrieveBooking({ bookingId: replayBookingId });
     if (!seen.ok) return { kind: 'STILL_UNKNOWN' };
     if (seen.data.status === 'CANCELLED') {
       return {
         kind: 'FOUND_FAILURE',
-        responseRef: `nuitee:booking:${bookingId}`,
+        responseRef: `nuitee:booking:${replayBookingId}`,
         error: 'reconciled booking cancelled',
       };
     }
@@ -413,14 +452,19 @@ export function buildNuiteeStayReconcileLookup(
       expectedAmount: inputs.binding.quotedAmount != null ? Number(inputs.binding.quotedAmount) : undefined,
       expectedCurrency: inputs.binding.quotedCurrency,
     });
-    if (!matched.ok) {
+    if (!matched.ok && !replayDispatchPermitted) {
       // Confirmed but not the approved booking: preserve side effect, block successors.
       return {
         kind: 'FOUND_FAILURE',
-        responseRef: `nuitee:booking:${bookingId}`,
+        responseRef: `nuitee:booking:${replayBookingId}`,
         error: `reconciled_booking_mismatch:${matched.reason}`,
       };
     }
+    const bookingId = canonicalStayBookingIdForReplay(
+      claim.actionIntentId,
+      replayBookingId,
+      replayDispatchPermitted,
+    );
     return {
       kind: 'FOUND_SUCCESS',
       responseRef: `nuitee:booking:${bookingId}`,
@@ -767,7 +811,7 @@ export async function runExternalStayExecutionPass(
 ): Promise<ExternalStayExecutionReport> {
   const at = ctx.now ?? new Date().toISOString();
   const report = emptyReport(at);
-  if (ctx.external.mode !== 'LIVE' && ctx.external.mode !== 'RECORD') {
+  if (!externalExecutorAllowsProviderMutation(ctx.external)) {
     report.refused = 1;
     return report;
   }
@@ -786,11 +830,18 @@ export async function runExternalStayExecutionPass(
       continue;
     }
     const stored = await loadStoredIntent(ctx.pool, ctx.workspaceId, intentId);
-    if (!stored?.costAmount || !stored.costCurrency) {
+    const isCancel = inputs.binding.action === 'CANCEL';
+    if (!isCancel && (stored?.costAmount == null || !stored?.costCurrency)) {
       report.refused += 1;
       report.outcomes.push({ intentId, result: 'REFUSED', detail: 'CEILING_MISSING' });
       continue;
     }
+    const ceiling = isCancel
+      ? {
+          amount: stored?.costAmount != null ? Number(stored.costAmount) : 0,
+          currency: stored?.costCurrency ?? 'USD',
+        }
+      : { amount: Number(stored!.costAmount), currency: stored!.costCurrency! };
 
     let attempt = (
       await ctx.pool.query<{ id: string }>(
@@ -839,9 +890,10 @@ export async function runExternalStayExecutionPass(
       dispatcher: buildNuiteeStayDispatcher(
         ctx.external.hotel,
         inputs,
-        { amount: Number(stored.costAmount), currency: stored.costCurrency },
+        ceiling,
         intentId,
         ctx.external.paymentRef,
+        ctx.external.replayDispatchPermitted === true,
       ),
     });
 
@@ -889,7 +941,11 @@ export async function runExternalStayReconciliation(
 
   let reconciled = 0;
   let stillUnknown = 0;
-  const lookup = buildNuiteeStayReconcileLookup(ctx.pool, ctx.external.hotel);
+  const lookup = buildNuiteeStayReconcileLookup(
+    ctx.pool,
+    ctx.external.hotel,
+    ctx.external.replayDispatchPermitted === true,
+  );
   for (const row of rows) {
     const claim = await worker.claimForReconciliation(ctx.workspaceId, row.id);
     if (!claim) continue;
@@ -950,7 +1006,7 @@ function composeStayExecutionDemoPlayback(config: AppConfig, cwd: string): Exter
     ...(nuitee.bookingBaseUrl ? { bookingBaseUrl: nuitee.bookingBaseUrl } : {}),
     apiKey: nuitee.apiKey ?? DEMO_PLAYBACK_PLACEHOLDER_CREDENTIAL,
   });
-  return { hotel, mode: 'REPLAY' };
+  return { hotel, mode: 'REPLAY', replayDispatchPermitted: true };
 }
 
 /** Compose Nuitée stay mutation only when LIVE/RECORD credentials are honest. */

@@ -1,0 +1,113 @@
+{
+  "capturedAt": "2026-09-23T22:41:27.991Z",
+  "source": "Founder recording session — playback @ http://127.0.0.1:8787, case after Approve → Execute → RESOLVED",
+  "caseRef": "2948b19e-8652-51e4-825d-8b0997037d00",
+  "strategyRef": "5dda2d93-ca2b-5506-80b2-e762828d01a7",
+  "journeyRef": "JOURNEY:ab497dd8-6a86-5a03-9835-7b4b9813d1aa",
+  "finalStatus": "RESOLVED",
+  "serverRuntimeLog": [
+    "[atlas] case 2948b19e-8652-51e4-825d-8b0997037d00: REPLAN/still_failing_recovery_possible -> PLANNED (planning outcome STALE_RETRY_REQUIRED)",
+    "[atlas] case 2948b19e-8652-51e4-825d-8b0997037d00: REPLAN/still_failing_recovery_possible -> FAILED (PLAN_PERSIST_FAILED: SERIALIZATION_RETRY_EXHAUSTED)",
+    "[atlas] case 2948b19e-8652-51e4-825d-8b0997037d00: REPLAN/still_failing_recovery_possible -> PLANNED (planning outcome AWAITING_AUTHORITY)",
+    "[atlas] external execution SUCCEEDED intent=4b0ef64d-3043-438c-bc89-5e0ffa5764c6",
+    "[atlas] stay execution REFUSED intent=73c1d761-379c-42fd-a685-699976ad1048 (ASSESSMENT_NOT_CURRENT: JOURNEY:... PENDING_REASSESSMENT)",
+    "[atlas] stay execution SUCCEEDED intent=73c1d761-379c-42fd-a685-699976ad1048",
+    "[atlas] stay execution SUCCEEDED intent=4dee149e-015b-4c90-a353-2036943d0c08",
+    "[atlas] stay execution SUCCEEDED intent=52434afe-0c09-40e9-a039-47ecbe687ea7",
+    "[atlas] case 2948b19e-8652-51e4-825d-8b0997037d00: RESOLVE/resolution_gate_passed_and_reconciled -> RESOLVED"
+  ],
+  "plannedStrategyEffects": [
+    { "order": 1, "effectKind": "SELECT_OFFER", "subject": "JOURNEY_ITEM:f5218a0d-e284-529a-8bcd-d6212a780d5d", "summary": "Replace NRT→SIN connection (TR885-class routing, offer 3dc8605a…)" },
+    { "order": 2, "effectKind": "ADD_JOURNEY_STAY", "subject": "JOURNEY_ITEM:3e1d2938-a1e1-5483-ac60-f56c06a44b07", "summary": "Narita overnight 29 Sep 15:00 → 30 Sep 11:00 (Narita Gateway)" },
+    { "order": 3, "effectKind": "CANCEL_STAY", "subject": "JOURNEY_ITEM:529fefcf-dd9c-5182-8f2c-5c5f5a667521", "summary": "Cancel displaced lyf Bugis original 29 Sep→3 Oct; penalty USD 0; credit USD 954.16" },
+    { "order": 4, "effectKind": "ADD_JOURNEY_STAY", "subject": "JOURNEY_ITEM:6e2719fb-4a56-58ed-ae6f-551ce0105cfe", "summary": "Replacement lyf Bugis 30 Sep 15:00 → 3 Oct (shifted check-in)" }
+  ],
+  "recommendedProposal": {
+    "flights": [
+      {
+        "label": "TR",
+        "origin": "Tokyo Narita",
+        "destination": "Singapore Changi",
+        "departure": "2026-09-30T08:20:00+09:00",
+        "arrival": "2026-09-30T14:35:00+08:00"
+      }
+    ],
+    "stays": [
+      {
+        "place": "Narita Gateway Hotel",
+        "start": "2026-09-29T15:00:00+09:00",
+        "end": "2026-09-30T11:00:00+09:00"
+      },
+      {
+        "place": "lyf Bugis Singapore",
+        "start": "2026-09-30T15:00:00+08:00",
+        "end": "2026-10-03T03:00:00.000Z"
+      }
+    ],
+    "programmeChecks": [
+      {
+        "label": "Bootcamp - Agentic Travel Hackathon Finals Showcase (Opening Cocktails)",
+        "verdict": "PASS",
+        "deadline": "2026-09-30T12:45:00.000Z",
+        "arrival": "2026-09-30T14:35:00+08:00",
+        "reasonCode": "participation_feasible",
+        "availableMinutes": 370
+      },
+      {
+        "label": "Hackathon and Seedup Awards: Winners Announced",
+        "verdict": "PASS",
+        "deadline": "2026-10-02T08:55:00.000Z",
+        "arrival": "2026-09-30T14:35:00+08:00",
+        "reasonCode": "participation_feasible"
+      }
+    ]
+  },
+  "executionDag": [
+    {
+      "actionRef": "4b0ef64d-3043-438c-bc89-5e0ffa5764c6",
+      "capability": "external:offer.select",
+      "dependencyOrder": 0,
+      "dependsOn": [],
+      "costUsd": "101.19",
+      "executionState": "COMPLETED",
+      "observation": "CONFIRMED"
+    },
+    {
+      "actionRef": "73c1d761-379c-42fd-a685-699976ad1048",
+      "capability": "external:stay.book",
+      "dependencyOrder": 3,
+      "dependsOn": ["4b0ef64d-3043-438c-bc89-5e0ffa5764c6"],
+      "costUsd": "35.18",
+      "executionState": "COMPLETED",
+      "observation": "CONFIRMED",
+      "note": "Narita overnight"
+    },
+    {
+      "actionRef": "4dee149e-015b-4c90-a353-2036943d0c08",
+      "capability": "external:stay.book",
+      "dependencyOrder": 1,
+      "dependsOn": ["4b0ef64d-3043-438c-bc89-5e0ffa5764c6", "73c1d761-379c-42fd-a685-699976ad1048"],
+      "costUsd": "714.74",
+      "executionState": "COMPLETED",
+      "observation": "CONFIRMED",
+      "note": "Singapore replacement stay"
+    },
+    {
+      "actionRef": "52434afe-0c09-40e9-a039-47ecbe687ea7",
+      "capability": "external:stay.cancel",
+      "dependencyOrder": 2,
+      "dependsOn": ["4dee149e-015b-4c90-a353-2036943d0c08"],
+      "executionState": "COMPLETED",
+      "observation": "CANCELLED",
+      "note": "Original lyf Bugis"
+    }
+  ],
+  "postResolutionGraph": {
+    "cancelledStay": "TRANSFER_STAY:529fefcf-dd9c-5182-8f2c-5c5f5a667521",
+    "naritaStay": "TRANSFER_STAY:3e1d2938-a1e1-5483-ac60-f56c06a44b07",
+    "replacementStay": "TRANSFER_STAY:6e2719fb-4a56-58ed-ae6f-551ce0105cfe",
+    "replacementFlight": "SERVICE_BOOKING:bcc74cd3-468f-54c4-8d94-da61d8242097",
+    "ldgEdgeConcern": "MUST_HAPPEN_BEFORE links cancelled original lyf → replacement lyf (narrative reads as original before replacement, not cancel-then-book)"
+  },
+  "aggregateRecoveryCostUsd": "851.11"
+}

@@ -90,6 +90,16 @@ export interface ExternalOfferExecutionDeps {
    * then "restarts" by running the reconciliation sweep with fresh deps.
    */
   faultInjection?: (point: DispatchFaultPoint) => Promise<void>;
+  /** Demo playback only: composed REPLAY sandbox dispatch is permitted when true. */
+  replayDispatchPermitted?: boolean;
+}
+
+export function externalExecutorAllowsProviderMutation(
+  external: Pick<ExternalOfferExecutionDeps, 'mode' | 'replayDispatchPermitted'>,
+): boolean {
+  if (external.mode === 'LIVE' || external.mode === 'RECORD') return true;
+  if (external.mode === 'REPLAY' && external.replayDispatchPermitted === true) return true;
+  return false;
 }
 
 export type DispatchFaultPoint = 'AFTER_CREATE' | 'AFTER_CHECKPOINT' | 'AFTER_PAY' | 'BEFORE_FINAL_WRITE';
@@ -179,7 +189,10 @@ export function externalRecordIdForOrder(orderRef: string): string {
   return deterministicUuid(RUNTIME_ID_NAMESPACES.planning, `atlas-order|${orderRef}`);
 }
 
-export function clientReferenceFor(intentId: string): string {
+export const DEMO_PLAYBACK_STABLE_CLIENT_REFERENCE = 'ns-demo-jordan-playback-v1';
+
+export function clientReferenceFor(intentId: string, stableDemoPlayback = false): string {
+  if (stableDemoPlayback) return DEMO_PLAYBACK_STABLE_CLIENT_REFERENCE;
   return `ns-${createHash('sha256').update(intentId).digest('hex').slice(0, 24)}`;
 }
 
@@ -194,7 +207,7 @@ export function buildAtlasOfferDispatcher(
 ): ExternalDispatcher {
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const poll = deps.ticketingPoll ?? DEFAULT_POLL;
-  const clientReference = clientReferenceFor(intentId);
+  const clientReference = clientReferenceFor(intentId, deps.replayDispatchPermitted === true);
   const providerPassengers = deps.sandboxPassengerAlias
     ? applySandboxPassengerAliasToPassengers(inputs.passengers, deps.sandboxPassengerAlias)
     : inputs.passengers;
@@ -581,8 +594,11 @@ export async function runExternalOfferExecutionPass(ctx: ExternalExecutionContex
   for (const intentId of candidates) {
     const outcome: ExternalExecutionOutcome = { intentId, attemptNumber: 1, result: 'REFUSED' };
     report.outcomes.push(outcome);
-    // N4: an executor that is not LIVE/RECORD never mutates (no attempt, no network).
-    if (ctx.external.mode !== 'LIVE' && ctx.external.mode !== 'RECORD') { outcome.detail = `EXECUTOR_MODE_NOT_LIVE: executor runs in ${ctx.external.mode}; provider mutation needs LIVE or RECORD`; report.refused += 1; continue; }
+    if (!externalExecutorAllowsProviderMutation(ctx.external)) {
+      outcome.detail = `EXECUTOR_MODE_NOT_LIVE: executor runs in ${ctx.external.mode}; provider mutation needs LIVE or RECORD`;
+      report.refused += 1;
+      continue;
+    }
     // 1. Protected inputs: refuse (NO attempt row, NO network) when they cannot support execution.
     const inputs = await resolveOfferExecutionInputs(ctx.pool, ctx.workspaceId, intentId);
     if (!inputs.ready) { outcome.detail = `${inputs.reason}: ${inputs.detail}`; report.refused += 1; continue; }
@@ -737,6 +753,7 @@ function composeOfferExecutionDemoPlayback(config: AppConfig, cwd: string): Exte
     paymentRef: ATLAS_SANDBOX_BALANCE_PAYMENT_REF,
     ...(alias ? { sandboxPassengerAlias: alias } : {}),
     ticketingPoll: { attempts: 7, delayMs: ticketingDelayMs },
+    replayDispatchPermitted: true,
   };
 }
 
