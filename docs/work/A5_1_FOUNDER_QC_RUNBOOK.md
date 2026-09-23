@@ -1,93 +1,112 @@
 # A5.1 founder QC runbook — Sarah + Jordan click-through
 
-Status: **ready for founder E2E click-through** (REPLAY / controlled boundaries).  
+Status: **ready for founder E2E click-through** against the **canonical Jordan clean-room corpus**.  
 Not A5.2 LIVE destructive acceptance.
+
+## Canonical recording corpus (required)
+
+| Role | Path |
+| --- | --- |
+| **CANONICAL (use this)** | `recordings/jordan-corpus-2026-09-23/` |
+| Marker | `.corpus-isolated` — runtime reads **only** this directory (no fixtures/scenario fallback) |
+| Manifest | `recordings/jordan-corpus-2026-09-23/MANIFEST.json` |
+| **QUARANTINED / NON-CANONICAL** | `recordings-quarantine/pre-2026-09-23-jordan-reset/` + `docs/work/JORDAN_RECORDINGS_QUARANTINE_MANIFEST.json` |
+
+Confirm the corpus is active:
+
+```bash
+# .env.local (never commit secrets)
+RECORDINGS_DIR=recordings/jordan-corpus-2026-09-23
+ADAPTER_MODE=REPLAY
+```
+
+Boot log must show `mode=REPLAY` for transport and hotel research. If `RECORDINGS_DIR` points at legacy `recordings/` or fixtures, stop — that world is contaminated.
+
+Jordan transactional RECORD (sandbox capture) uses `npm run demo:record` — see `docs/work/JORDAN_FOUNDER_RECORD_PROFILE.md`.
 
 ## Base
 
-- Branch: `fix/a5-backend-truth-closure` (from `finish/a5-final-truth-repeat-freeze` @ `372a664041897ddb173aa12612307c759e060bc3`)
+- Branch: `fix/a5-jordan-transaction-recording` (clean-room corpus freeze)
 - Physically accepted A4 product: `546adf210db8ead343ecdac22b410515665c176a`
 
 ## Shared boot
 
-1. Use a stable demo PostgreSQL workspace (`PG_TARGET_WORKSPACE_ID`) with `NORTHSTAR_DEMO_DATASET_DIR` pointing at the AiT demo pack.
-2. `ADAPTER_MODE=REPLAY` for founder QC (do not burn fresh destructive bookings). For **Jordan transactional RECORD** (sandbox capture, not production pay), use `npm run demo:record` — see `docs/work/JORDAN_FOUNDER_RECORD_PROFILE.md`.
-3. Boot normal product: `npm run dev` (or built `npm start`) on the configured port.
-4. Open Overview in the browser.
+1. PostgreSQL demo workspace (`PG_TARGET_WORKSPACE_ID`) with `NORTHSTAR_DEMO_DATASET_DIR` → AiT demo pack.
+2. `RECORDINGS_DIR=recordings/jordan-corpus-2026-09-23` and `ADAPTER_MODE=REPLAY` for founder QC.
+3. `NORTHSTAR_DEMO_CONTROLS_FILE=data/ait-demo-input-pack/demo-controls.json` so Jordan D1/D2/D3 controls appear.
+4. Boot: `npm run dev` on the configured port.
+5. Open Overview in the browser.
 
-**One workspace holds both heroes.** Sarah and Jordan are both present after a single dataset provision. Do **not** demo-reset between Sarah and Jordan click-through — reset clears the whole world and is only for an initial healthy baseline.
+**One workspace holds both heroes.** Do **not** demo-reset between Sarah and Jordan.
 
-Optional reset (healthy baseline, once):
+Optional reset (healthy baseline, once — wipes Sarah and Jordan progression):
 
 ```bash
 curl -X POST http://localhost:8787/api/v2/demo/reset
 ```
 
-(Only when demo reset is configured/open.)
+### Jordan provider stay baseline (mandatory before progression)
+
+Current architecture does **not** bootstrap the provider stay on boot/reset.
+
+```bash
+curl -X POST http://localhost:8787/api/v2/demo/provider-baseline
+```
+
+Expect `ok: true`, `status: ATTACHED` (or `ALREADY_ATTACHED`), a **fresh** sandbox booking id (not historical `z-xdzAxcv`), and provider `bookedTotal` / cancellation terms. REPLAY uses the canonical corpus (`booking_lookup` + `stay_context`).
 
 ### Approval prerequisites (Jordan composite recommendation)
 
-Before expecting Approve to be clickable on a costed Jordan recommendation, provision sandbox spend envelopes and protected booking identities **before** disruption/planning (A4 lesson). Typical REPLAY blocker without that setup is `FRESH_PROVIDER_QUOTE_REQUIRED` or `BUDGET_UNAVAILABLE` / `EXECUTION_INPUTS_UNAVAILABLE` on `executionBlocker` — not a missing UI button. Use `scripts/provision-sandbox-execution-inputs.ts` with an explicit synthetic inputs file when rehearsing approval composition. Do not bypass safety gates.
+Before expecting Approve to be clickable, provision sandbox spend envelopes when rehearsing approval (`scripts/provision-sandbox-execution-inputs.ts`). Typical REPLAY blocker without that setup is `FRESH_PROVIDER_QUOTE_REQUIRED` / `BUDGET_UNAVAILABLE`. Do not bypass safety gates.
 
 ---
 
 ## Sarah — founder QC path
 
-Sarah already has accepted A2 LIVE programme recovery. For A5.1 QC:
-
-1. Confirm Overview shows healthy/ready state for the summit population.
-2. Apply the disclosed **Simulated airline update** from Overview (Sarah disruption control).
-3. Open the Sarah Case from Needs attention / Open case.
-4. Confirm V5.6 graph sits **above** secondary blocks; read What changed → graph → impact → recommendation.
-5. Confirm recovery planning / provider-model activity is understandable; technical dumps stay behind disclosures.
-6. Approve the programme recommendation when ready (programme-side execution — **no forced external flight purchase**).
-7. Watch execution → reassessment → RESOLVED / recovered presentation.
-
-If anything looks like implementation logs or UUID-heavy primary copy, note it; do not reopen planner architecture.
-
-**Leave Sarah’s Case in place** and continue to Jordan on the same Overview.
+(Unchanged.) Confirm healthy Overview → Simulated airline update → Case → Approve programme recommendation when ready. **Leave Sarah’s Case in place** and continue to Jordan.
 
 ---
 
 ## Jordan — founder QC path (progressive delay)
 
+### 0. Provider baseline (above) — then healthy Overview / Jordan READY.
+
 ### Progression control (generic / data-driven)
 
+Demo Console HTTP (same seams as the product UI):
+
 ```bash
-# List stages from progressive-delay-timeline.json
+curl -X POST http://localhost:8787/api/v2/demo/controls/delay_begins_connection_viable/apply
+curl -X POST http://localhost:8787/api/v2/demo/controls/delay_increases_connection_at_risk/apply
+curl -X POST http://localhost:8787/api/v2/demo/controls/zg053_impossible/apply
+```
+
+Or the harness (requires `PG_TARGET_*` env loaded):
+
+```bash
 node --experimental-strip-types scripts/a5-founder-qc-progression.ts --list
-
-# Reset cursor only (does not wipe Sarah / workspace)
 node --experimental-strip-types scripts/a5-founder-qc-progression.ts --reset-cursor
-node --experimental-strip-types scripts/a5-founder-qc-progression.ts --next   # D1 viable delay
-node --experimental-strip-types scripts/a5-founder-qc-progression.ts --next   # D2 tight / Case opens / monitor — no replacement sell
-node --experimental-strip-types scripts/a5-founder-qc-progression.ts --next   # D3 connection impossible / recovery actionable
+node --experimental-strip-types scripts/a5-founder-qc-progression.ts --next   # D1
+node --experimental-strip-types scripts/a5-founder-qc-progression.ts --next   # D2
+node --experimental-strip-types scripts/a5-founder-qc-progression.ts --next   # D3
 ```
-
-Or jump:
-
-```bash
-node --experimental-strip-types scripts/a5-founder-qc-progression.ts --stage zg053_impossible
-```
-
-Clock-only overnight stages (`planningNow = 2026-09-29T21:30:00+09:00`) are printed by `--list` / exhausted `--next`; they are **not** auto-applied by inventing wall-clock. Planning for overnight-required must keep that synthetic clock — do not let wall-clock revive departed same-night inventory.
 
 ### Browser click-through
 
-1. Healthy Overview / Jordan trip ready (Sarah may already show an active Case).
-2. Apply D1 → connection still viable; Overview stays GREEN / ready; graph must **not** show definitive red failure.
-3. Apply D2 → tight/at-risk; Overview **AMBER** (`AT_RISK` / CHECKING); Case may open for monitoring; connection relationship amber/watch (AFFECTED); delayed arrival CHANGED; **no** actionable replacement recommendation.
-4. Apply D3 → Overview **RED** (`DISRUPTED`); unmistakable **FAILED** connection relationship; delayed arrival may remain CHANGED; recovery becomes actionable when planning completes.
-5. Continue to missed-connection / same-night context as configured.
-6. When a complete recommendation is present and sandbox inputs are provisioned: confirm approval composition (authority/budget) without burning A5.2 destructive bookings unless rehearsing that path.
-7. For A5.1: stop before burning fresh destructive Atlas/Nuitée bookings unless explicitly rehearsing approval UX only. Final destructive LIVE/SANDBOX is **A5.2**.
+1. Healthy Overview / Jordan trip ready (after provider-baseline).
+2. D1 → connection still viable; Overview GREEN / ready.
+3. D2 → tight/at-risk; Overview **AMBER**; no actionable replacement.
+4. D3 → Overview **RED**; connection FAILED; recovery planning → Path A recommended; Path B rejected (`original_stay_late_arrival_survival_unknown`).
+5. For A5.1: stop before burning fresh destructive Atlas/Nuitée bookings unless rehearsing approval UX. Final destructive path is **A5.2 / CP6**.
+
+Clock-only overnight stages use the scenario synthetic evaluation clock — do not substitute wall clock.
 
 ---
 
 ## What A5.1 must prove for Min Htet
 
 - Product is understandable without reading implementation internals.
-- Both heroes are clickable end-to-end in a repeatable QC setup **without reset between them**.
+- Both heroes are clickable end-to-end **without reset between them**.
 - Graph truth and cost/property presentation are trustworthy enough to decide whether this is the candidate to record.
 
 Do **not** claim A5 complete. Do **not** run full release gates until A5.2/A5.3.

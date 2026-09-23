@@ -10,11 +10,15 @@
 
 ## Canonical recording corpus (clean-room reset 2026-09-23)
 
-- **CANONICAL:** `recordings/jordan-corpus-2026-09-23/` (`RECORDINGS_DIR`; `.corpus-isolated`).
-- **QUARANTINED / NON-CANONICAL:** `recordings-quarantine/pre-2026-09-23-jordan-reset/` + manifest
-  `docs/work/JORDAN_RECORDINGS_QUARANTINE_MANIFEST.json` (274 prior captures: runtime + fixtures +
-  scenario + test fixtures). Do not use for Jordan RECORD/REPLAY.
-- Fresh RECORD → REPLAY freeze is in progress (CP-R1 quarantine done; CP-R2/CP-R3 pending).
+- **CANONICAL:** `recordings/jordan-corpus-2026-09-23/` (`RECORDINGS_DIR`; `.corpus-isolated`;
+  `MANIFEST.json`). Proven RECORD → REPLAY for Jordan D1→D2→D3 → `AWAITING_AUTHORITY`
+  (Path A recommended; Path B `REJECTED_DETERMINISTIC` / `original_stay_late_arrival_survival_unknown`).
+  Baseline booking `-hCa0gm5w` @ USD 954.16 (not historical `z-xdzAxcv`).
+- **QUARANTINED / NON-CANONICAL:** `recordings-quarantine/pre-2026-09-23-jordan-reset/` +
+  `docs/work/JORDAN_RECORDINGS_QUARANTINE_MANIFEST.json`.
+- Act Now fix during freeze: Nuitée booking ids starting with `-` were rejected by stay-element
+  validation (`isOpaqueProviderStayElementId`); REPLAY baseline prefers recorded `booking_lookup`
+  when the sandbox booking already exists (book returns duplicate clientReference).
 
 ## Scenario truth (recording world)
 
@@ -170,7 +174,11 @@
     issue. (Park) the arrival→commitment edge is drawn from the last *implicated* timing node (inbound NRT
     arrival), not the destination arrival — pre-existing enrichment rule. The 6 pre-existing `current` failures
     above need their own fix pass (CP2/CP3 fallout) — not CP4 scope.
-- [ ] CP5 — Chromium D1/D2/D3 acceptance
+- [x] CP-R1 — quarantine legacy Jordan recording corpus (`fc28ea6`)
+- [x] CP-R2 — fresh Jordan RECORD corpus (`jordan-corpus-2026-09-23`, 25 provider files) + stay-element
+  leading-`-` fix + REPLAY `booking_lookup` baseline path
+- [x] CP-R3 — REPLAY D1→D2→D3 → `AWAITING_AUTHORITY` proof; runbook + ACTIVE_TASK point at this corpus only
+- [ ] CP5 — Chromium D1/D2/D3 acceptance (**using ONLY `jordan-corpus-2026-09-23`**)
 - [ ] CP6 — protected sandbox execution → RESOLVED + sanitized recordings + REPLAY proof
 
 ## Parked
