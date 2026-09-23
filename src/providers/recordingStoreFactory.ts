@@ -13,8 +13,35 @@ import { FileRecordingStore, type RecordingStore } from './recordingStore.ts';
 /** Marker filename that isolates RECORD/REPLAY to RECORDINGS_DIR only. */
 export const CORPUS_ISOLATED_MARKER = '.corpus-isolated';
 
+/**
+ * Marker filename that freezes a corpus against RECORD writes entirely.
+ * Distinct from `.corpus-isolated` (which only controls READ fallback):
+ * a corpus can be isolated (reads restricted to it) while still accepting
+ * new writes (e.g. a CP6-style staging copy), or frozen (no RECORD writes
+ * permitted at all, e.g. a founder-approved evidence corpus), independent
+ * of whether it also isolates reads. This is generic to any corpus in any
+ * scenario — it is keyed only on the marker file's presence, never on a
+ * corpus id, scenario name or script name.
+ */
+export const CORPUS_FROZEN_MARKER = '.corpus-frozen';
+
 export function isCorpusIsolated(recordingsDir: string, cwd = process.cwd()): boolean {
   return existsSync(resolve(cwd, recordingsDir, CORPUS_ISOLATED_MARKER));
+}
+
+export function isCorpusFrozen(recordingsDir: string, cwd = process.cwd()): boolean {
+  return existsSync(resolve(cwd, recordingsDir, CORPUS_FROZEN_MARKER));
+}
+
+export class FrozenCorpusWriteError extends Error {
+  constructor(recordingsDir: string) {
+    super(
+      `Refusing to configure a RECORD write path into "${recordingsDir}": this corpus carries ` +
+        `${CORPUS_FROZEN_MARKER}, marking it frozen/immutable evidence. Point RECORDINGS_DIR at an ` +
+        `explicit scratch or staging copy instead of writing into a frozen corpus.`,
+    );
+    this.name = 'FrozenCorpusWriteError';
+  }
 }
 
 export function listScenarioRecordingDirs(fixturesDir: string, cwd: string): string[] {
@@ -54,6 +81,9 @@ export function createAppRecordingStore(input: {
   forceIsolated?: boolean;
 }): RecordingStore {
   const recordingsDir = resolve(input.cwd, input.recordingsDir);
+  if (input.adapterMode === 'RECORD' && isCorpusFrozen(input.recordingsDir, input.cwd)) {
+    throw new FrozenCorpusWriteError(input.recordingsDir);
+  }
   return new FileRecordingStore({
     readDirs: recordingReadDirs(input),
     ...(input.adapterMode === 'RECORD' ? { writeDir: recordingsDir } : {}),

@@ -1,0 +1,7 @@
+Founder-approved, frozen evidence corpus. RECORD writes into this path are refused
+by src/providers/recordingStoreFactory.ts (CORPUS_FROZEN_MARKER). Do not remove this
+marker to "fix" a RECORD failure — point RECORDINGS_DIR at an explicit staging/scratch
+copy instead (see recordings/jordan-corpus-2026-09-23-cp6-staging/).
+corpusId=jordan-corpus-2026-09-23
+frozenAt=2026-09-24T00:00:00Z
+reason=CP5/CP5.1 founder visual QC approved; CP6 staging derives from this corpus but writes only into its own copy
