@@ -30,10 +30,23 @@ import type {
  * join the visible chain too (still only when visible). A step whose own subject is
  * not a visible node is recorded in `unmappedCausalSteps`; this is truthful — the
  * focused graph is deliberately sparse and does not mirror every backend subject.
+ *
+ * `dependencyContext` carries the case's other blocking, applicable, NON-failing
+ * evaluator explanations (never part of `causalPath`). One such explanation joins
+ * the spine only when it explicitly names — as cause or related subject — a
+ * non-traveller node already on the causal chain: it is an evaluator-declared
+ * dependency of that chain (e.g. a destination stay or a required commitment
+ * that depends on the implicated arrival). Its other visible subjects are then
+ * appended after the causal nodes. One hop only: the anchors are fixed before
+ * this pass, so a dependent never pulls in dependents of its own, and an
+ * explanation that names nothing on the chain (an unrelated commitment) stays
+ * off the spine. The traveller is never an anchor — every journey explanation
+ * concerns the traveller, so anchoring on it would pull in everything.
  */
 export function projectFocusedGraph(
   ldg: LiveDependencyGraph,
   causalPath: readonly CausalPathStep[],
+  dependencyContext: readonly CausalPathStep[] = [],
 ): FocusedGraphView | undefined {
   if (causalPath.length === 0) return undefined;
 
@@ -100,10 +113,19 @@ export function projectFocusedGraph(
       }
       pushNode(breakpointRef);
       if (causeRef) pushNode(causeRef);
-      if (affectedRef && !arrivalRef) pushNode(affectedRef);
+      // The affected subject is otherwise redundant once arrival timing takes
+      // over as the breakpoint — except a TRAVELLER, which owns the causal
+      // spine and must stay connected to it regardless of which node leads.
+      if (affectedRef && (!arrivalRef || nodeByRef.get(affectedRef)?.kind === 'TRAVELLER')) pushNode(affectedRef);
+      // A related subject is only ever here because the evaluator's own
+      // explanation named it as part of this causal step — that is already
+      // the "explicit dependency owner" signal. A traveller is no exception:
+      // suppressing it disconnected the traveller from the causal spine in
+      // arrival-breakpoint cases even when the evaluator explicitly named
+      // them as a dependency of that step (e.g. the credential/visit owner).
       for (const related of step.relatedSubjectRefs) {
         const relatedRef = resolveVisibleRef(related);
-        if (relatedRef && !(arrivalRef && nodeByRef.get(relatedRef)?.kind === 'TRAVELLER')) pushNode(relatedRef);
+        if (relatedRef) pushNode(relatedRef);
       }
     } else {
       unmappedCausalSteps.push({
@@ -135,6 +157,18 @@ export function projectFocusedGraph(
         pushNode(edge.toRef);
       }
     }
+  }
+
+  // Evaluator-declared dependents of the causal chain (see header). Anchors are
+  // frozen here so the pass is exactly one hop.
+  const anchorRefs = new Set(causalNodeRefs.filter((ref) => nodeByRef.get(ref)?.kind !== 'TRAVELLER'));
+  for (const dependency of dependencyContext) {
+    const visible = [dependency.causeSubjectRef, ...dependency.relatedSubjectRefs]
+      .filter((ref): ref is string => ref !== undefined)
+      .map(resolveVisibleRef)
+      .filter((ref): ref is string => ref !== undefined);
+    if (!visible.some((ref) => anchorRefs.has(ref))) continue;
+    for (const ref of visible) pushNode(ref);
   }
 
   const causalNodeSet = new Set(causalNodeRefs);

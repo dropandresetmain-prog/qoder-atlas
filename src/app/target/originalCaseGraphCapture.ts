@@ -88,7 +88,10 @@ export async function ensureOriginalCaseGraph(
   args: { caseId: string; basisAssessmentId?: string; now: string },
 ): Promise<OriginalCaptureResult> {
   if (await hasOriginalCaseGraphSnapshot(ctx.pool, ctx.workspaceId, args.caseId)) return { status: 'EXISTS' };
-  const facts = await loadRecoveryCaseFacts(ctx.pool, ctx.workspaceId, args.caseId, args.now);
+  // Original is current-world truth: never capture a proposed-service preview.
+  const facts = await loadRecoveryCaseFacts(ctx.pool, ctx.workspaceId, args.caseId, args.now, undefined, {
+    proposedServicePreview: false,
+  });
   if (!facts) return { status: 'NOT_YET_TRUTHFUL', reason: 'case_not_found' };
   const derived = deriveOriginalGraphPayload(projectRecoveryCase(facts));
   if (!derived.ok) return { status: 'NOT_YET_TRUTHFUL', reason: derived.reason };

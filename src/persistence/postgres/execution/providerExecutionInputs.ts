@@ -44,6 +44,13 @@ export interface OfferExecutionBinding {
   quotedAmount: string;
   quotedCurrency: string;
   itinerary: OfferBindingItinerary;
+  /**
+   * The deterministic prospective transport-service id (`svc:<hash>`) the
+   * planning proposer minted for this offer, when the persisting call could
+   * resolve one. This is never a `transport_services` uuid row — it is the id
+   * a successful execution would materialise. Read-model preview only.
+   */
+  proposedTransportServiceId?: string;
 }
 
 export interface BookingPassenger {
@@ -109,8 +116,8 @@ export async function persistOfferExecutionBindings(
         `INSERT INTO offer_execution_bindings (
            workspace_id, id, recovery_case_id, recovery_strategy_id, journey_item_id, offer_key,
            provider_id, provider_offer_ref, research_mode, observed_at, quoted_amount, quoted_currency,
-           itinerary, created_by_actor_id
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::timestamptz,$11,$12,$13::jsonb,$14)
+           itinerary, created_by_actor_id, proposed_transport_service_id
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::timestamptz,$11,$12,$13::jsonb,$14,$15)
          ON CONFLICT ON CONSTRAINT offer_execution_bindings_identity_uidx DO NOTHING`,
         [
           params.workspaceId, randomUUID(), params.recoveryCaseId, strategy.id, effect.journeyItemId, effect.offerId,
@@ -118,13 +125,51 @@ export async function persistOfferExecutionBindings(
           researched.provenance.mode === 'INTERNAL' ? 'SIMULATED' : researched.provenance.mode,
           researched.provenance.observedAt,
           price?.amount ?? String(researched.commercial.amount), price?.currency ?? researched.commercial.currency,
-          JSON.stringify(itinerary), params.actorId,
+          JSON.stringify(itinerary), params.actorId, resolved?.transportServiceId ?? null,
         ],
       );
       written += result.rowCount ?? 0;
     }
   }
   return written;
+}
+
+/** One proposed (not-yet-executed) SELECT_OFFER binding, for the Case graph preview only. */
+export interface ProposedOfferBinding {
+  journeyItemId: string;
+  offerKey: string;
+  proposedTransportServiceId: string;
+  itinerary: OfferBindingItinerary;
+}
+
+/**
+ * Every SELECT_OFFER binding recorded for one recovery strategy that carries a
+ * resolved prospective transport-service id. Read-only, preview-scoped: this
+ * never resolves passengers/authority and is not the execution-readiness probe
+ * (`resolveOfferExecutionInputsForStrategy` above remains that gate). Absence
+ * of a binding, or of its proposed service id, means no preview — never guessed.
+ */
+export async function loadProposedOfferBindingsForStrategy(
+  db: Queryable,
+  workspaceId: string,
+  recoveryStrategyId: string,
+): Promise<ProposedOfferBinding[]> {
+  const rows = await db.query<{
+    journey_item_id: string; offer_key: string; proposed_transport_service_id: string | null; itinerary: OfferBindingItinerary;
+  }>(
+    `SELECT journey_item_id, offer_key, proposed_transport_service_id, itinerary
+       FROM offer_execution_bindings
+      WHERE workspace_id = $1 AND recovery_strategy_id = $2`,
+    [workspaceId, recoveryStrategyId],
+  );
+  return rows.rows
+    .filter((row): row is typeof row & { proposed_transport_service_id: string } => row.proposed_transport_service_id !== null)
+    .map((row) => ({
+      journeyItemId: row.journey_item_id,
+      offerKey: row.offer_key,
+      proposedTransportServiceId: row.proposed_transport_service_id,
+      itinerary: row.itinerary,
+    }));
 }
 
 interface StoredIntentLite {

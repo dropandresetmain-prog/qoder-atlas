@@ -285,8 +285,60 @@ export interface FocusedCaseGraphEnrichmentInput {
    * Proposed SELECT_OFFER transport services keyed by journey item id.
    * When present, composition uses these instead of the persisted selection so
    * the Case graph preview follows the recommended rebook before commit.
+   * Build it with `selectProposedServicePreview`; canonical state is never read
+   * back from it.
    */
   proposedServiceByJourneyItem?: ReadonlyMap<string, string>;
+  /**
+   * Presentation rows for the proposed services named above, derived from the
+   * recorded offer itinerary (operator/mode/route/times). They are NOT
+   * `transport_services` rows, never shadow one, and carry no service code —
+   * an offer itinerary has none, so none is invented.
+   */
+  proposedTransportServices?: readonly TransportServiceRow[];
+}
+
+/** One recorded proposed SELECT_OFFER binding, reduced to what the preview needs. */
+export interface ProposedServiceBinding {
+  journeyItemId: string;
+  proposedTransportServiceId: string;
+}
+
+/**
+ * Which journey items the focused Case graph may preview as rebound to a
+ * proposed service. Pure and conservative:
+ *   - the caller supplies only the bindings of the ONE recommended strategy
+ *     (never every candidate);
+ *   - once execution of that strategy has started, canonical state (and later
+ *     observation) owns the card — no preview, so a booked service is never
+ *     hidden behind a stale proposal;
+ *   - only TRANSPORT items of the case's journeys are eligible;
+ *   - a proposal equal to the canonical selection previews nothing;
+ *   - two different proposals for one item are ambiguous and preview nothing.
+ */
+export function selectProposedServicePreview(input: {
+  journeyItems: readonly JourneyItemRow[];
+  bindings: readonly ProposedServiceBinding[];
+  executionStarted: boolean;
+}): Map<string, string> {
+  const preview = new Map<string, string>();
+  if (input.executionStarted) return preview;
+  const itemById = new Map(input.journeyItems.map((item) => [item.id, item]));
+  const ambiguous = new Set<string>();
+  for (const binding of input.bindings) {
+    const item = itemById.get(binding.journeyItemId);
+    if (!item || item.kind !== 'TRANSPORT') continue;
+    if (binding.proposedTransportServiceId === item.selectedServiceId) continue;
+    if (ambiguous.has(item.id)) continue;
+    const existing = preview.get(item.id);
+    if (existing === undefined) {
+      preview.set(item.id, binding.proposedTransportServiceId);
+    } else if (existing !== binding.proposedTransportServiceId) {
+      preview.delete(item.id);
+      ambiguous.add(item.id);
+    }
+  }
+  return preview;
 }
 
 /** Output: additional nodes and edges to append to the case's ldg. */
@@ -393,11 +445,33 @@ export function projectFocusedCaseGraphEnrichment(
   // 2. Journey composition nodes (SERVICE_BOOKING, TRANSFER_STAY, TIMING).
   // ---------------------------------------------------------------------------
   const serviceById = new Map(input.transportServices.map((s) => [s.id, s]));
+  // Itinerary-derived proposal rows only label a proposal; they never replace
+  // a canonical row that happens to share the id.
+  for (const proposed of input.proposedTransportServices ?? []) {
+    if (!serviceById.has(proposed.id)) serviceById.set(proposed.id, proposed);
+  }
   const programmeItemById = new Map(input.programmeItems.map((p) => [p.id, p]));
+  /** The proposed service previewed for this item, when it differs from canonical. */
+  const previewServiceIdFor = (item: JourneyItemRow): string | undefined => {
+    if (item.kind !== 'TRANSPORT') return undefined;
+    const proposed = input.proposedServiceByJourneyItem?.get(item.id);
+    return proposed !== undefined && proposed !== item.selectedServiceId ? proposed : undefined;
+  };
   const resolvedServiceIdFor = (item: JourneyItemRow): string | undefined =>
     item.kind === 'TRANSPORT'
-      ? (input.proposedServiceByJourneyItem?.get(item.id) ?? item.selectedServiceId ?? undefined)
+      ? (previewServiceIdFor(item) ?? item.selectedServiceId ?? undefined)
       : undefined;
+  // Presentation refs of previewed (not yet booked) services. Every edge that
+  // touches one is a PROPOSED relationship, and evaluator explanations of the
+  // canonical service (e.g. its broken connection) are never painted onto it.
+  const previewBookingRefs = new Set(
+    input.journeyItems
+      .map(previewServiceIdFor)
+      .filter((id): id is string => id !== undefined)
+      .map((id) => `SERVICE_BOOKING:${id}`),
+  );
+  const edgeAuthority = (fromRef: string, toRef: string): 'AUTHORITATIVE' | 'PROPOSED' =>
+    previewBookingRefs.has(fromRef) || previewBookingRefs.has(toRef) ? 'PROPOSED' : 'AUTHORITATIVE';
   const selectedJourneysByService = new Map<string, Set<string>>();
   for (const item of input.journeyItems) {
     const serviceId = resolvedServiceIdFor(item);
@@ -428,6 +502,9 @@ export function projectFocusedCaseGraphEnrichment(
       });
     if (relatedItems.length < 2) continue;
     const downstream = relatedItems[relatedItems.length - 1]!;
+    // The explanation judged the canonical onward booking; a previewed
+    // replacement is not the booking that was made unreachable.
+    if (previewServiceIdFor(downstream)) continue;
     const downstreamServiceId = resolvedServiceIdFor(downstream);
     if (downstreamServiceId) connectionFailedDownstreamServices.add(downstreamServiceId);
   }
@@ -483,6 +560,7 @@ export function projectFocusedCaseGraphEnrichment(
       let label: string;
       let detail: string | undefined;
       let transportService: TransportServiceRow | undefined;
+      const previewServiceId = previewServiceIdFor(item);
 
       if (item.kind === 'TRANSPORT') {
         // SERVICE_BOOKING: ref is SERVICE_BOOKING:<service_id>, label from transport_services.
@@ -524,12 +602,20 @@ export function projectFocusedCaseGraphEnrichment(
       itemRefs.push(ref);
 
       const resolvedServiceId = resolvedServiceIdFor(item);
-      const bookingState = resolvedServiceId ? bookingStateFor(resolvedServiceId) : undefined;
-      const state = item.kind === 'TRANSPORT'
-        ? { semanticState: bookingState?.state ?? 'UNKNOWN' as LdgSemanticState }
-        : stateFor(ref);
+      // A previewed service has no reservation evidence and no assessment of
+      // its own: it is PROPOSED, never HEALTHY/FAILED by borrowed truth.
+      const bookingState = resolvedServiceId && !previewServiceId ? bookingStateFor(resolvedServiceId) : undefined;
+      const state = previewServiceId
+        ? { semanticState: 'PROPOSED' as LdgSemanticState }
+        : item.kind === 'TRANSPORT'
+          ? { semanticState: bookingState?.state ?? 'UNKNOWN' as LdgSemanticState }
+          : stateFor(ref);
       if (bookingState?.detail) {
         detail = detail ? `${detail} · ${bookingState.detail}` : bookingState.detail;
+      }
+      if (previewServiceId) {
+        const note = 'Proposed replacement · not booked yet';
+        detail = detail ? `${detail} · ${note}` : note;
       }
 
       const serviceSubjectRef = resolvedServiceId
@@ -539,7 +625,9 @@ export function projectFocusedCaseGraphEnrichment(
       const currentAt = transportService
         ? transportService.actual_arrival ?? transportService.estimated_arrival ?? transportService.published_arrival
         : null;
-      const timingImplicated = currentAt !== null && serviceSubjectRef !== undefined && (
+      // Persisted explanations describe canonical services only, so a preview
+      // never grows an arrival-timing node from them.
+      const timingImplicated = !previewServiceId && currentAt !== null && serviceSubjectRef !== undefined && (
         hasArrivalExplanation(itemSubjectRef, serviceSubjectRef, currentAt)
       );
 
@@ -548,11 +636,14 @@ export function projectFocusedCaseGraphEnrichment(
         kind,
         label,
         semanticState: state.semanticState,
-        authority: 'AUTHORITATIVE',
+        authority: previewServiceId ? 'PROPOSED' : 'AUTHORITATIVE',
         caseRef: input.caseId,
         ...(serviceSubjectRef
           ? { subjectRefs: timingImplicated ? [serviceSubjectRef] : [serviceSubjectRef, itemSubjectRef] }
-          : {}),
+          // A stay card is the visual home of its own JourneyItem, so an
+          // evaluator explanation naming that item (stay alignment, overnight
+          // need) can map onto it instead of leaving the card unreachable.
+          : item.kind === 'STAY' ? { subjectRefs: [itemSubjectRef] } : {}),
         ...(state.evaluation ? { evaluation: state.evaluation } : {}),
         ...(detail ? { detail } : {}),
       });
@@ -625,19 +716,19 @@ export function projectFocusedCaseGraphEnrichment(
         fromRef,
         toRef,
         kind: 'MUST_HAPPEN_BEFORE',
-        authority: 'AUTHORITATIVE',
+        authority: edgeAuthority(fromRef, toRef),
       });
     }
 
     // Traveller (journey) → every composed item, including departure first in
-    // order_key sequence so the graph always shows Jordan→departure.
+    // order_key sequence so the graph always shows the traveller→departure.
     for (const itemRef of itemRefs) {
       pushEdge({
         id: `RELIES_ON:${journeyRef}:${itemRef}`,
         fromRef: journeyRef,
         toRef: itemRef,
         kind: 'RELIES_ON',
-        authority: 'AUTHORITATIVE',
+        authority: edgeAuthority(journeyRef, itemRef),
       });
     }
   }
@@ -666,6 +757,11 @@ export function projectFocusedCaseGraphEnrichment(
     const downstreamServiceId = resolvedServiceIdFor(downstreamItem)!;
     const upstreamBooking = `SERVICE_BOOKING:${upstreamServiceId}`;
     const downstreamBooking = `SERVICE_BOOKING:${downstreamServiceId}`;
+    // The explanation judged the canonical connection. When either leg is a
+    // previewed proposal, the relationship shown is the proposed one — never
+    // the canonical verdict transplanted onto a service it did not assess.
+    const involvesPreview = previewBookingRefs.has(upstreamBooking) || previewBookingRefs.has(downstreamBooking);
+    const shownState: LdgSemanticState = involvesPreview ? 'PROPOSED' : relationshipState;
     const timingRef = timingRefByJourneyItem.get(upstreamItem.id);
     if (timingRef) {
       pushEdge({
@@ -673,8 +769,8 @@ export function projectFocusedCaseGraphEnrichment(
         fromRef: timingRef,
         toRef: downstreamBooking,
         kind: 'MUST_HAPPEN_BEFORE',
-        authority: 'AUTHORITATIVE',
-        semanticState: relationshipState,
+        authority: edgeAuthority(timingRef, downstreamBooking),
+        semanticState: shownState,
       });
     } else {
       pushEdge({
@@ -682,8 +778,8 @@ export function projectFocusedCaseGraphEnrichment(
         fromRef: upstreamBooking,
         toRef: downstreamBooking,
         kind: 'MUST_HAPPEN_BEFORE',
-        authority: 'AUTHORITATIVE',
-        semanticState: relationshipState,
+        authority: edgeAuthority(upstreamBooking, downstreamBooking),
+        semanticState: shownState,
       });
     }
   }

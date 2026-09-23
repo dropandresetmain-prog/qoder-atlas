@@ -551,6 +551,66 @@ describe('A5 Jordan D3 planning (composed REPLAY transport research)', () => {
     assert.equal(replayCancel.scheduledCancellationPenalty, undefined);
     assert.equal(Number(replayCancel.recoverableStayCredit?.amount), 0);
     assert.equal(replayCancel.recoverableStayCredit?.currency, 'USD');
+
+    // CP4 — the Case graph previews the recommended strategy's bound proposed
+    // onward service (read model only; the canonical selection is untouched)
+    // and connects the evaluator-declared dependents — destination stay and the
+    // commitments that depend on the implicated arrival — into the focused spine.
+    const proposedBinding = await pool.query<{
+      journey_item_id: string;
+      proposed_transport_service_id: string | null;
+      itinerary: { operator: string };
+    }>(
+      `SELECT journey_item_id, proposed_transport_service_id, itinerary
+         FROM offer_execution_bindings
+        WHERE workspace_id = $1 AND recovery_strategy_id = $2`,
+      [workspaceId, recommended.rows[0]!.strategy_id],
+    );
+    assert.equal(proposedBinding.rowCount, 1, 'the recommendation binds exactly one SELECT_OFFER');
+    const binding = proposedBinding.rows[0]!;
+    assert.ok(binding.proposed_transport_service_id, 'planning recorded the proposed service id');
+    const canonicalSelection = async () => (await pool.query<{ selected_service_id: string }>(
+      `SELECT selected_service_id FROM transport_item_details WHERE workspace_id = $1 AND journey_item_id = $2`,
+      [workspaceId, binding.journey_item_id],
+    )).rows[0]!.selected_service_id;
+    const canonicalOnward = await canonicalSelection();
+    assert.notEqual(canonicalOnward, binding.proposed_transport_service_id);
+    const previewView = projectRecoveryCase((await loadRecoveryCaseFacts(pool, workspaceId, caseId, d3.at))!);
+    const previewRef = `SERVICE_BOOKING:${binding.proposed_transport_service_id}`;
+    const previewNode = previewView.ldg.nodes.find((node) => node.ref === previewRef);
+    assert.ok(previewNode, `proposed onward card present: ${JSON.stringify(previewView.ldg.nodes.map((node) => node.ref))}`);
+    assert.equal(previewNode.authority, 'PROPOSED');
+    assert.equal(previewNode.semanticState, 'PROPOSED');
+    assert.ok(previewNode.label.startsWith(binding.itinerary.operator), previewNode.label);
+    assert.match(previewNode.detail ?? '', / → .*Proposed replacement/, 'route named from canonical places');
+    assert.equal(previewView.ldg.nodes.some((node) => node.ref === `SERVICE_BOOKING:${canonicalOnward}`), false, 'no stale canonical onward card');
+    assert.equal(await canonicalSelection(), canonicalOnward, 'the preview never mutates canonical selection');
+    const spine = previewView.focusedGraph;
+    assert.ok(spine);
+    assert.equal(previewView.causalPath.length, 1, 'the failure chain itself is unchanged: one broken connection');
+    assert.ok(spine.causalNodeRefs.includes(previewRef), 'arrival → proposed onward on the spine');
+    const stayItem = await pool.query<{ id: string }>(
+      `SELECT id FROM journey_items WHERE workspace_id = $1 AND journey_id = $2 AND kind = 'STAY'`,
+      [workspaceId, journeyId],
+    );
+    assert.equal(stayItem.rowCount, 1);
+    const stayRef = `TRANSFER_STAY:${stayItem.rows[0]!.id}`;
+    assert.ok(spine.causalNodeRefs.includes(stayRef), `stay on the spine: ${JSON.stringify(spine.causalNodeRefs)}`);
+    assert.ok(spine.causalEdgeIds.some((id) => id.endsWith(`:${stayRef}`)), 'the stay is connected, not floating');
+    const commitments = previewView.ldg.nodes.filter((node) => node.kind === 'PROGRAMME_COMMITMENT');
+    assert.ok(commitments.length > 0);
+    for (const commitment of commitments) {
+      assert.ok(spine.causalNodeRefs.includes(commitment.ref), `dependent commitment on the spine: ${commitment.ref}`);
+      assert.ok(spine.causalEdgeIds.some((id) => id.startsWith('MUST_HAPPEN_BEFORE:TIMING:') && id.endsWith(`:${commitment.ref}`)),
+        `arrival → ${commitment.ref}`);
+    }
+    // The immutable Original is captured without the preview.
+    const originalMode = projectRecoveryCase((await loadRecoveryCaseFacts(pool, workspaceId, caseId, d3.at, undefined, {
+      proposedServicePreview: false,
+    }))!);
+    assert.ok(originalMode.ldg.nodes.some((node) => node.ref === `SERVICE_BOOKING:${canonicalOnward}`));
+    assert.equal(originalMode.ldg.nodes.some((node) => node.authority === 'PROPOSED'), false);
+
     // Sandbox book/cancel is destructive and was already proven with this flag set.
     // The default gate stops at the replayed recommendation so a second run does not
     // cancel the same provider booking again.

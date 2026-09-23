@@ -250,6 +250,14 @@ export interface RecoveryCaseFacts extends ProductWorldFacts {
   cause?: CaseCauseView;
   /** T3: blocking FAIL explanations of the case's failing subjects, in evaluator order. */
   causalPath?: readonly CausalPathStep[];
+  /**
+   * CP4: the same subjects' other blocking, applicable, NON-failing explanations
+   * (PASS/UNKNOWN), in evaluator order. Never part of `causalPath` and never
+   * shown as a cause; the focused-graph projector uses only those that name a
+   * subject already on the causal chain, to connect evaluator-declared
+   * dependents (stay, required commitment) into the spine.
+   */
+  dependencyContext?: readonly CausalPathStep[];
   status: 'OPEN' | 'PLANNING' | 'AWAITING_AUTHORITY' | 'EXECUTING' | 'RESOLVED' | 'CLOSED' | 'CANCELLED' | 'SUPERSEDED';
   changeSummary: string;
   bookingServiceState: BookingServiceFact;

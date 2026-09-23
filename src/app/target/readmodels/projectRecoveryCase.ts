@@ -52,7 +52,7 @@ export function projectRecoveryCase(input: RecoveryCaseFacts): RecoveryCaseView 
     facts: { ...step.facts },
     relatedSubjectRefs: [...step.relatedSubjectRefs],
   }));
-  const focusedGraph = projectFocusedGraph(ldg, causalPath);
+  const focusedGraph = projectFocusedGraph(ldg, causalPath, input.dependencyContext ?? []);
 
   return RecoveryCaseViewSchema.parse({
     generatedAt: input.generatedAt,

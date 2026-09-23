@@ -46,9 +46,13 @@ import { loadOriginalCaseGraphSnapshot } from '../../../persistence/postgres/com
 import { disruptionEventFileFromEnv } from '../../demo/providerDisruptionEventSource.ts';
 import {
   projectFocusedCaseGraphEnrichment,
+  selectProposedServicePreview,
+  type JourneyItemRow,
   type ProgrammeParticipationAssessment,
   type TransportBookingFact,
+  type TransportServiceRow,
 } from './projectFocusedCaseGraph.ts';
+import { loadProposedOfferBindingsForStrategy } from '../../../persistence/postgres/execution/providerExecutionInputs.ts';
 import type { TypedRef } from '../../../domain/v2/shared/identity.ts';
 
 function isoNow(at?: string): string {
@@ -592,6 +596,16 @@ async function projectCaseStrategies(
   });
 }
 
+/** Read options for one Case projection. */
+export interface RecoveryCaseFactsOptions {
+  /**
+   * Preview the recommended strategy's proposed SELECT_OFFER service on the
+   * focused graph (default true). The immutable Original capture passes false:
+   * Original is current-world truth and must never contain a proposal.
+   */
+  proposedServicePreview?: boolean;
+}
+
 /**
  * Defect-1 fix: the actual query/join logic, run against a client already
  * inside the caller's `withProjectionSnapshot` transaction. Never call this
@@ -613,6 +627,7 @@ async function loadRecoveryCaseFactsInner(
    * prior cursor to compare against) rather than everything.
    */
   sinceCursor: string | undefined,
+  options: RecoveryCaseFactsOptions = {},
 ): Promise<RecoveryCaseFacts | null> {
   const caseRow = await client.query<{
     id: string;
@@ -718,6 +733,10 @@ async function loadRecoveryCaseFactsInner(
   // T3: the deterministic causal path — every applicable blocking FAIL
   // explanation of every failing subject, exactly as the evaluator typed it.
   const causalPath: CausalPathStep[] = [];
+  // CP4: the other blocking, applicable, non-failing explanations of the same
+  // CURRENT assessments. Not causes; the focused-graph projector only uses the
+  // ones that explicitly name a subject already on the causal chain.
+  const dependencyContext: CausalPathStep[] = [];
   const programmeParticipationViews = new Map<string, {
     status: AssessmentViewStatus;
     explanations: ReadonlyArray<{
@@ -772,23 +791,22 @@ async function loadRecoveryCaseFactsInner(
       if (tone === 'UNKNOWN') {
         uncertainty.push(`${ref} current assessment verdict ${verdict}`);
       }
-      if (tone === 'FAIL') {
-        for (const dim of view.assessment.dimensions) {
-          if (!dim.applicable || !dim.blocking || dim.verdict !== 'FAIL') continue;
-          for (const explanation of dim.explanations) {
-            if (explanation.status !== 'FAIL') continue;
-            causalPath.push({
-              subjectRef: `${explanation.affectedSubject.kind}:${explanation.affectedSubject.id}`,
-              ...(explanation.cause.subjectRef
-                ? { causeSubjectRef: `${explanation.cause.subjectRef.kind}:${explanation.cause.subjectRef.id}` }
-                : {}),
-              dimension: dim.dimension,
-              reasonCode: explanation.reasonCode,
-              evaluatorId: explanation.evaluatorId,
-              facts: { ...explanation.facts },
-              relatedSubjectRefs: explanation.relatedSubjects.map((r) => `${r.kind}:${r.id}`),
-            });
-          }
+      for (const dim of view.assessment.dimensions) {
+        if (!dim.applicable || !dim.blocking) continue;
+        for (const explanation of dim.explanations) {
+          const causalFail = tone === 'FAIL' && dim.verdict === 'FAIL' && explanation.status === 'FAIL';
+          if (explanation.status === 'FAIL' && !causalFail) continue;
+          (causalFail ? causalPath : dependencyContext).push({
+            subjectRef: `${explanation.affectedSubject.kind}:${explanation.affectedSubject.id}`,
+            ...(explanation.cause.subjectRef
+              ? { causeSubjectRef: `${explanation.cause.subjectRef.kind}:${explanation.cause.subjectRef.id}` }
+              : {}),
+            dimension: dim.dimension,
+            reasonCode: explanation.reasonCode,
+            evaluatorId: explanation.evaluatorId,
+            facts: { ...explanation.facts },
+            relatedSubjectRefs: explanation.relatedSubjects.map((r) => `${r.kind}:${r.id}`),
+          });
         }
       }
       // A5 FIX-2A — the classification above is this subject's own. Worst-of
@@ -1101,6 +1119,84 @@ async function loadRecoveryCaseFactsInner(
     }
   }
 
+  const enrichmentJourneyItems: JourneyItemRow[] = journeyItems.rows.map((i) => ({
+    id: i.id,
+    journey_id: i.journey_id,
+    kind: i.kind,
+    order_key: i.order_key,
+    lifecycle_status: i.lifecycle_status,
+    intended_window_start: i.intended_window_start,
+    intended_window_end: i.intended_window_end,
+    timeZone: i.stay_time_zone,
+    selectedServiceId: i.selected_service_id,
+  }));
+
+  // A5/CP4 — proposed-service preview. Only the ONE recommended strategy of
+  // the case's current planning attempt is previewed (never every candidate),
+  // only from its recorded SELECT_OFFER bindings, and only until execution of
+  // that strategy starts: from the first attempt on, canonical state and then
+  // observation own the card. Canonical selection is never mutated here.
+  const recommendedStrategyRef = options.proposedServicePreview === false
+    ? undefined
+    : planningAttempt?.attempt.recommendation?.recommendedStrategyRef;
+  let proposedServiceByJourneyItem = new Map<string, string>();
+  const proposedTransportServices: TransportServiceRow[] = [];
+  if (recommendedStrategyRef) {
+    const bindings = await loadProposedOfferBindingsForStrategy(client, workspaceId, recommendedStrategyRef);
+    const executionStarted = bindings.length > 0
+      ? (await client.query<{ started: boolean }>(
+          `SELECT EXISTS (
+             SELECT 1
+               FROM action_plans plan
+               JOIN action_intents intent
+                 ON intent.workspace_id = plan.workspace_id AND intent.action_plan_id = plan.id
+               JOIN execution_attempts attempt
+                 ON attempt.workspace_id = intent.workspace_id AND attempt.action_intent_id = intent.id
+              WHERE plan.workspace_id = $1 AND plan.recovery_strategy_id = $2
+           ) AS started`,
+          [workspaceId, recommendedStrategyRef],
+        )).rows[0]?.started === true
+      : false;
+    proposedServiceByJourneyItem = selectProposedServicePreview({
+      journeyItems: enrichmentJourneyItems,
+      bindings,
+      executionStarted,
+    });
+    const previewed = bindings.filter(
+      (binding) => proposedServiceByJourneyItem.get(binding.journeyItemId) === binding.proposedTransportServiceId,
+    );
+    if (previewed.length > 0) {
+      // Human place names for the proposed route (same `places` source the
+      // canonical service rows join); an unknown place stays unnamed.
+      const placeIds = [...new Set(previewed.flatMap((b) => [b.itinerary.originPlaceId, b.itinerary.destinationPlaceId]))];
+      const places = await client.query<{ id: string; name: string | null; time_zone: string | null }>(
+        `SELECT id::text AS id, name, time_zone FROM places WHERE workspace_id = $1 AND id::text = ANY($2::text[])`,
+        [workspaceId, placeIds],
+      );
+      const placeById = new Map(places.rows.map((place) => [place.id, place]));
+      const seen = new Set<string>();
+      for (const binding of previewed) {
+        if (seen.has(binding.proposedTransportServiceId)) continue;
+        seen.add(binding.proposedTransportServiceId);
+        const { itinerary } = binding;
+        proposedTransportServices.push({
+          id: binding.proposedTransportServiceId,
+          mode: itinerary.mode,
+          operator: itinerary.operator,
+          origin_place_id: itinerary.originPlaceId,
+          destination_place_id: itinerary.destinationPlaceId,
+          origin_place_name: placeById.get(itinerary.originPlaceId)?.name ?? null,
+          destination_place_name: placeById.get(itinerary.destinationPlaceId)?.name ?? null,
+          published_departure: itinerary.departure,
+          published_arrival: itinerary.arrival,
+          destination_time_zone: placeById.get(itinerary.destinationPlaceId)?.time_zone ?? null,
+          // An offer itinerary carries no service designator; none is invented.
+          service_code: null,
+        });
+      }
+    }
+  }
+
   // Call the pure enrichment projector.
   const enrichment = projectFocusedCaseGraphEnrichment({
     caseSubjects: subjects.rows,
@@ -1112,17 +1208,7 @@ async function loadRecoveryCaseFactsInner(
       intended_window_start: j.intended_window_start,
       intended_window_end: j.intended_window_end,
     })),
-    journeyItems: journeyItems.rows.map((i) => ({
-      id: i.id,
-      journey_id: i.journey_id,
-      kind: i.kind,
-      order_key: i.order_key,
-      lifecycle_status: i.lifecycle_status,
-      intended_window_start: i.intended_window_start,
-      intended_window_end: i.intended_window_end,
-      timeZone: i.stay_time_zone,
-      selectedServiceId: i.selected_service_id,
-    })),
+    journeyItems: enrichmentJourneyItems,
     transportServices: transportServices.rows.map((s) => ({
       id: s.id,
       mode: s.mode,
@@ -1160,6 +1246,7 @@ async function loadRecoveryCaseFactsInner(
       reprotectedTransportServiceRefs: new Set(changedTransportServiceRefs.rows.map((fact) => fact.subject_id)),
       ...(displacedPublishedArrival ? { displacedPublishedArrival } : {}),
     } : {}),
+    ...(proposedServiceByJourneyItem.size > 0 ? { proposedServiceByJourneyItem, proposedTransportServices } : {}),
   });
 
   // ---------------------------------------------------------------------
@@ -1277,6 +1364,7 @@ async function loadRecoveryCaseFactsInner(
     caseRef: caseId,
     ...(cause ? { cause } : {}),
     causalPath,
+    dependencyContext,
     status,
     changeSummary: cause
       ? `${cause.changeType} (${cause.originKind}) received ${cause.receivedAt}`
@@ -1335,9 +1423,10 @@ export async function loadRecoveryCaseFacts(
   caseId: string,
   at?: string,
   sinceCursor?: string,
+  options: RecoveryCaseFactsOptions = {},
 ): Promise<RecoveryCaseFacts | null> {
   const { value, changeCursor } = await withProjectionSnapshot(pool, (client) =>
-    loadRecoveryCaseFactsInner(client, workspaceId, caseId, at, sinceCursor),
+    loadRecoveryCaseFactsInner(client, workspaceId, caseId, at, sinceCursor, options),
   );
   return value ? { ...value, changeCursor } : null;
 }

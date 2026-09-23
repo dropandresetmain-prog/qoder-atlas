@@ -98,7 +98,70 @@
     in `postgres-integration/a5JordanD3Planning.pgtest.ts` (not just observed via a throwaway debug log).
   - Checks: 16 operator-ui-convergence + 2 new UI regression tests pass; full D3 planning PG test passes
     with the new Path A/B structural assertions; `gate:test-boundary` and full `tsc --noEmit` clean.
-- [ ] CP4 — focused graph spine + proposed-service preview
+- [x] CP4 — focused graph spine + proposed-service preview (CP4 commit(s) on top of `162a47a`)
+  - Start state note: the worktree was NOT clean at `162a47a` — the pre-CP4 prep (migration `0138`
+    + `providerExecutionInputs.ts` `proposedTransportServiceId`/`loadProposedOfferBindingsForStrategy`,
+    staged; the traveller-kind suppression fixes in `projectFocusedGraph.ts` + A1 test update, unstaged)
+    was uncommitted. It is committed as part of CP4.
+  - Empirical D3 truth (real AiT clone, D1→D2→D3 + REPLAY planning, throwaway diag dump): `causalPath` is
+    exactly ONE step (`connection_feasibility/connection_broken`, cause = inbound item, related = inbound +
+    onward items). `stay_arrival_date_aligned` and both `programme_participation` explanations are PASS at
+    D3 (canonical onward still lands on the check-in date) — so they can never enter `causalPath` (blocking
+    FAIL explanations only, correctly). Before CP4, `causalNodeRefs` = signal, inbound booking, arrival
+    timing, traveller, onward booking; the stay and both commitments sat in the dimmed context band under
+    the spine ("floating"). Found a real generic bug: the `TRANSFER_STAY` card carried NO `subjectRefs`, so
+    no evaluator explanation naming the stay's `JOURNEY_ITEM` could ever map onto it.
+  - Piece 1 (proposed-service preview): `pgFactAssembler` previews ONLY the current planning attempt's
+    `recommendation.recommendedStrategyRef`, from its `offer_execution_bindings.proposed_transport_service_id`
+    (`loadProposedOfferBindingsForStrategy`), gated by pure `selectProposedServicePreview` (no preview once any
+    `execution_attempts` row exists for an action plan of that strategy; TRANSPORT items of the case only;
+    proposal == canonical → nothing; two proposals for one item → ambiguous → nothing). Label from the
+    itinerary (operator + mode, route via `places` names); no service code (the itinerary has none — never
+    invented). Preview card + every edge touching it are `authority: PROPOSED`, card `semanticState: PROPOSED`,
+    detail "… · Proposed replacement · not booked yet"; the canonical connection's FAILED verdict/"unreachable"
+    detail is never transplanted onto it and no timing node grows from it. Canonical selection is only read.
+    `ensureOriginalCaseGraph` reads with `{ proposedServicePreview: false }` so Original never contains a proposal.
+  - Piece 2 (spine connectivity): generic, evaluator-driven — `TRANSFER_STAY` cards now declare
+    `subjectRefs: [JOURNEY_ITEM:<item>]`; the assembler also collects `dependencyContext` (blocking, applicable,
+    NON-FAIL explanations of the same CURRENT assessments; never part of `causalPath`); `projectFocusedGraph`
+    appends, after the causal chain, the visible subjects of any dependency explanation that explicitly names a
+    non-traveller node already on the chain. One hop (anchors frozen first), traveller never an anchor, so an
+    unrelated commitment (explanation names no chain item) stays off. No topology search, no scenario tokens.
+    Real D3 result: arrival → proposed onward, onward → stay, Jordan → stay, arrival → both commitments are
+    causal edges; `causalPath` itself unchanged (1 step).
+  - Checks: `test/a5-proposed-service-preview.test.ts` (new, 6 tests: canonical before proposal; PROPOSED
+    preview from itinerary; no stale canonical card; after execution / canonical rebind → booked canonical card,
+    no preview; selector edge cases; no canonical shadowing) + 3 new CP4 tests in
+    `test/r2-focused-graph-projection.test.ts` (dependents join / unrelated + second-hop excluded; no chain → no
+    additions; enrichment→projector end-to-end incl. stay subjectRefs + arrival→proposed onward→stay).
+    10 graph-related unit files: 128/128 pass. `postgres-integration/a5JordanD3Planning.pgtest.ts` extended with
+    durable CP4 assertions on the real D3 run (preview node from the real binding, canonical selection unchanged,
+    no stale onward card, stay + both commitments on spine with connecting causal edges, Original-mode read has
+    no PROPOSED node): 1/1 pass (166 s). `tsc --noEmit` clean; test-boundary gate CLEAN (313 files).
+    `npm test` (current): 1404/1411 — the 7 failures were proven pre-existing/unrelated by running them on an
+    index export without CP4 changes (6 reproduce: b1-product-acceptance, final-demo-content-coherence
+    ait-draft-09 hotel, m9-vertical-loop copy regex, postgres-fast-suite-contract (a5ProviderStayBaseline in
+    postgresFast), r1-case-projection C9 "Replacement travel" copy, r4-offer-execution-boundary provider-mutation
+    guard flags `providerStayBaseline.ts`); the 7th (demo-console popover e2e timer) passes 10/10 alone — load flake.
+    `npm run test:postgres:fast` (once, 28.6 min): 552/610 pass, 58 fail — NONE attributable to CP4. ~45 are
+    one pre-existing family `VALIDATION_FAILED: GRANT_MISSING: action.intent.dispatch` (m8AuthorityExecution,
+    c3TargetedRemediation, a4CompositeExecution/SelectedPlanContinuation/StayExecution, m7m8*, m9SameProgramme*,
+    m9SarahTargetE2E, r1UnknownOutcome). Every read-model/planning-adjacent failure was re-run on the pre-CP4
+    index export and reproduces identically there: r2FocusedCaseGraph "selected service uses an exact confirmed
+    allocated reservation line", r1PlanningEvidenceProjection C9 "later canonical change…", r1CaseAttention,
+    r1RecoveryProgression, b1RecoveryLoop, m9JordanMultiActionRecovery, a3StayArrivalRequirement, m8 (15/55 fail
+    on baseline, same subtests). `a3JordanConnectionFoundation` ("the healthy whole journey passes before any
+    disruption") passes on the tracked-only baseline but fails identically on that SAME pre-CP4 code once the
+    worktree's 25 UNTRACKED `recordings/**` files (earlier sessions' RECORD output: atlas/search, frankfurter,
+    nuitee quote/search/stay_context, official-documents) are copied in — environmental, not CP4; those
+    untracked recordings are deliberately NOT committed and need a decision (commit, sanitize or delete) before
+    CP6 REPLAY proof. These pre-existing PG failures are NOT CP4 scope; they
+    must be triaged before CP5/CP6 relies on the execution gates (GRANT_MISSING blocks authority→dispatch).
+  - Carry-forwards: (Park) `programme_participation` PASSes on the canonical onward arrival even when the
+    connection into it is broken (evaluator is connection-blind) — pre-existing evaluator semantics, not a graph
+    issue. (Park) the arrival→commitment edge is drawn from the last *implicated* timing node (inbound NRT
+    arrival), not the destination arrival — pre-existing enrichment rule. The 6 pre-existing `current` failures
+    above need their own fix pass (CP2/CP3 fallout) — not CP4 scope.
 - [ ] CP5 — Chromium D1/D2/D3 acceptance
 - [ ] CP6 — protected sandbox execution → RESOLVED + sanitized recordings + REPLAY proof
 
