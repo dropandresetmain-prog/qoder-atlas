@@ -201,6 +201,106 @@ test('R2 enrichment: creates TRANSFER_STAY node for stay item', () => {
   assert.equal(node.detail, '15 Jan 22:00 → 16 Jan 18:00 GMT+8');
 });
 
+test('A1 enrichment: cancelled stay reservation paints CANCELLED, not UNKNOWN', () => {
+  const base = {
+    caseSubjects: [{ subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' }],
+    journeys: [{ id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null }],
+    journeyItems: [
+      {
+        id: 'item-displaced',
+        journey_id: 'journey-1',
+        kind: 'STAY' as const,
+        order_key: '001',
+        lifecycle_status: 'DROPPED',
+        intended_window_start: '2026-09-29T14:00:00Z',
+        intended_window_end: '2026-10-03T10:00:00Z',
+        timeZone: 'Asia/Singapore',
+        placeName: 'Original hotel',
+        selectedServiceId: null,
+      },
+      {
+        id: 'item-replacement',
+        journey_id: 'journey-1',
+        kind: 'STAY' as const,
+        order_key: '002',
+        lifecycle_status: 'PLANNED',
+        intended_window_start: '2026-09-30T14:00:00Z',
+        intended_window_end: '2026-10-03T10:00:00Z',
+        timeZone: 'Asia/Singapore',
+        placeName: 'Replacement hotel',
+        selectedServiceId: null,
+      },
+    ],
+    transportServices: [],
+    participations: [],
+    programmeItems: [],
+    objectives: [],
+    assessmentViews: new Map(),
+    travellerLabelsByJourney: new Map([['journey-1', 'Alice']]),
+    caseId: 'case-1',
+  };
+
+  const result = projectFocusedCaseGraphEnrichment({
+    ...base,
+    stayBookingFacts: [
+      {
+        journeyItemId: 'item-displaced',
+        lineCount: 1,
+        // Authoritative line cancellation; reservation header may remain CONFIRMED.
+        lineStatus: 'CANCELLED',
+        reservationStatus: 'CONFIRMED',
+        observedAt: '2026-09-24T02:00:00.000Z',
+      },
+      {
+        journeyItemId: 'item-replacement',
+        lineCount: 1,
+        lineStatus: 'CONFIRMED',
+        reservationStatus: 'CONFIRMED',
+        observedAt: '2026-09-24T01:00:00.000Z',
+      },
+    ],
+  });
+
+  const displaced = result.nodes.find((node) => node.ref === 'TRANSFER_STAY:item-displaced');
+  const replacement = result.nodes.find((node) => node.ref === 'TRANSFER_STAY:item-replacement');
+  assert.equal(displaced?.semanticState, 'CANCELLED');
+  assert.match(displaced?.detail ?? '', /Cancelled/);
+  assert.doesNotMatch(displaced?.detail ?? '', /Unknown|unconfirmed/i);
+  assert.equal(replacement?.semanticState, 'HEALTHY');
+  assert.match(replacement?.detail ?? '', /Booking line confirmed/);
+});
+
+test('A1 enrichment: ambiguous stay allocation count stays UNKNOWN', () => {
+  const result = projectFocusedCaseGraphEnrichment({
+    caseSubjects: [{ subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' }],
+    journeys: [{ id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null }],
+    journeyItems: [{
+      id: 'item-1',
+      journey_id: 'journey-1',
+      kind: 'STAY',
+      order_key: '001',
+      lifecycle_status: 'PLANNED',
+      intended_window_start: null,
+      intended_window_end: null,
+      selectedServiceId: null,
+    }],
+    transportServices: [],
+    participations: [],
+    programmeItems: [],
+    objectives: [],
+    assessmentViews: new Map(),
+    travellerLabelsByJourney: new Map([['journey-1', 'Alice']]),
+    caseId: 'case-1',
+    stayBookingFacts: [{
+      journeyItemId: 'item-1',
+      lineCount: 2,
+      lineStatus: null,
+      reservationStatus: null,
+    }],
+  });
+  assert.equal(result.nodes[0]?.semanticState, 'UNKNOWN');
+});
+
 test('R2 enrichment: creates PROGRAMME_COMMITMENT node for accepted participation', () => {
   const result = projectFocusedCaseGraphEnrichment({
     caseSubjects: [{ subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' }],

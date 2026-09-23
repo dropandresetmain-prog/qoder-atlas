@@ -45,6 +45,8 @@ export const LdgSemanticStateSchema = z.enum([
   'ACTIVE',
   'UNKNOWN',
   'RECOVERED',
+  /** Authoritative supplier cancellation — inactive, not unknown and not failed recovery. */
+  'CANCELLED',
 ]);
 export type LdgSemanticState = z.infer<typeof LdgSemanticStateSchema>;
 

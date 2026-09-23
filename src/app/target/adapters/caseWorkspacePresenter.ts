@@ -702,7 +702,8 @@ function buildAffects(view: RecoveryCaseView): CaseWorkspaceModel['affects'] {
       healthy += 1;
       continue;
     }
-    if (node.semanticState === 'PROPOSED' || node.semanticState === 'ACTIVE') continue;
+    // Cancelled bookings are inactive history — not current open impact.
+    if (node.semanticState === 'CANCELLED' || node.semanticState === 'PROPOSED' || node.semanticState === 'ACTIVE') continue;
     const label = node.kind === 'TRAVELLER'
       ? 'Trip objective'
       : plain(node.label) ?? CASE_NODE_KIND_NOUN[node.kind] ?? 'Part of the trip';

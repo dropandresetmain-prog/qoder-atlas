@@ -72,6 +72,11 @@ export interface OperatorItemFact {
   decisionRequired?: boolean;
   unresolvedUncertainty?: readonly string[];
   evaluation?: AssessmentViewStatus;
+  /**
+   * RecoveryCase lifecycle when this queue row was built from a case.
+   * Terminal lifecycles are excluded from the open-attention queue.
+   */
+  caseLifecycleStatus?: string;
 }
 
 /**

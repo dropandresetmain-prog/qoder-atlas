@@ -298,9 +298,9 @@ export interface FocusedCaseGraphEnrichmentInput {
    */
   proposedTransportServices?: readonly TransportServiceRow[];
   /**
-   * Exact reservation evidence for stay journey items (CONFIRMED line + reservation).
-   * When present, the stay card paints HEALTHY with confirmation detail instead of
-   * UNKNOWN merely because no assessment tone was recorded.
+   * Exact reservation evidence for stay journey items.
+   * CONFIRMED line + reservation paints HEALTHY; exact CANCELLED line +
+   * reservation paints CANCELLED (inactive) instead of UNKNOWN.
    */
   stayBookingFacts?: readonly StayBookingFact[];
 }
@@ -712,14 +712,25 @@ export function projectFocusedCaseGraphEnrichment(
           && stayFact.lineCount === 1
           && stayFact.lineStatus === 'CONFIRMED'
           && stayFact.reservationStatus === 'CONFIRMED';
+        // OBSERVED_STAY_CANCELLED updates the reservation line to CANCELLED and
+        // drops the journey item; the reservation header may remain CONFIRMED.
+        // Exact single CANCELLED line is authoritative inactive stay truth.
+        const stayCancelled = stayFact
+          && stayFact.lineCount === 1
+          && stayFact.lineStatus === 'CANCELLED';
         const assessed = stateFor(ref);
         const state = stayConfirmed
           ? {
               semanticState: 'HEALTHY' as LdgSemanticState,
               detail: `Booking line confirmed${stayFact?.observedAt ? ` · observed ${formatInstantUtc(stayFact.observedAt)}` : ''}`,
             }
-          : assessed;
-        if (stayConfirmed && state.detail) {
+          : stayCancelled
+            ? {
+                semanticState: 'CANCELLED' as LdgSemanticState,
+                detail: `Cancelled${stayFact?.observedAt ? ` · observed ${formatInstantUtc(stayFact.observedAt)}` : ''}`,
+              }
+            : assessed;
+        if ((stayConfirmed || stayCancelled) && state.detail) {
           detail = detail ? `${detail} · ${state.detail}` : state.detail;
         }
         itemRefs.push(ref);
@@ -727,11 +738,15 @@ export function projectFocusedCaseGraphEnrichment(
           ref,
           kind: 'TRANSFER_STAY',
           label,
-          semanticState: stayConfirmed ? 'HEALTHY' : assessed.semanticState,
+          semanticState: stayConfirmed
+            ? 'HEALTHY'
+            : stayCancelled
+              ? 'CANCELLED'
+              : assessed.semanticState,
           authority: 'AUTHORITATIVE',
           caseRef: input.caseId,
           subjectRefs: [itemSubjectRef],
-          ...(!stayConfirmed && assessed.evaluation ? { evaluation: assessed.evaluation } : {}),
+          ...(!stayConfirmed && !stayCancelled && assessed.evaluation ? { evaluation: assessed.evaluation } : {}),
           ...(detail ? { detail } : {}),
         });
         continue;

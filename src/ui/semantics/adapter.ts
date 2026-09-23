@@ -19,6 +19,7 @@ const GRAPH_STATES: Record<LdgSemanticState, SemanticIndicator> = {
   ACTIVE: indicator('Work in progress', 'active', 'active'),
   UNKNOWN: indicator('Unknown / unconfirmed', 'neutral', 'question'),
   RECOVERED: indicator('Recovered', 'ok', 'check'),
+  CANCELLED: indicator('Cancelled', 'neutral', 'cross'),
 };
 const VIABILITY: Record<RemainderViability, SemanticIndicator> = {
   VIABLE: indicator('Viable', 'ok', 'check'),

@@ -197,10 +197,35 @@
     confirmed stay reservations paint HEALTHY. Default Disruption Path: mainline +
     proposed sharp, dashed Arrival→proposed always visible, owner/stay/programme faded
     until click. Post-execution Narita / replacement-stay solid edges: Park for Later.
-  - **CP5.1 founder visual QC: APPROVED.** Uncommitted working-tree presentation fixes
-    still need a commit before CP6. Do **not** begin CP6 until that commit lands.
-- [ ] CP6 — protected sandbox execution → RESOLVED + sanitized recordings + REPLAY proof
+  - **CP5.1 founder visual QC: APPROVED.** Committed at `9a8eef2`
+    (`fix(a5): founder-approved Jordan D3 case graph presentation`).
+- [x] CP6 — protected sandbox execution → RESOLVED
+  - **Verdict:** `CP6_RESOLVED_PASS` at `f1297fa`
+  - CP6-A readiness: `35d1538`
+  - Atlas sandbox passenger alias: `bffb05f`
+  - Nuitee connection resolve + evidence: `f1297fa`
+  - Evidence: `docs/work/cp6-evidence/` (`CP6_EXECUTION_LEDGER.md`)
+  - Preserved resolved clone (UI / recording): `ns_ait_cl_74748a4c1901496f`
+  - Case `193487a7-c3b9-5086-af4d-71a159613454` → `RESOLVED` / product `RECOVERED` /
+    whole-trip viability `PASS`; canonical traveller remains Jordan Hale
+  - Atlas replacement transport: `OBSERVED_SUCCESS` / `JOURNEY_ITEM_UPDATED`
+  - Replacement stay: `OBSERVED_SUCCESS` / `OBSERVED_STAY_ATTACHED`
+  - Displaced stay: `OBSERVED_SUCCESS` / `OBSERVED_STAY_CANCELLED` (`DpnZRH43H`)
+- [x] Post-CP6 product-truth polish (this pass)
+  - Defect 1 (RESOLVED counted as open attention): **Act Now → closed**
+  - Defect 2 (CANCELLED stay rendered Unknown): **Act Now → closed**
+  - First ticketing `OUTCOME_UNKNOWN`: **Investigated/Closed** — exact-order
+    reconciliation adopted the already-ticketed Atlas order; no blind retry /
+    duplicate payment
+  - Old PG suite failures: **Park for Later**
+  - Old sandbox-account artifacts: **Park for Later**
+  - Canonical CP5 corpus remains frozen (`recordings/jordan-corpus-2026-09-23/`)
 
 ## Parked
 
 - Unified all-provider LIVE/RECORD master switch — deferred (unchanged).
+- Pre-existing PG suite / GRANT_MISSING family failures — Park for Later
+  (not Jordan recording blockers).
+- Old sandbox-account artifacts — Park for Later.
+- Stale unit expectation `A5 enrichment: proposed SELECT_OFFER rebinds…`
+  (expects canonical onward hidden; CP5.1 keeps both) — Park for Later.

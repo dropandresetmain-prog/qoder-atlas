@@ -1491,6 +1491,16 @@ async function loadOperatorOverviewFactsInner(
   const items = [];
   const caseStamps: bigint[] = [];
   for (const c of cases.rows) {
+    // Terminal cases are history, not open attention. Population still carries
+    // the traveller readiness; Case deep-links remain available from roster.
+    if (
+      c.lifecycle_status === 'RESOLVED'
+      || c.lifecycle_status === 'CLOSED'
+      || c.lifecycle_status === 'CANCELLED'
+      || c.lifecycle_status === 'SUPERSEDED'
+    ) {
+      continue;
+    }
     const facts = await loadRecoveryCaseFactsInner(client, workspaceId, c.id, generatedAt, undefined);
     if (!facts) continue;
     caseStamps.push(BigInt(facts.projectionRevision));
@@ -1543,6 +1553,7 @@ async function loadOperatorOverviewFactsInner(
       status,
       remainderViability: remainder,
       caseRef: c.id,
+      caseLifecycleStatus: c.lifecycle_status,
       ...(facts.cause ? { incidentRef: facts.cause.changeSignalRef } : {}),
       whatChanged: facts.changeSummary,
       affectedPeople: affected,

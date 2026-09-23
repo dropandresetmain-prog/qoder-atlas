@@ -368,6 +368,7 @@ test('operator overview keeps attention queue and full managed population', () =
       status: 'DISRUPTED',
       remainderViability: 'NOT_VIABLE',
       caseRef: 'CASE:one',
+      caseLifecycleStatus: 'OPEN',
       affectedPeople: [],
       affectedItems: [],
       decisionRequired: true,
@@ -387,6 +388,60 @@ test('operator overview keeps attention queue and full managed population', () =
   assert.match(html, /data-test="event-overview-graph"/);
   assert.match(html, /Traveller 001/);
   assert.match(html, /Traveller 002/);
+});
+
+test('RESOLVED recovery cases do not count as open attention stories', () => {
+  const population = [
+    pop(1, 'READY', 'CURRENT', { caseRef: 'CASE:resolved' }),
+    pop(2, 'DISRUPTED', 'CURRENT', { caseRef: 'CASE:open' }),
+  ];
+  const facts: OperatorOverviewFacts = {
+    generatedAt: '2031-03-10T08:00:00.000Z',
+    projectionRevision: 1,
+    changedVisibleRefs: [],
+    changedEdgeIds: [],
+    currentSemanticState: 'HEALTHY',
+    nodes: [],
+    edges: [],
+    items: [
+      {
+        tripRef: 'TRIP:001',
+        travellerLabel: 'Traveller Recovered',
+        status: 'READY',
+        remainderViability: 'VIABLE',
+        caseRef: 'CASE:resolved',
+        caseLifecycleStatus: 'RESOLVED',
+        affectedPeople: [],
+        affectedItems: [],
+        decisionRequired: false,
+        unresolvedUncertainty: [],
+      },
+      {
+        tripRef: 'TRIP:002',
+        travellerLabel: 'Traveller Open',
+        status: 'DISRUPTED',
+        remainderViability: 'NOT_VIABLE',
+        caseRef: 'CASE:open',
+        caseLifecycleStatus: 'PLANNING',
+        affectedPeople: [],
+        affectedItems: [],
+        decisionRequired: true,
+        unresolvedUncertainty: [],
+      },
+    ],
+    population,
+  };
+  const view = projectOperatorOverview(facts);
+  const surface = adaptOperatorOverviewToDashboard(view);
+
+  assert.equal(view.items.length, 1);
+  assert.equal(view.items[0]?.caseRef, 'CASE:open');
+  assert.equal(surface.attentionCount, 1);
+  assert.match(surface.attentionHtml, /Traveller Open/);
+  assert.doesNotMatch(surface.attentionHtml, /Traveller Recovered/);
+  // Population still shows the recovered traveller as Confirmed.
+  assert.equal(view.populationSummary.ready, 1);
+  assert.equal(view.populationSummary.disrupted, 1);
 });
 
 function geometryNode(id: string, kind: OgNode['kind'], dayIndex?: number): OgNode {

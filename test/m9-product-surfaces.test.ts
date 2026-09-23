@@ -412,7 +412,7 @@ describe('M9 operator surfaces consume the single semantic boundary', () => {
 
   test('incident programme commitment dots keep UNKNOWN and ACTIVE out of brass', () => {
     const view = incidentProgrammeView();
-    const states = ['HEALTHY', 'CHANGED', 'AFFECTED', 'FAILED', 'PROPOSED', 'ACTIVE', 'UNKNOWN', 'RECOVERED'] as const;
+    const states = ['HEALTHY', 'CHANGED', 'AFFECTED', 'FAILED', 'PROPOSED', 'ACTIVE', 'UNKNOWN', 'RECOVERED', 'CANCELLED'] as const;
     const html = renderProductIncidentProgramme({
       ...view,
       programmeCommitments: states.map((state) => ({ itemRef: `commit-${state}`, label: state, state })),
@@ -420,6 +420,7 @@ describe('M9 operator surfaces consume the single semantic boundary', () => {
     const expected: Record<(typeof states)[number], string> = {
       HEALTHY: 'd-ok', CHANGED: 'd-watch', AFFECTED: 'd-watch', FAILED: 'd-bad',
       PROPOSED: 'd-watch', ACTIVE: 'd-active', UNKNOWN: 'd-unconfirmed', RECOVERED: 'd-ok',
+      CANCELLED: 'd-unconfirmed',
     };
     for (const state of states) {
       const item = html.slice(html.indexOf(`data-item-ref="commit-${state}"`));
