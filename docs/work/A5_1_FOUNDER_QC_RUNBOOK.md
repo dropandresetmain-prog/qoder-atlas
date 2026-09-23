@@ -1,7 +1,7 @@
 # A5.1 founder QC runbook — Sarah + Jordan click-through
 
-Status: **ready for founder E2E click-through** against the **canonical Jordan clean-room corpus**.  
-Not A5.2 LIVE destructive acceptance.
+Status: **CP5 browser acceptance PASS** against the **canonical Jordan clean-room corpus**.  
+Not A5.2 LIVE destructive acceptance (CP6).
 
 ## Canonical recording corpus (required)
 

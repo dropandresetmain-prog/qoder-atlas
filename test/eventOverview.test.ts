@@ -131,6 +131,27 @@ test('cleared members remain promoted and listed after the others', () => {
   assert.equal(ov.landmarks[0]!.affectedCount, 2);
 });
 
+test('CURRENT UNKNOWN blast members stay CHECKING — not false-red UNRESOLVED', () => {
+  // Viable delay (D1): journey assessment may remain UNKNOWN while the shared
+  // service is only changed/amber. UNKNOWN must not paint "Needs attention".
+  const population = [pop(1, 'UNKNOWN', 'CURRENT'), pop(2, 'DISRUPTED', 'CURRENT'), pop(3, 'READY', 'CURRENT')];
+  const src: EventOverviewSourceFacts = {
+    programmeItems: [item(1, 1, 9)],
+    participations: population.map((_, i) => part(i + 1, 1)),
+    journeyServices: [svc(1, 'Alpha', true), svc(2, 'Alpha', true), svc(3, 'Alpha', true)],
+  };
+  const ov = buildEventOverview({ source: src, population, items: [] });
+  assert.deepEqual(
+    ov.promotedTravellers.map((t) => ({ label: t.label, membership: t.membership })),
+    [
+      { label: 'Traveller 002', membership: 'UNRESOLVED' },
+      { label: 'Traveller 001', membership: 'CHECKING' },
+      { label: 'Traveller 003', membership: 'CLEARED' },
+    ],
+  );
+  assert.deepEqual(ov.blastRadius && [ov.blastRadius.clearedCount, ov.blastRadius.checkingCount, ov.blastRadius.unresolvedCount], [1, 1, 1]);
+});
+
 test('participant currentness alone leaves commitment health neutral', () => {
   const population = [pop(1), pop(2, 'UNKNOWN', 'PENDING_REASSESSMENT')];
   const src: EventOverviewSourceFacts = {

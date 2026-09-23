@@ -178,7 +178,9 @@
 - [x] CP-R2 — fresh Jordan RECORD corpus (`jordan-corpus-2026-09-23`, 25 provider files) + stay-element
   leading-`-` fix + REPLAY `booking_lookup` baseline path
 - [x] CP-R3 — REPLAY D1→D2→D3 → `AWAITING_AUTHORITY` proof; runbook + ACTIVE_TASK point at this corpus only
-- [ ] CP5 — Chromium D1/D2/D3 acceptance (**using ONLY `jordan-corpus-2026-09-23`**)
+- [x] CP5 — Chromium D1/D2/D3 browser acceptance on `jordan-corpus-2026-09-23`
+  - Evidence: `docs/work/cp5-evidence/` (healthy → D1 CHECKING → D2 AT_RISK → D3 DISRUPTED → Path A).
+  - Fix: Overview blast membership no longer paints CURRENT `UNKNOWN` as red UNRESOLVED (D1 false-red).
 - [ ] CP6 — protected sandbox execution → RESOLVED + sanitized recordings + REPLAY proof
 
 ## Parked

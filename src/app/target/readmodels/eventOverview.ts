@@ -36,8 +36,9 @@ function dateLabel(localDate: string): string {
 function membershipOf(p: OperatorPopulationFact): Exclude<EventOverviewMembership, 'ATTENTION'> {
   if (p.evaluation !== 'CURRENT') return 'CHECKING';
   if (p.status === 'READY') return 'CLEARED';
-  // Tight connection / recovering stay watchable amber, not definitive red.
-  if (p.status === 'AT_RISK' || p.status === 'RECOVERING') return 'CHECKING';
+  // Tight connection / recovering / still-unknown stay watchable amber, not
+  // definitive red. Only DISRUPTED is unresolved attention in the blast.
+  if (p.status === 'AT_RISK' || p.status === 'RECOVERING' || p.status === 'UNKNOWN') return 'CHECKING';
   return 'UNRESOLVED';
 }
 
