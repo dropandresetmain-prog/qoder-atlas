@@ -11,7 +11,7 @@ Not A5.2 LIVE destructive acceptance.
 ## Shared boot
 
 1. Use a stable demo PostgreSQL workspace (`PG_TARGET_WORKSPACE_ID`) with `NORTHSTAR_DEMO_DATASET_DIR` pointing at the AiT demo pack.
-2. `ADAPTER_MODE=REPLAY` for founder QC (do not burn fresh destructive bookings).
+2. `ADAPTER_MODE=REPLAY` for founder QC (do not burn fresh destructive bookings). For **Jordan transactional RECORD** (sandbox capture, not production pay), use `npm run demo:record` — see `docs/work/JORDAN_FOUNDER_RECORD_PROFILE.md`.
 3. Boot normal product: `npm run dev` (or built `npm start`) on the configured port.
 4. Open Overview in the browser.
 

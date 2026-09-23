@@ -13,6 +13,10 @@
 
 Close remaining demo/runtime defects for founder video recording.
 
+## Parked (CP2+)
+
+- **Unified all-provider LIVE/RECORD profile** — single env switch composing LIVE or RECORD across Atlas, Nuitée, Frankfurter, Google Routes, and intelligence providers together. **Deferred**; Jordan founder path uses `NORTHSTAR_DEMO_PROFILE=record` / `npm run demo:record` only (Atlas RECORD + sandbox markers + Nuitée credentials preflight). Revisit after provider-parity audit closure.
+
 ## Checkpoint ledger
 
 - [x] CP-A — Cancellation semantics + Jordan economic proof (`29e1ae1`)

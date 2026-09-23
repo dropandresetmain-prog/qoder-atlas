@@ -11,6 +11,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
+import { applyDemoProfileToEnv } from './demoProfiles.ts';
 
 export const AdapterModeSchema = z.enum(['LIVE', 'RECORD', 'REPLAY']);
 export type AdapterMode = z.infer<typeof AdapterModeSchema>;
@@ -271,7 +272,10 @@ export function mergeEnvWithDotenvFiles(
   env: Record<string, string | undefined> = process.env,
   cwd: string = process.cwd(),
 ): Record<string, string | undefined> {
-  return { ...compactEnvValues(readDotenvFiles(cwd)), ...overlayEnv(env) };
+  return applyDemoProfileToEnv({
+    ...compactEnvValues(readDotenvFiles(cwd)),
+    ...overlayEnv(env),
+  });
 }
 
 /**
@@ -288,8 +292,8 @@ export function loadConfig(
   env: Record<string, string | undefined> = process.env,
   cwd: string = process.cwd(),
 ): AppConfig {
-  // Precedence: defaults < .env < .env.local < process env
-  const merged = mapEnv({ ...readDotenvFiles(cwd), ...env });
+  // Precedence: defaults < .env < .env.local < process env < demo profile overlay
+  const merged = mapEnv(applyDemoProfileToEnv({ ...readDotenvFiles(cwd), ...env }));
   return AppConfigSchema.parse(merged);
 }
 
