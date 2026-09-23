@@ -11,7 +11,11 @@ function instantMs(value: string): number {
   return Date.parse(value);
 }
 
-export type RecoveryCostKind = 'SELECT_OFFER' | 'ADD_JOURNEY_STAY' | 'POLICY_PENALTY_ESTIMATE';
+export type RecoveryCostKind =
+  | 'SELECT_OFFER'
+  | 'ADD_JOURNEY_STAY'
+  | 'POLICY_PENALTY_ESTIMATE'
+  | 'DISPLACED_STAY_CREDIT';
 
 export interface RecoveryCostLine {
   kind: RecoveryCostKind;
@@ -30,8 +34,13 @@ export interface RecoveryCostComparison {
   /** Maximum cancellation / policy loss exposure — not a confirmed new purchase. */
   potentialLossHomeAmount: ExactMoney;
   /**
-   * Maximum total exposure = new spend + potential loss.
-   * Do not present this alone as “cost”; prefer the split fields above.
+   * Recovered value when cancelling a displaced stay (scheduled booking value
+   * minus the current cancellation fee). Subtracted when forming net cost.
+   */
+  creditHomeAmount: ExactMoney;
+  /**
+   * Net recovery economics in home currency:
+   * new spend + cancellation fee − displaced-stay credit.
    */
   totalHomeAmount: ExactMoney;
   lines: readonly RecoveryCostLine[];
@@ -88,17 +97,45 @@ function rateDecimal(rate: number): string | undefined {
   return text;
 }
 
-function effectCost(effect: ScenarioEffect): { kind: RecoveryCostKind; amount: ExactMoney; observed: boolean } | undefined {
+function negateExactMoney(amount: ExactMoney): ExactMoney {
+  if (/^-?0+(?:\.0+)?$/.test(amount.amount)) {
+    return { amount: amount.amount.replace(/^-/, ''), currency: amount.currency };
+  }
+  return {
+    amount: amount.amount.startsWith('-') ? amount.amount.slice(1) : `-${amount.amount}`,
+    currency: amount.currency,
+  };
+}
+
+function effectCosts(effect: ScenarioEffect): Array<{ kind: RecoveryCostKind; amount: ExactMoney; observed: boolean }> {
   switch (effect.effectKind) {
     case 'SELECT_OFFER':
-      if (!effect.offerPrice) return undefined;
-      return { kind: 'SELECT_OFFER', amount: effect.offerPrice, observed: false };
+      if (!effect.offerPrice) return [];
+      return [{ kind: 'SELECT_OFFER', amount: effect.offerPrice, observed: false }];
     case 'ADD_JOURNEY_STAY':
-      return { kind: 'ADD_JOURNEY_STAY', amount: effect.offerPrice, observed: false };
-    case 'CANCEL_STAY':
-      return { kind: 'POLICY_PENALTY_ESTIMATE', amount: effect.cancellationPenalty, observed: false };
+      return [{ kind: 'ADD_JOURNEY_STAY', amount: effect.offerPrice, observed: false }];
+    case 'CANCEL_STAY': {
+      const lines: Array<{ kind: RecoveryCostKind; amount: ExactMoney; observed: boolean }> = [
+        { kind: 'POLICY_PENALTY_ESTIMATE', amount: effect.cancellationPenalty, observed: false },
+      ];
+      // When a free-cancel window still applies, scheduledCancellationPenalty is
+      // the displaced booking value recovered on cancel (full refund less any
+      // current fee). Net = fee − that recovered value.
+      const scheduled = effect.scheduledCancellationPenalty;
+      if (scheduled && scheduled.currency === effect.cancellationPenalty.currency) {
+        try {
+          const credit = addExactMoney(scheduled, negateExactMoney(effect.cancellationPenalty));
+          if (!/^-?0+(?:\.0+)?$/.test(credit.amount) && !credit.amount.startsWith('-')) {
+            lines.push({ kind: 'DISPLACED_STAY_CREDIT', amount: credit, observed: false });
+          }
+        } catch {
+          // Currency/precision mismatch: omit credit rather than invent net.
+        }
+      }
+      return lines;
+    }
     default:
-      return undefined;
+      return [];
   }
 }
 
@@ -166,12 +203,14 @@ export function compareRecoveryCosts(input: {
   for (const rawEffect of input.effects) {
     const parsed = ScenarioEffectSchema.safeParse(rawEffect);
     if (!parsed.success) return unavailable('INVALID_INPUT', 'scenario effects must be validated closed effects');
-    const cost = effectCost(parsed.data);
-    if (parsed.data.effectKind === 'SELECT_OFFER' && !cost) return unavailable('MISSING_EFFECT_PRICE', 'SELECT_OFFER has no captured offer price');
-    if (cost) costs.push(cost);
+    if (parsed.data.effectKind === 'SELECT_OFFER' && !parsed.data.offerPrice) {
+      return unavailable('MISSING_EFFECT_PRICE', 'SELECT_OFFER has no captured offer price');
+    }
+    costs.push(...effectCosts(parsed.data));
   }
   let newSpendHomeAmount: ExactMoney = { amount: '0', currency: input.homeCurrency };
   let potentialLossHomeAmount: ExactMoney = { amount: '0', currency: input.homeCurrency };
+  let creditHomeAmount: ExactMoney = { amount: '0', currency: input.homeCurrency };
   const lines: RecoveryCostLine[] = [];
   const selectedFxEvidence: string[] = [];
   for (const cost of costs) {
@@ -180,6 +219,8 @@ export function compareRecoveryCosts(input: {
     try {
       if (cost.kind === 'POLICY_PENALTY_ESTIMATE') {
         potentialLossHomeAmount = addExactMoney(potentialLossHomeAmount, converted.homeAmount);
+      } else if (cost.kind === 'DISPLACED_STAY_CREDIT') {
+        creditHomeAmount = addExactMoney(creditHomeAmount, converted.homeAmount);
       } else {
         newSpendHomeAmount = addExactMoney(newSpendHomeAmount, converted.homeAmount);
       }
@@ -191,7 +232,10 @@ export function compareRecoveryCosts(input: {
   }
   let totalHomeAmount: ExactMoney;
   try {
-    totalHomeAmount = addExactMoney(newSpendHomeAmount, potentialLossHomeAmount);
+    totalHomeAmount = addExactMoney(
+      addExactMoney(newSpendHomeAmount, potentialLossHomeAmount),
+      negateExactMoney(creditHomeAmount),
+    );
   } catch {
     return unavailable('UNSUPPORTED_MONEY_PRECISION', 'an amount exceeds the supported currency precision');
   }
@@ -200,6 +244,7 @@ export function compareRecoveryCosts(input: {
     homeCurrency: input.homeCurrency,
     newSpendHomeAmount,
     potentialLossHomeAmount,
+    creditHomeAmount,
     totalHomeAmount,
     lines,
     selectedFxEvidence,

@@ -477,9 +477,11 @@ function costEvidenceForStrategy(view: RecoveryCaseView, strategy: RecoveryStrat
     };
   }
   return {
-    total: `Compared total: ${formatExactMoney(comparison.totalHomeAmount)}`,
-    lines: comparison.lines.map((line) =>
-      `${line.kind.label}: ${formatExactMoney(line.providerAmount)} → ${formatExactMoney(line.homeAmount)}${line.observed ? ' (observed)' : ' (quoted or estimated)'}.`),
+    total: `Net cost: ${formatExactMoney(comparison.totalHomeAmount)}`,
+    lines: comparison.lines.map((line) => {
+      const credit = line.kind.code === 'DISPLACED_STAY_CREDIT';
+      return `${line.kind.label}: ${credit ? '−' : ''}${formatExactMoney(line.providerAmount)} → ${credit ? '−' : ''}${formatExactMoney(line.homeAmount)}${line.observed ? ' (observed)' : ' (quoted or estimated)'}.`;
+    }),
     rates: comparison.selectedFxEvidence.map((fx) => {
       const validUntil = fx.validUntil ? `; valid until ${formatCaseWindowInstant(fx.validUntil)}` : '';
       return `${costSourceLabel(fx.source)}: ${fx.baseCurrency} to ${fx.homeCurrency} at ${fx.rate}; reference dated ${formatCaseWindowInstant(fx.observedAt)}${validUntil}.`;
@@ -602,7 +604,7 @@ function buildConsidered(view: RecoveryCaseView, shownStrategyRefs: ReadonlySet<
       movements: movements.map((d) =>
         `${plain(d.subject.label) ?? 'Part of the trip'}: ${deltaWord(d.baseline)} → ${deltaWord(d.candidate)}`),
       ...(candidate.costComparison?.status === 'AVAILABLE'
-        ? { costLine: `Compared cost: ${candidate.costComparison.totalHomeAmount.currency} ${candidate.costComparison.totalHomeAmount.amount}` }
+        ? { costLine: `Net cost: ${candidate.costComparison.totalHomeAmount.currency} ${candidate.costComparison.totalHomeAmount.amount}` }
         : {}),
       ...(changed.length > 0 && unchanged > 0 ? { unchangedNote: `${unchanged} other ${unchanged === 1 ? 'check was' : 'checks were'} unchanged.` } : {}),
       ...(candidate.proposal ? { proposalLines: proposalLines(candidate.proposal) } : {}),

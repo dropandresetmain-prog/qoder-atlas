@@ -127,6 +127,16 @@ export function changeSummary(change: RecoveryStrategyView['changes'][number]): 
   const vocabulary = CASE_EFFECT_PHRASE[change.effectKind];
   const action = vocabulary ? (label ? vocabulary.title.replace('{subject}', label) : vocabulary.generic)
     : label ? `Update ${label}` : 'Update part of the trip';
+  if (change.effectKind === 'CANCEL_STAY') {
+    const parts = [action];
+    if (change.cancellationPenalty) {
+      parts.push(`cancellation fee ${decisionMoney(change.cancellationPenalty)}`);
+    }
+    if (change.scheduledCancellationPenalty) {
+      parts.push(`cancelled stay value ${decisionMoney(change.scheduledCancellationPenalty)}`);
+    }
+    return parts.join(' · ');
+  }
   if (!change.proposedWindow) return action;
   const next = `${decisionTime(change.proposedWindow.start, change.timeZone)} – ${decisionTime(change.proposedWindow.end, change.timeZone)}`;
   if (!change.currentWindow) return `${action}: ${next}`;
@@ -167,7 +177,7 @@ export function sumDisplayedMoney(amounts: readonly Money[]): string[] | undefin
 
 export function decisionCosts(comparison: PlanningCostComparisonView | undefined) {
   if (!comparison || comparison.status === 'UNAVAILABLE') return {
-    spend: [], exposure: [], other: [],
+    spend: [], exposure: [], credit: [], other: [],
     // Supplied reasons arrive mid-sentence; they now stand alone, so they are
     // sentence-cased here rather than carried behind a restating prefix.
     unavailable: comparison?.status === 'UNAVAILABLE'
@@ -176,16 +186,20 @@ export function decisionCosts(comparison: PlanningCostComparisonView | undefined
   };
   const spend = comparison.lines.filter((line) => line.kind.code === 'SELECT_OFFER' || line.kind.code === 'ADD_JOURNEY_STAY');
   const exposure = comparison.lines.filter((line) => line.kind.code === 'POLICY_PENALTY_ESTIMATE');
-  const other = comparison.lines.filter((line) => !spend.includes(line) && !exposure.includes(line));
+  const credit = comparison.lines.filter((line) => line.kind.code === 'DISPLACED_STAY_CREDIT');
+  const other = comparison.lines.filter((line) =>
+    !spend.includes(line) && !exposure.includes(line) && !credit.includes(line));
   // Line items are provider evidence. A known-zero internal change has none,
   // but the comparison totals are still the operator-facing spend and loss.
   const declared = (money: { amount: string; currency: string } | undefined): string[] | undefined =>
     money ? [decisionMoney(money)] : undefined;
   return {
-    spend, exposure, other, comparison,
+    spend, exposure, credit, other, comparison,
     newSpend: sumDisplayedMoney(spend.map((line) => line.homeAmount)) ?? declared(comparison.newSpendHomeAmount),
     providerSpend: sumDisplayedMoney(spend.map((line) => line.providerAmount)),
     potentialLoss: sumDisplayedMoney(exposure.map((line) => line.homeAmount)) ?? declared(comparison.potentialLossHomeAmount),
+    creditTotal: sumDisplayedMoney(credit.map((line) => line.homeAmount)) ?? declared(comparison.creditHomeAmount),
+    net: declared(comparison.totalHomeAmount),
   };
 }
 

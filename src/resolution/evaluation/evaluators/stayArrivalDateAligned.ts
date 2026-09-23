@@ -1,7 +1,9 @@
 /**
- * Required destination-stay policy: an original booked stay must either keep
- * its arrival-aligned local dates, or be retired in the candidate and replaced
- * by an equally located stay whose dates align with the selected arrival.
+ * Required destination-stay policy: an original booked stay must either still
+ * cover the selected arrival's local date (check-in through night before
+ * checkout — late arrival into a multi-night stay is allowed), or be retired
+ * and replaced by an equally located stay whose start aligns with arrival and
+ * whose checkout matches the original.
  */
 import type { TypedRef } from '../../../domain/v2/shared/identity.ts';
 import type { CapturedWorld, WConstraintDefinition } from '../../world/world.ts';
@@ -67,10 +69,17 @@ function evaluateConstraint(subject: TypedRef, world: CapturedWorld, context: Ev
   }
   const related = [{ kind: 'CONSTRAINT_DEFINITION' as const, id: constraint.id }, original.itemRef, arrival.itemRef];
   if (original.active) {
-    if (originalStart === arrivalDate) {
+    // YYYY-MM-DD lexicographic order matches calendar order.
+    const coversArrival = arrivalDate >= originalStart && arrivalDate < originalCheckout;
+    if (coversArrival) {
       return explain({
-        evaluatorId: EVALUATOR_ID, dimension: 'stay_arrival_date_aligned', status: 'PASS', reasonCode: 'original_stay_arrival_aligned',
-        cause: { kind: 'WORLD_STATE', subjectRef: original.itemRef }, affectedSubject: subject, relatedSubjects: related,
+        evaluatorId: EVALUATOR_ID,
+        dimension: 'stay_arrival_date_aligned',
+        status: 'PASS',
+        reasonCode: originalStart === arrivalDate ? 'original_stay_arrival_aligned' : 'original_stay_covers_arrival',
+        cause: { kind: 'WORLD_STATE', subjectRef: original.itemRef },
+        affectedSubject: subject,
+        relatedSubjects: related,
         facts: { arrivalLocalDate: arrivalDate, stayStartLocalDate: originalStart, checkoutLocalDate: originalCheckout },
       });
     }

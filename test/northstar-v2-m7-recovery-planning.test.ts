@@ -1486,7 +1486,27 @@ test('CANCEL_STAY retires only intent and an arrival-aligned replacement is requ
   const lateOnly = applyScenarioOverlay({ baseWorld: world, scenarioChange: change([lateSelect]), resolvedOffers });
   assert.equal(lateOnly.ok, true);
   if (!lateOnly.ok) return;
-  assert.equal(verdict(lateOnly.value.proposedWorld).verdict, 'FAIL', 'late arrival leaves the active original stay misaligned');
+  assert.equal(verdict(lateOnly.value.proposedWorld).verdict, 'PASS', 'late arrival still covered by the multi-night original stay');
+  assert.equal(
+    verdict(lateOnly.value.proposedWorld).explanations[0]?.reasonCode,
+    'original_stay_covers_arrival',
+  );
+  const afterCheckoutService = service({
+    id: id(), originPlaceId, destinationPlaceId,
+    published: { departure: observed('2030-06-06T04:00:00.000Z'), arrival: observed('2030-06-06T08:00:00.000Z') },
+  });
+  const afterCheckoutWorld = structuredClone(world);
+  afterCheckoutWorld.transportServices.push(afterCheckoutService);
+  const afterCheckoutSelect = { effectKind: 'SELECT_OFFER' as const, journeyItemId: arrival.id, offerId: id(), offerPrice: { amount: '100.00', currency: 'NZD' } };
+  const afterCheckout = applyScenarioOverlay({
+    baseWorld: afterCheckoutWorld,
+    scenarioChange: change([afterCheckoutSelect]),
+    resolvedOffers: [{ offerId: afterCheckoutSelect.offerId, transportServiceId: afterCheckoutService.id }],
+  });
+  assert.equal(afterCheckout.ok, true);
+  if (afterCheckout.ok) {
+    assert.equal(verdict(afterCheckout.value.proposedWorld).verdict, 'FAIL', 'arrival after checkout cannot keep the original stay');
+  }
   const cancelOnly = applyScenarioOverlay({ baseWorld: world, scenarioChange: change([lateSelect, cancel]), resolvedOffers });
   assert.equal(cancelOnly.ok, true);
   if (!cancelOnly.ok) return;
@@ -1494,7 +1514,7 @@ test('CANCEL_STAY retires only intent and an arrival-aligned replacement is requ
   const addOnly = applyScenarioOverlay({ baseWorld: world, scenarioChange: change([lateSelect, add]), resolvedOffers, resolvedStayOffers });
   assert.equal(addOnly.ok, true);
   if (!addOnly.ok) return;
-  assert.equal(verdict(addOnly.value.proposedWorld).verdict, 'FAIL', 'a replacement without retiring the original intent is insufficient');
+  assert.equal(verdict(addOnly.value.proposedWorld).verdict, 'PASS', 'original stay still covers arrival; an extra stay without cancel is not required to pass alignment');
   const replacement = applyScenarioOverlay({ baseWorld: world, scenarioChange: change([lateSelect, cancel, add]), resolvedOffers, resolvedStayOffers });
   assert.equal(replacement.ok, true);
   if (!replacement.ok) return;
@@ -1731,7 +1751,7 @@ test(`hotel planning combines overnight and destination-stay replacement with ca
     assert.equal(missingPolicyEvaluation.ok, true);
     if (missingPolicyEvaluation.ok) {
       const assessment = missingPolicyEvaluation.value.strategy.candidateAssessmentResults.find((row) => row.subjects[0]?.subjectRef.id === journey.id)!;
-      assert.equal(assessment.dimensions.find((dimension) => dimension.dimension === 'stay_arrival_date_aligned')?.verdict, 'FAIL', 'without cancellation terms the active original stay leaves the real policy unsatisfied');
+      assert.equal(assessment.dimensions.find((dimension) => dimension.dimension === 'stay_arrival_date_aligned')?.verdict, 'PASS', 'keeping the original multi-night stay is viable when arrival still falls inside its window');
     }
   }
   const wrongReplacementSearch = searchResults.map((result, index) => index === 1 ? {

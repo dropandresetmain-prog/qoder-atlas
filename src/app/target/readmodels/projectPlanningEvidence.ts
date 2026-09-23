@@ -229,9 +229,10 @@ function projectCandidate(
 }
 
 const COST_KIND_LABELS: Record<RecoveryCostLineEvidence['kind'], string> = {
-  SELECT_OFFER: 'Replacement travel',
-  ADD_JOURNEY_STAY: 'Accommodation',
-  POLICY_PENALTY_ESTIMATE: 'Cancellation policy exposure (up to)',
+  SELECT_OFFER: 'Replacement flight',
+  ADD_JOURNEY_STAY: 'New hotel booking',
+  POLICY_PENALTY_ESTIMATE: 'Cancellation fee',
+  DISPLACED_STAY_CREDIT: 'Refund (cancelled stay)',
 };
 
 function projectCostComparison(cost: NonNullable<MaterialCandidateEvidence['costComparison']>) {
@@ -244,6 +245,7 @@ function projectCostComparison(cost: NonNullable<MaterialCandidateEvidence['cost
     totalHomeAmount: cost.totalHomeAmount,
     ...(cost.newSpendHomeAmount ? { newSpendHomeAmount: cost.newSpendHomeAmount } : {}),
     ...(cost.potentialLossHomeAmount ? { potentialLossHomeAmount: cost.potentialLossHomeAmount } : {}),
+    ...(cost.creditHomeAmount ? { creditHomeAmount: cost.creditHomeAmount } : {}),
     lines: cost.lines.map((line) => ({
       kind: { label: COST_KIND_LABELS[line.kind], code: line.kind },
       providerAmount: line.providerAmount,

@@ -75,7 +75,7 @@ test('A5: D2 monitoring suppresses actionable recommendation presentation', () =
   assert.equal(decisionOptions(view).recommended, undefined);
 });
 
-test('A5: broken connection firstBreakpoint prefers FAILED onward, not CHANGED arrival', () => {
+test('A5: broken connection firstBreakpoint is Arrival (Sarah mechanic), not FAILED onward', () => {
   const ldg = {
     scope: 'FOCUSED_CASE' as const,
     nodes: [
@@ -97,8 +97,9 @@ test('A5: broken connection firstBreakpoint prefers FAILED onward, not CHANGED a
     facts: { gapMinutes: -40, upstreamArrival: '2031-01-01T12:00:00.000Z' },
     relatedSubjectRefs: ['JOURNEY_ITEM:in', 'JOURNEY_ITEM:out'],
   }]);
-  assert.equal(focused?.firstBreakpoint?.nodeRef, 'SERVICE_BOOKING:onward');
+  assert.equal(focused?.firstBreakpoint?.nodeRef, 'TIMING:in:ARRIVAL');
   assert.equal(focused?.firstBreakpoint?.reasonCode, 'connection_broken');
+  assert.ok(focused?.causalNodeRefs.includes('SERVICE_BOOKING:onward'));
 });
 
 test('A5: Event Overview maps AT_RISK population to CHECKING (amber), not UNRESOLVED (red)', () => {

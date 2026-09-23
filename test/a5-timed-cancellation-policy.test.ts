@@ -83,6 +83,9 @@ test('recovery cost comparison uses current zero loss, not scheduled exposure', 
   if (!currentZero.ok) return;
   assert.deepEqual(currentZero.potentialLossHomeAmount, { amount: '0.00', currency: 'SGD' });
   assert.deepEqual(currentZero.newSpendHomeAmount, { amount: '270.00', currency: 'SGD' });
+  assert.deepEqual(currentZero.creditHomeAmount, { amount: '905.54', currency: 'SGD' });
+  assert.deepEqual(currentZero.totalHomeAmount, { amount: '-635.54', currency: 'SGD' });
+  assert.equal(currentZero.lines.some((line) => line.kind === 'DISPLACED_STAY_CREDIT'), true);
 
   const afterDeadline = compareRecoveryCosts({
     effects: [{

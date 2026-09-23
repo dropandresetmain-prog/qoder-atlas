@@ -115,44 +115,24 @@ export function projectFocusedGraph(
     }
   }
 
-  // First operational breakpoint = persisted cause where mappable, otherwise the
-  // affected subject. For a physically broken connection, prefer the FAILED
-  // connection relationship's destination (missed onward) over a CHANGED
-  // arrival timing — the delayed arrival is context, not the definitive break.
+  // First operational breakpoint = arrival timing when the enrichment mapped one
+  // (same rule for programme readiness and broken connections), else cause, else
+  // affected subject. Onward can still be FAILED without becoming the hero card.
   const firstStep = causalPath[0];
-  const gapMinutes = firstStep && typeof firstStep.facts.gapMinutes === 'number'
-    ? firstStep.facts.gapMinutes
-    : undefined;
-  const brokenConnection = firstStep?.dimension === 'connection_feasibility'
-    && (firstStep.reasonCode === 'connection_broken'
-      || firstStep.reasonCode === 'connection_impossible'
-      || (gapMinutes !== undefined && gapMinutes < 0));
   const firstArrivalRef = firstStep ? arrivalFor(firstStep) : undefined;
-  const failedConnectionTarget = brokenConnection
-    ? ldg.edges.find((edge) =>
-      edge.kind === 'MUST_HAPPEN_BEFORE'
-      && edge.semanticState === 'FAILED'
-      && visibleRefs.has(edge.toRef)
-      && (firstArrivalRef ? edge.fromRef === firstArrivalRef : true))?.toRef
-    : undefined;
   const firstBreakpointRef = firstStep
-    ? (brokenConnection
-      ? (failedConnectionTarget
-        ?? (firstStep.causeSubjectRef ? resolveVisibleRef(firstStep.causeSubjectRef) : undefined)
-        ?? resolveVisibleRef(firstStep.subjectRef))
-      : firstArrivalRef
-        ?? (firstStep.causeSubjectRef ? resolveVisibleRef(firstStep.causeSubjectRef) : undefined)
-        ?? resolveVisibleRef(firstStep.subjectRef))
+    ? (firstArrivalRef
+      ?? (firstStep.causeSubjectRef ? resolveVisibleRef(firstStep.causeSubjectRef) : undefined)
+      ?? resolveVisibleRef(firstStep.subjectRef))
     : undefined;
 
-  // Ensure the chosen breakpoint and its FAILED connection endpoints join the
-  // causal spine when the related JOURNEY_ITEM was not itself a visible node.
   if (firstBreakpointRef) pushNode(firstBreakpointRef);
-  if (failedConnectionTarget) {
-    pushNode(failedConnectionTarget);
+  // Keep FAILED connection endpoints on the causal spine so the onward booking
+  // remains visible next to the arrival breakpoint.
+  if (firstArrivalRef) {
     for (const edge of ldg.edges) {
-      if (edge.toRef === failedConnectionTarget && edge.semanticState === 'FAILED') {
-        pushNode(edge.fromRef);
+      if (edge.fromRef === firstArrivalRef && edge.semanticState === 'FAILED' && edge.kind === 'MUST_HAPPEN_BEFORE') {
+        pushNode(edge.toRef);
       }
     }
   }

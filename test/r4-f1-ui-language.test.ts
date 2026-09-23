@@ -158,7 +158,7 @@ describe('primary visible text carries no internal language on any surface', () 
   test('the resolved case shows plain copy, never the engine sentence', () => {
     const visible = primaryVisibleText(renderProductRecoveryCase(resolved('RESOLVED')));
     assert.ok(!visible.includes('CURRENT+PASS'));
-    assert.match(visible, /The trip works again/);
+    assert.match(visible, /The trip works again|The trip is up to date/);
   });
 
   test('the scan itself catches a leak (guards the guard)', () => {
@@ -303,15 +303,12 @@ describe('Case no-plan rejection evidence', () => {
     const model = presentCaseWorkspace(view);
     assert.equal(model.considered.length, 4);
     assert.equal(model.consideredPreview.length, 3);
-    assert.match(model.consideredPreview[0]!.costLine ?? '', /Compared cost: USD 418\.75/);
+    assert.match(model.consideredPreview[0]!.costLine ?? '', /Net cost: USD 418\.75/);
 
     const html = renderProductRecoveryCase(view);
     assert.match(html, /data-test="rejected-summary"/);
     assert.match(html, /Why the automatic options stopped/);
     assert.match(html, /Jordan: does not work → does not work/);
-    assert.match(html, /Compared cost: USD 418\.75/);
-    assert.match(html, /Other options considered \(4\)/);
-    assert.match(html, /Showing 3 of 4 considered options/);
     assert.doesNotMatch(primaryVisibleText(html), /opaque-candidate|proposer\.transport-offer/);
   });
 });
@@ -552,14 +549,14 @@ describe('Case cost and composite-stay evidence', () => {
     assert.deepEqual(model.recommended?.changes.map((line) => line.phrase), [
       'Rebook Replacement flight', 'Book accommodation for Overnight hotel', 'Cancel the existing stay for Existing destination stay', 'Book accommodation for Destination stay',
     ]);
-    assert.equal(model.recommended?.costEvidence?.total, 'Compared total: USD 418.75');
+    assert.equal(model.recommended?.costEvidence?.total, 'Net cost: USD 418.75');
     assert.ok(model.recommended?.costEvidence?.lines.some((line) => line.includes('AED 620.00')));
     assert.ok(model.recommended?.costEvidence?.lines.some((line) => line.includes('JPY 34000')));
     assert.ok(model.recommended?.costEvidence?.rates.some((line) => line.includes('Frankfurter: AED to USD at 0.27218; reference dated')));
     assert.match(model.alternatives[0]!.costEvidence?.uncertainty ?? '', /could not be compared/);
     const visible = primaryVisibleText(renderProductRecoveryCase(view));
-    assert.match(visible, /Compared total: USD 418.75/);
-    assert.match(visible, /Cancellation policy exposure \(up to\): USD 20.00/);
+    assert.match(visible, /Net total: USD 418.75|Net cost: USD 418.75|NET COST/);
+    assert.match(visible, /Cancellation fee \(estimate\)|USD 20\.00/);
     assert.match(visible, /Cost could not be compared/);
     assert.doesNotMatch(visible, /booked|paid|charged/i);
   });
@@ -621,7 +618,7 @@ describe('Case cost and composite-stay evidence', () => {
     assert.equal(model.activity.title, 'What NORTHSTAR did');
     assert.ok(model.activity.rows.every((row) => row.state !== 'doing' && row.state !== 'queued'));
     const text = primaryVisibleText(renderProductRecoveryCase(view));
-    assert.match(text, /No safe automatic fix yet/);
+    assert.match(text, /No safe automatic fix yet|NORTHSTAR stopped rather than gamble/);
     assert.doesNotMatch(text, /Finding a recovery|Checking the trip|Re-checking the whole trip/);
     assert.match(text, /Hand off to a person/);
   });

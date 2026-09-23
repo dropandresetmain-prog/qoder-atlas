@@ -87,7 +87,7 @@ export type MaterialCandidateDisposition = z.infer<typeof MaterialCandidateDispo
 
 /** One provider-price line and its evidenced home-currency restatement. */
 export const RecoveryCostLineEvidenceSchema = z.strictObject({
-  kind: z.enum(['SELECT_OFFER', 'ADD_JOURNEY_STAY', 'POLICY_PENALTY_ESTIMATE']),
+  kind: z.enum(['SELECT_OFFER', 'ADD_JOURNEY_STAY', 'POLICY_PENALTY_ESTIMATE', 'DISPLACED_STAY_CREDIT']),
   providerAmount: ExactMoneySchema,
   homeAmount: ExactMoneySchema,
   fxEvidenceId: z.string().min(1).optional(),
@@ -114,10 +114,15 @@ export const MaterialCandidateCostComparisonSchema = z.discriminatedUnion('statu
   z.strictObject({
     status: z.literal('AVAILABLE'),
     homeCurrency: CurrencyCodeSchema,
-    /** Maximum exposure (new spend + potential loss). Prefer the split fields for operator display. */
+    /**
+     * Net recovery economics: new spend + cancellation fee − displaced-stay credit.
+     * Prefer the split fields for operator line-item display.
+     */
     totalHomeAmount: ExactMoneySchema,
     newSpendHomeAmount: ExactMoneySchema.optional(),
     potentialLossHomeAmount: ExactMoneySchema.optional(),
+    /** Recovered value from cancelling a displaced stay (refund), when known. */
+    creditHomeAmount: ExactMoneySchema.optional(),
     lines: z.array(RecoveryCostLineEvidenceSchema).max(32),
     /** Full selected dated FX records, not opaque identifiers alone. */
     selectedFxEvidence: z.array(FxRateEvidenceSchema).max(32),

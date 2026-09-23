@@ -98,3 +98,41 @@ test('a zero cancellation penalty is zero potential loss, not a missing price', 
   assert.deepEqual(result.totalHomeAmount, { amount: '0.00', currency: 'SGD' });
   assert.deepEqual(result.newSpendHomeAmount, { amount: '0', currency: 'SGD' });
 });
+
+test('Path A (cancel+rebook+Narita+flight) nets below Path B (keep+Narita+flight) on LIVE-shaped numbers', () => {
+  const pathA = compareRecoveryCosts({
+    effects: [
+      { effectKind: 'SELECT_OFFER', journeyItemId: id(60), offerId: id(61), offerPrice: { amount: '116.96', currency: 'USD' } },
+      { effectKind: 'ADD_JOURNEY_STAY', proposedJourneyItemId: id(62), journeyId: id(63), orderKey: '015', offerId: id(64), offerPrice: { amount: '35.18', currency: 'USD' }, visit: { kind: 'EXISTING', visitId: id(65) } },
+      { effectKind: 'ADD_JOURNEY_STAY', proposedJourneyItemId: id(66), journeyId: id(63), orderKey: '025', offerId: id(67), offerPrice: { amount: '698.83', currency: 'USD' }, visit: { kind: 'EXISTING', visitId: id(68) } },
+      {
+        effectKind: 'CANCEL_STAY',
+        journeyItemId: id(69),
+        reservationLineId: id(70),
+        cancellationPenalty: { amount: '0', currency: 'USD' },
+        freeCancellationUntil: '2026-09-29T23:59:59Z',
+        scheduledCancellationPenalty: { amount: '976.04', currency: 'USD' },
+      },
+    ],
+    homeCurrency: 'USD',
+    rates: [],
+    comparedAt: at,
+  });
+  const pathB = compareRecoveryCosts({
+    effects: [
+      { effectKind: 'SELECT_OFFER', journeyItemId: id(71), offerId: id(72), offerPrice: { amount: '116.96', currency: 'USD' } },
+      { effectKind: 'ADD_JOURNEY_STAY', proposedJourneyItemId: id(73), journeyId: id(74), orderKey: '015', offerId: id(75), offerPrice: { amount: '35.18', currency: 'USD' }, visit: { kind: 'EXISTING', visitId: id(76) } },
+    ],
+    homeCurrency: 'USD',
+    rates: [],
+    comparedAt: at,
+  });
+  assert.equal(pathA.ok, true);
+  assert.equal(pathB.ok, true);
+  if (!pathA.ok || !pathB.ok) return;
+  assert.deepEqual(pathA.totalHomeAmount, { amount: '-125.07', currency: 'USD' });
+  assert.deepEqual(pathB.totalHomeAmount, { amount: '152.14', currency: 'USD' });
+  assert.ok(Number(pathA.totalHomeAmount.amount) < Number(pathB.totalHomeAmount.amount));
+  assert.equal(pathA.lines.some((line) => line.kind === 'DISPLACED_STAY_CREDIT'), true);
+  assert.equal(pathB.lines.some((line) => line.kind === 'DISPLACED_STAY_CREDIT'), false);
+});

@@ -87,43 +87,48 @@ function cancelStayNoteHtml(strategy: RecoveryStrategyView): string {
       `Free cancellation is available until ${decisionTime(cancel.freeCancellationUntil, cancel.timeZone)}; after that, potential loss ${decisionMoney(cancel.scheduledCancellationPenalty)}.`,
     );
   } else if (cancel.cancellationPenalty) {
-    parts.push(`Current cancellation loss ${decisionMoney(cancel.cancellationPenalty)}.`);
+    parts.push(`Current cancellation fee ${decisionMoney(cancel.cancellationPenalty)}.`);
   }
   return `<p class="cw-muted" data-test="cancel-stay-economics">${e(parts.join(' '))}</p>`;
 }
 
-/** Compact spend/loss for the decision panel only — not a second full table. */
+/** Compact net + line items for the decision panel and recommendation card. */
 function moneySummaryHtml(candidate: PlanningCandidateView | undefined): string {
   const cost = decisionCosts(candidate?.costComparison);
   if (cost.unavailable) {
     return `<div class="cw-metrics cw-metrics-unknown">
-      <div class="cw-metric" data-test="cost-new-spend"><small>NEW SPEND</small><strong>Not compared</strong></div>
-      <div class="cw-metric" data-test="cost-potential-loss"><small>POTENTIAL DISPLACED-BOOKING LOSS</small><strong>Not compared</strong></div>
+      <div class="cw-metric" data-test="cost-net"><small>NET COST</small><strong>Not compared</strong></div>
     </div>
     <p class="cw-muted" data-test="cost-unavailable">${e(cost.unavailable)}</p>`;
   }
-  const exposureNote = cost.exposure.some((line) => /up to/i.test(line.kind.label))
-    ? ' · up to (source maximum)'
-    : ' · estimate';
+  const lineRows = [
+    ...cost.spend.map((line) => ({ label: decisionText(line.kind.label, 'Spend'), amount: decisionMoney(line.homeAmount), credit: false })),
+    ...cost.exposure.map((line) => ({ label: decisionText(line.kind.label, 'Cancellation fee'), amount: decisionMoney(line.homeAmount), credit: false })),
+    ...cost.credit.map((line) => ({ label: decisionText(line.kind.label, 'Refund'), amount: decisionMoney(line.homeAmount), credit: true })),
+  ];
+  const linesHtml = lineRows.length
+    ? `<ul class="cw-cost-lines" data-test="cost-line-items">${lineRows.map((row) =>
+      `<li data-test="cost-line"><span>${e(row.label)}</span><strong>${row.credit ? '−' : ''}${e(row.amount)}</strong></li>`).join('')}</ul>`
+    : '';
   return `<div class="cw-metrics" data-test="cost-separated">
-    <div class="cw-metric cw-metric-spend" data-test="cost-new-spend"><small>NEW SPEND</small><strong>${e(cost.newSpend?.join(' + ') ?? 'Not supplied')}</strong><span class="cw-metric-note">Proposed expenditure · home currency</span></div>
-    <div class="cw-metric cw-metric-exposure" data-test="cost-potential-loss"><small>POTENTIAL DISPLACED-BOOKING LOSS</small><strong>${e(cost.potentialLoss?.join(' + ') ?? 'Not supplied')}</strong><span class="cw-metric-note">Not a confirmed charge${exposureNote}</span></div>
+    <div class="cw-metric cw-metric-net" data-test="cost-net"><small>NET COST</small><strong>${e(cost.net?.join(' + ') ?? 'Not supplied')}</strong><span class="cw-metric-note">New spend + cancellation fee − refund · home currency</span></div>
   </div>
+  ${linesHtml}
   ${cost.providerSpend ? `<p class="cw-muted">Original provider currency: ${e(cost.providerSpend.join(' + '))}.</p>` : ''}`;
 }
 
 function costBreakdownHtml(candidate: PlanningCandidateView | undefined, key: string): string {
   const cost = decisionCosts(candidate?.costComparison);
   if (cost.unavailable || !cost.comparison) return '';
-  const rows = (lines: typeof cost.spend, category: 'spend' | 'exposure' | 'other'): string => lines.map((line) => `<tr>
-    <td>${e(decisionText(line.kind.label, 'Comparison item'))}${category === 'exposure' ? '<br>Potential loss · estimate only' : category === 'spend' ? '<br>Proposed expenditure' : '<br>Other recorded comparison item'}</td>
-    <td>${e(decisionMoney(line.providerAmount))}</td><td>${e(decisionMoney(line.homeAmount))}</td></tr>`).join('');
+  const rows = (lines: typeof cost.spend, category: 'spend' | 'exposure' | 'credit' | 'other'): string => lines.map((line) => `<tr>
+    <td>${e(decisionText(line.kind.label, 'Comparison item'))}${category === 'exposure' ? '<br>Cancellation fee · estimate only' : category === 'credit' ? '<br>Refund credit · not yet received' : category === 'spend' ? '<br>Proposed expenditure' : '<br>Other recorded comparison item'}</td>
+    <td>${e(decisionMoney(line.providerAmount))}</td><td>${category === 'credit' ? '−' : ''}${e(decisionMoney(line.homeAmount))}</td></tr>`).join('');
   const fx = cost.comparison.selectedFxEvidence ?? [];
   return details(`cost-evidence-${key}`, 'Cost breakdown and FX evidence',
-    `<p class="cw-muted">Comparison figures, not confirmed charges or refunds. Potential loss is separate from new spending.</p>
+    `<p class="cw-muted">Net figures include refund credit from the cancelled stay when a free-cancellation window recovers that stay's value.</p>
     <table class="cw-cost-table"><thead><tr><th scope="col">Item</th><th scope="col">Provider currency</th><th scope="col">Home comparison</th></tr></thead>
-    <tbody>${rows(cost.spend, 'spend')}${rows(cost.exposure, 'exposure')}${rows(cost.other, 'other')}</tbody></table>
-    <p>Compared total: <strong>${e(decisionMoney(cost.comparison.totalHomeAmount))}</strong> · ${e(formatInstant(cost.comparison.comparedAt))}</p>
+    <tbody>${rows(cost.spend, 'spend')}${rows(cost.exposure, 'exposure')}${rows(cost.credit, 'credit')}${rows(cost.other, 'other')}</tbody></table>
+    <p>Net total: <strong>${e(decisionMoney(cost.comparison.totalHomeAmount))}</strong> · ${e(formatInstant(cost.comparison.comparedAt))}</p>
     ${fx.length ? list(fx.map((rate) => `${decisionText(rate.source.label, 'Recorded exchange-rate source')}: ${rate.baseCurrency} → ${rate.homeCurrency} at ${rate.rate}; reference ${formatInstant(rate.observedAt)}${rate.validUntil ? `; valid until ${formatInstant(rate.validUntil)}` : ''}.`)) : '<p>No exchange-rate record was supplied.</p>'}`);
 }
 
@@ -137,11 +142,14 @@ interface ProposalHtmlOptions {
   readonly parts?: 'itinerary' | 'commitments';
   /** Step 2 only: tuck each directly-shown check's dense timing line behind a disclosure. */
   readonly timingDisclosure?: boolean;
+  /** Cancelled-stay articles rendered ahead of proposed stays in the itinerary. */
+  readonly cancelledStayHtml?: string;
 }
 function proposalHtml(candidate: PlanningCandidateView | undefined, options?: ProposalHtmlOptions): string {
   const p = candidate?.proposal;
   if (!p) {
     if (options?.parts === 'commitments') return '';
+    if (options?.cancelledStayHtml) return `<div class="cw-itinerary">${options.cancelledStayHtml}</div>`;
     return '<p class="cw-muted">Detailed itinerary evidence was not supplied for this option.</p>';
   }
   const flights = p.flights.map((flight) => `<article><p class="cw-kicker">Flight</p><h4>${e(decisionText(flight.label, 'Replacement flight'))}</h4>
@@ -152,10 +160,10 @@ function proposalHtml(candidate: PlanningCandidateView | undefined, options?: Pr
     const placeContext = stay.propertyLabel && stay.propertyLabel !== stay.placeLabel
       ? `<p class="cw-muted">Place context: ${e(stay.placeLabel)}</p>`
       : '';
-    return `<article><p class="cw-kicker">Accommodation</p><h4>${e(decisionText(property, 'Property not supplied'))}</h4>
+    return `<article data-test="proposed-stay"><p class="cw-kicker">New accommodation</p><h4>${e(decisionText(property, 'Property not supplied'))}</h4>
     ${placeContext}<p>${e(decisionTime(stay.start, stay.timeZone))} → ${e(decisionTime(stay.end, stay.timeZone))}</p></article>`;
   }).join('');
-  const itineraryHtml = `<div class="cw-itinerary">${flights}${stays}</div>`;
+  const itineraryHtml = `<div class="cw-itinerary">${options?.cancelledStayHtml ?? ''}${flights}${stays}</div>`;
   if (options?.parts === 'itinerary') return itineraryHtml;
 
   const checks = p.programmeChecks ?? [];
@@ -259,7 +267,19 @@ function glanceProtectsCell(strategy: RecoveryStrategyView, candidate: PlanningC
 function glanceCostsCell(candidate: PlanningCandidateView | undefined): string {
   const cost = decisionCosts(candidate?.costComparison);
   if (cost.unavailable) return 'Not compared';
-  return e(cost.newSpend?.join(' + ') ?? 'Not supplied');
+  const net = cost.net?.join(' + ') ?? 'Not supplied';
+  const parts: string[] = [];
+  for (const line of cost.spend) {
+    parts.push(`${decisionText(line.kind.label, 'Item')} ${decisionMoney(line.homeAmount)}`);
+  }
+  for (const line of cost.exposure) {
+    parts.push(`${decisionText(line.kind.label, 'Fee')} ${decisionMoney(line.homeAmount)}`);
+  }
+  for (const line of cost.credit) {
+    parts.push(`${decisionText(line.kind.label, 'Refund')} −${decisionMoney(line.homeAmount)}`);
+  }
+  const sub = parts.length ? `<span class="v5-glance-sub">${e(parts.join(' · '))}</span>` : '';
+  return `Net ${e(net)}${sub}`;
 }
 
 function glanceBlockedByCell(strategy: RecoveryStrategyView): string {
@@ -267,12 +287,29 @@ function glanceBlockedByCell(strategy: RecoveryStrategyView): string {
   return e(executionBlockerShort(strategy.executionBlocker));
 }
 
+function cancelledStayArticles(strategy: RecoveryStrategyView): string {
+  return strategy.changes.filter((change) => change.effectKind === 'CANCEL_STAY').map((change) => {
+    const label = decisionText(change.subjectLabel, 'Existing stay');
+    const fee = change.cancellationPenalty
+      ? `<p>Cancellation fee ${e(decisionMoney(change.cancellationPenalty))}</p>` : '';
+    const booked = change.scheduledCancellationPenalty
+      ? `<p class="cw-muted">Cancelled stay value ${e(decisionMoney(change.scheduledCancellationPenalty))}</p>` : '';
+    const window = change.currentWindow
+      ? `<p>${e(decisionTime(change.currentWindow.start, change.timeZone))} → ${e(decisionTime(change.currentWindow.end, change.timeZone))}</p>`
+      : '';
+    return `<article data-test="cancelled-stay"><p class="cw-kicker">Cancelled stay</p><h4>${e(label)}</h4>${window}${fee}${booked}</article>`;
+  }).join('');
+}
+
 function changeStepHtml(strategy: RecoveryStrategyView, candidate: PlanningCandidateView | undefined): string {
   const moves = strategy.changes.map((change) => changeSummary(change)).filter((line) => line.length > 0);
   const proposal = candidate?.proposal;
   const hasItinerary = (proposal?.flights.length ?? 0) + (proposal?.stays.length ?? 0) > 0;
-  const itinerary = hasItinerary ? proposalHtml(candidate, { parts: 'itinerary' }) : '';
-  if (moves.length === 0) return itinerary || proposalHtml(candidate, { parts: 'itinerary' });
+  const cancelled = cancelledStayArticles(strategy);
+  const itinerary = (hasItinerary || cancelled)
+    ? proposalHtml(candidate, { parts: 'itinerary', cancelledStayHtml: cancelled || undefined })
+    : '';
+  if (moves.length === 0) return itinerary || proposalHtml(candidate, { parts: 'itinerary', cancelledStayHtml: cancelled || undefined });
   return `${list(moves)}${itinerary}`;
 }
 
@@ -320,6 +357,7 @@ function recommendationHtml(view: RecoveryCaseView): string {
       <p class="v5-rec-verdict">${e(recommendationVerdict(strategy))}</p>
     </div>
     ${recommendationGlanceHtml(strategy, candidate)}
+    <section class="v5-rec-costs" data-test="recommendation-costs">${moneySummaryHtml(candidate)}</section>
     <section class="v5-rec-step" data-step="1"><h4>What changes</h4>${changeStepHtml(strategy, candidate)}</section>
     <section class="v5-rec-step" data-step="2"><h4>Directly affected</h4>${affectedStepHtml(candidate)}</section>
     <section class="v5-rec-step" data-step="3"><h4>Why this one</h4>
@@ -352,10 +390,13 @@ function alternativesHtml(view: RecoveryCaseView): string {
     `<p class="cw-muted">Concise comparison first. Open an option for its full evaluation.</p>` + options.alternatives.map((strategy) => {
       const candidate = candidateFor(view, strategy);
       const cost = decisionCosts(candidate?.costComparison);
-      const spend = cost.newSpend?.join(' + ') ?? (cost.unavailable ? 'Cost not compared' : 'Not supplied');
+      const spend = cost.net?.join(' + ')
+        ?? (cost.unavailable
+          ? (/could not be compared/i.test(cost.unavailable) ? 'Cost could not be compared' : 'Cost not compared')
+          : 'Not supplied');
       return `<article class="cw-card cw-alt option-card" data-test="recovery-strategy" data-strategy-ref="${e(strategy.strategyRef)}" data-option-number="${strategy.optionNumber}">
         <p class="cw-kicker">Alternative ${strategy.optionNumber}</p><h3>${e(decisionTitle(strategy))}</h3>
-        <p class="cw-muted">Estimated new spend: ${e(spend)}</p>
+        <p class="cw-muted">Estimated net cost: ${e(spend)}</p>
         ${details(`alt-eval-${strategy.strategyRef}`, 'Full evaluation', `${proposalHtml(candidate)}${changesHtml(strategy)}${costBreakdownHtml(candidate, `alt-${strategy.strategyRef}`)}`)}
       </article>`;
     }).join(''));

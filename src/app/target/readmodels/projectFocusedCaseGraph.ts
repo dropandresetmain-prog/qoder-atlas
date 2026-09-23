@@ -281,6 +281,12 @@ export interface FocusedCaseGraphEnrichmentInput {
    * arrival already equals the replacement schedule.
    */
   displacedPublishedArrival?: string;
+  /**
+   * Proposed SELECT_OFFER transport services keyed by journey item id.
+   * When present, composition uses these instead of the persisted selection so
+   * the Case graph preview follows the recommended rebook before commit.
+   */
+  proposedServiceByJourneyItem?: ReadonlyMap<string, string>;
 }
 
 /** Output: additional nodes and edges to append to the case's ldg. */
@@ -388,17 +394,47 @@ export function projectFocusedCaseGraphEnrichment(
   // ---------------------------------------------------------------------------
   const serviceById = new Map(input.transportServices.map((s) => [s.id, s]));
   const programmeItemById = new Map(input.programmeItems.map((p) => [p.id, p]));
+  const resolvedServiceIdFor = (item: JourneyItemRow): string | undefined =>
+    item.kind === 'TRANSPORT'
+      ? (input.proposedServiceByJourneyItem?.get(item.id) ?? item.selectedServiceId)
+      : undefined;
   const selectedJourneysByService = new Map<string, Set<string>>();
   for (const item of input.journeyItems) {
-    if (item.kind !== 'TRANSPORT' || !item.selectedServiceId) continue;
-    const journeys = selectedJourneysByService.get(item.selectedServiceId) ?? new Set<string>();
+    const serviceId = resolvedServiceIdFor(item);
+    if (!serviceId) continue;
+    const journeys = selectedJourneysByService.get(serviceId) ?? new Set<string>();
     journeys.add(item.journey_id);
-    selectedJourneysByService.set(item.selectedServiceId, journeys);
+    selectedJourneysByService.set(serviceId, journeys);
   }
   const bookingFactByJourneyService = new Map(
     (input.transportBookingFacts ?? []).map((fact) => [`${fact.journeyId}:${fact.serviceId}`, fact]),
   );
+  /**
+   * Onward bookings made impossible by a broken connection are FAILED on the
+   * card itself — not only on the timing→onward edge. Topology uses journey
+   * order_key so alphabetical relatedSubject sorting cannot reverse legs.
+   */
+  const connectionFailedDownstreamServices = new Set<string>();
+  for (const step of input.causalPath ?? []) {
+    if (connectionRelationshipState(step) !== 'FAILED') continue;
+    const relatedItems = step.relatedSubjectRefs
+      .filter((ref) => ref.startsWith('JOURNEY_ITEM:'))
+      .map((ref) => input.journeyItems.find((item) => item.id === ref.slice('JOURNEY_ITEM:'.length)))
+      .filter((item): item is JourneyItemRow => item != null && !!resolvedServiceIdFor(item))
+      .sort((a, b) => {
+        if (a.order_key < b.order_key) return -1;
+        if (a.order_key > b.order_key) return 1;
+        return a.id.localeCompare(b.id);
+      });
+    if (relatedItems.length < 2) continue;
+    const downstream = relatedItems[relatedItems.length - 1]!;
+    const downstreamServiceId = resolvedServiceIdFor(downstream);
+    if (downstreamServiceId) connectionFailedDownstreamServices.add(downstreamServiceId);
+  }
   const bookingStateFor = (serviceId: string): { state: LdgSemanticState; detail?: string } => {
+    if (connectionFailedDownstreamServices.has(serviceId)) {
+      return { state: 'FAILED', detail: 'Onward booking unreachable after broken connection' };
+    }
     const journeyIds = selectedJourneysByService.get(serviceId);
     if (!journeyIds || journeyIds.size === 0) return { state: 'UNKNOWN' };
     const facts = [...journeyIds]
@@ -451,7 +487,7 @@ export function projectFocusedCaseGraphEnrichment(
       if (item.kind === 'TRANSPORT') {
         // SERVICE_BOOKING: ref is SERVICE_BOOKING:<service_id>, label from transport_services.
         kind = 'SERVICE_BOOKING';
-        const serviceId = item.selectedServiceId;
+        const serviceId = resolvedServiceIdFor(item);
         if (!serviceId) continue; // Skip transport items without a selected service.
         ref = `SERVICE_BOOKING:${serviceId}`;
         transportService = serviceById.get(serviceId);
@@ -487,9 +523,8 @@ export function projectFocusedCaseGraphEnrichment(
 
       itemRefs.push(ref);
 
-      const bookingState = item.kind === 'TRANSPORT' && item.selectedServiceId
-        ? bookingStateFor(item.selectedServiceId)
-        : undefined;
+      const resolvedServiceId = resolvedServiceIdFor(item);
+      const bookingState = resolvedServiceId ? bookingStateFor(resolvedServiceId) : undefined;
       const state = item.kind === 'TRANSPORT'
         ? { semanticState: bookingState?.state ?? 'UNKNOWN' as LdgSemanticState }
         : stateFor(ref);
@@ -497,8 +532,8 @@ export function projectFocusedCaseGraphEnrichment(
         detail = detail ? `${detail} · ${bookingState.detail}` : bookingState.detail;
       }
 
-      const serviceSubjectRef = item.kind === 'TRANSPORT' && item.selectedServiceId
-        ? `TRANSPORT_SERVICE:${item.selectedServiceId}`
+      const serviceSubjectRef = resolvedServiceId
+        ? `TRANSPORT_SERVICE:${resolvedServiceId}`
         : undefined;
       const itemSubjectRef = `JOURNEY_ITEM:${item.id}`;
       const currentAt = transportService
@@ -522,8 +557,8 @@ export function projectFocusedCaseGraphEnrichment(
         ...(detail ? { detail } : {}),
       });
 
-      if (item.kind === 'TRANSPORT' && item.selectedServiceId
-        && input.changeSignalRef && input.changedTransportServiceRefs?.has(item.selectedServiceId)) {
+      if (item.kind === 'TRANSPORT' && resolvedServiceId
+        && input.changeSignalRef && input.changedTransportServiceRefs?.has(resolvedServiceId)) {
         pushEdge({
           id: `AFFECTED_BY:${input.changeSignalRef}:${ref}`,
           fromRef: input.changeSignalRef,
@@ -537,7 +572,8 @@ export function projectFocusedCaseGraphEnrichment(
       if (item.kind === 'TRANSPORT' && transportService && currentAt && timingImplicated) {
           const timingRef = `TIMING:${item.id}:ARRIVAL`;
           timingRefByJourneyItem.set(item.id, timingRef);
-          const reprotected = input.reprotectedTransportServiceRefs?.has(item.selectedServiceId!) === true;
+          const reprotected = resolvedServiceId !== undefined
+            && input.reprotectedTransportServiceRefs?.has(resolvedServiceId) === true;
           const displaced = reprotected ? input.displacedPublishedArrival : undefined;
           const ownPublished = transportService.published_arrival ?? undefined;
           const priorAt = displaced && displaced !== currentAt ? displaced : ownPublished;
@@ -593,7 +629,8 @@ export function projectFocusedCaseGraphEnrichment(
       });
     }
 
-    // Emit RELIES_ON edges from the journey to its items.
+    // Traveller (journey) → every composed item, including departure first in
+    // order_key sequence so the graph always shows Jordan→departure.
     for (const itemRef of itemRefs) {
       pushEdge({
         id: `RELIES_ON:${journeyRef}:${itemRef}`,
@@ -609,21 +646,27 @@ export function projectFocusedCaseGraphEnrichment(
   // and the onward booking. When a timing node exists, that arrival→onward
   // edge is the single connection story — do not also colour the booking→
   // booking topology edge as the same causal dependency (founder dual-line).
+  // Upstream/downstream follows journey order_key, never relatedSubject sort order.
   for (const step of input.causalPath ?? []) {
     const relationshipState = connectionRelationshipState(step);
     if (!relationshipState) continue;
-    const relatedItemIds = step.relatedSubjectRefs
+    const relatedItems = step.relatedSubjectRefs
       .filter((ref) => ref.startsWith('JOURNEY_ITEM:'))
-      .map((ref) => ref.slice('JOURNEY_ITEM:'.length));
-    if (relatedItemIds.length < 2) continue;
-    const upstreamItemId = relatedItemIds[0]!;
-    const downstreamItemId = relatedItemIds[1]!;
-    const upstreamItem = input.journeyItems.find((item) => item.id === upstreamItemId);
-    const downstreamItem = input.journeyItems.find((item) => item.id === downstreamItemId);
-    if (!upstreamItem?.selectedServiceId || !downstreamItem?.selectedServiceId) continue;
-    const upstreamBooking = `SERVICE_BOOKING:${upstreamItem.selectedServiceId}`;
-    const downstreamBooking = `SERVICE_BOOKING:${downstreamItem.selectedServiceId}`;
-    const timingRef = timingRefByJourneyItem.get(upstreamItemId);
+      .map((ref) => input.journeyItems.find((item) => item.id === ref.slice('JOURNEY_ITEM:'.length)))
+      .filter((item): item is JourneyItemRow => item != null && !!resolvedServiceIdFor(item))
+      .sort((a, b) => {
+        if (a.order_key < b.order_key) return -1;
+        if (a.order_key > b.order_key) return 1;
+        return a.id.localeCompare(b.id);
+      });
+    if (relatedItems.length < 2) continue;
+    const upstreamItem = relatedItems[0]!;
+    const downstreamItem = relatedItems[relatedItems.length - 1]!;
+    const upstreamServiceId = resolvedServiceIdFor(upstreamItem)!;
+    const downstreamServiceId = resolvedServiceIdFor(downstreamItem)!;
+    const upstreamBooking = `SERVICE_BOOKING:${upstreamServiceId}`;
+    const downstreamBooking = `SERVICE_BOOKING:${downstreamServiceId}`;
+    const timingRef = timingRefByJourneyItem.get(upstreamItem.id);
     if (timingRef) {
       pushEdge({
         id: `MUST_HAPPEN_BEFORE:${timingRef}:${downstreamBooking}`,
@@ -781,20 +824,39 @@ export function projectFocusedCaseGraphEnrichment(
         authority: 'AUTHORITATIVE',
       });
 
+      // Composition: Arrival → required programmes (Sarah mechanic), not only on
+      // participation FAIL. Mark FAILED only when that participation failed.
+      const journeyArrivalTimings = (itemsByJourney.get(journey.id) ?? [])
+        .map((item) => timingRefByJourneyItem.get(item.id))
+        .filter((ref): ref is string => ref !== undefined);
+      const arrivalTimingRef = journeyArrivalTimings[journeyArrivalTimings.length - 1];
+      const participationFailed = semanticState === 'FAILED' || (input.causalPath ?? []).some(
+        (step) => step.dimension === 'programme_participation'
+          && step.causeSubjectRef === programmeItemSubjectRef,
+      );
+      if (arrivalTimingRef) {
+        pushEdge({
+          id: `MUST_HAPPEN_BEFORE:${arrivalTimingRef}:${programmeItemRef}`,
+          fromRef: arrivalTimingRef,
+          toRef: programmeItemRef,
+          kind: 'MUST_HAPPEN_BEFORE',
+          authority: 'AUTHORITATIVE',
+          ...(participationFailed ? { semanticState: 'FAILED' as const } : {}),
+        });
+      }
+
       for (const participationStep of input.causalPath ?? []) {
         if (participationStep.dimension !== 'programme_participation' || participationStep.causeSubjectRef !== programmeItemSubjectRef) continue;
         for (const relatedRef of participationStep.relatedSubjectRefs) {
           if (!relatedRef.startsWith('JOURNEY_ITEM:')) continue;
           const timingRef = timingRefByJourneyItem.get(relatedRef.slice('JOURNEY_ITEM:'.length));
-          if (!timingRef) continue;
+          if (!timingRef || timingRef === arrivalTimingRef) continue;
           pushEdge({
             id: `MUST_HAPPEN_BEFORE:${timingRef}:${programmeItemRef}`,
             fromRef: timingRef,
             toRef: programmeItemRef,
             kind: 'MUST_HAPPEN_BEFORE',
             authority: 'AUTHORITATIVE',
-            // This specific arrival-to-participation relationship failed in the
-            // stored evaluator explanation; no endpoint tone is substituted.
             semanticState: 'FAILED',
           });
         }

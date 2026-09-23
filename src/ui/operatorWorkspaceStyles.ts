@@ -37,6 +37,13 @@ export const OPERATOR_WORKSPACE_STYLES = `<style data-operator-workspace-styles>
 .case-workspace .cw-metric strong { display: block; font-size: 19px; font-variant-numeric: tabular-nums; margin-top: 4px; }
 .case-workspace .cw-metric-note { display: block; margin-top: 6px; color: var(--text-soft); font-size: 12px; line-height: 1.35; }
 .case-workspace .cw-metric-spend { border-color: var(--ok-border, #b7d9c8); background: var(--ok-bg, #f3faf6); }
+.case-workspace .cw-metric-net { border-color: var(--ink); background: var(--surface-2, var(--paper-warm)); }
+.case-workspace .cw-metric-net strong { font-size: 22px; }
+.case-workspace .cw-cost-lines { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.case-workspace .cw-cost-lines li { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; line-height: 1.35; padding: 6px 0; border-bottom: 1px solid var(--line-soft); }
+.case-workspace .cw-cost-lines li:last-child { border-bottom: 0; }
+.case-workspace .cw-cost-lines strong { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.case-workspace .v5-rec-costs { margin: 0 0 22px; }
 .case-workspace .cw-metric-exposure { border-style: dashed; border-color: var(--watch-border, #edc477); background: var(--watch-bg, #fff8ea); }
 .case-workspace .cw-metric-exposure strong { color: var(--watch, #a56800); }
 .case-workspace .cw-cost-table, .case-workspace .cw-research-table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 13px; }

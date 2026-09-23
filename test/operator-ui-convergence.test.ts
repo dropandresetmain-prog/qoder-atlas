@@ -294,11 +294,9 @@ test('exact price totals keep expenditure, provider currency and potential loss 
   assert.deepEqual(zero.potentialLoss, ['USD 0']);
   const html = renderProductRecoveryCase(view());
   assert.match(html, /data-test="cost-separated"/);
-  assert.match(html, /data-test="cost-new-spend"/);
-  assert.match(html, /NEW SPEND/);
-  assert.match(html, /data-test="cost-potential-loss"/);
-  assert.match(html, /POTENTIAL DISPLACED-BOOKING LOSS/);
-  assert.match(html, /Not a confirmed charge/);
+  assert.match(html, /data-test="cost-net"/);
+  assert.match(html, /NET COST/);
+  assert.match(html, /data-test="cost-line-items"/);
   assert.match(html, /Published reference feed/);
   assert.match(html, /data-region-key="cost-evidence-selected"/);
 });

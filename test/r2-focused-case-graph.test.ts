@@ -499,6 +499,7 @@ test('A1 enrichment: broken connection marks the arrival→onward relationship F
     travellerLabelsByJourney: new Map([['journey-1', 'Alice']]), caseId: 'case-1',
   });
   assert.equal(result.nodes.find((node) => node.ref === 'TIMING:inbound:ARRIVAL')?.semanticState, 'CHANGED');
+  assert.equal(result.nodes.find((node) => node.ref === 'SERVICE_BOOKING:onward-service')?.semanticState, 'FAILED');
   assert.equal(
     result.edges.find((edge) => edge.id === 'MUST_HAPPEN_BEFORE:SERVICE_BOOKING:inbound-service:SERVICE_BOOKING:onward-service')?.semanticState,
     undefined,
@@ -506,6 +507,34 @@ test('A1 enrichment: broken connection marks the arrival→onward relationship F
   assert.equal(
     result.edges.find((edge) => edge.id === 'MUST_HAPPEN_BEFORE:TIMING:inbound:ARRIVAL:SERVICE_BOOKING:onward-service')?.semanticState,
     'FAILED',
+  );
+});
+
+test('A1 enrichment: reversed relatedSubjectRefs still paint timing→onward and onward FAILED', () => {
+  const result = projectFocusedCaseGraphEnrichment({
+    caseSubjects: [{ subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' }],
+    journeys: [{ id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null }],
+    journeyItems: [
+      { id: 'inbound', journey_id: 'journey-1', kind: 'TRANSPORT', order_key: '001', lifecycle_status: 'PLANNED', intended_window_start: null, intended_window_end: null, selectedServiceId: 'inbound-service' },
+      { id: 'onward', journey_id: 'journey-1', kind: 'TRANSPORT', order_key: '002', lifecycle_status: 'PLANNED', intended_window_start: null, intended_window_end: null, selectedServiceId: 'onward-service' },
+    ],
+    transportServices: [
+      { id: 'inbound-service', mode: 'FLIGHT', operator: 'Carrier', origin_place_id: 'origin', destination_place_id: 'hub', published_departure: null, published_arrival: '2031-04-05T08:00:00.000Z', estimated_arrival: '2031-04-05T12:00:00.000Z', actual_arrival: null },
+      { id: 'onward-service', mode: 'FLIGHT', operator: 'Carrier', origin_place_id: 'hub', destination_place_id: 'destination', published_departure: null, published_arrival: '2031-04-05T11:00:00.000Z', estimated_arrival: null, actual_arrival: null },
+    ],
+    participations: [], programmeItems: [], objectives: [], assessmentViews: new Map(),
+    // Alphabetical sort of UUIDs/ids would put "onward" before "inbound".
+    causalPath: [{ subjectRef: 'JOURNEY:journey-1', causeSubjectRef: 'JOURNEY_ITEM:inbound', dimension: 'connection_feasibility', reasonCode: 'connection_broken', evaluatorId: 'm6.connection', facts: { upstreamArrival: '2031-04-05T12:00:00.000Z', downstreamDeparture: '2031-04-05T11:00:00.000Z', gapMinutes: -60 }, relatedSubjectRefs: ['JOURNEY_ITEM:onward', 'JOURNEY_ITEM:inbound'] }],
+    travellerLabelsByJourney: new Map([['journey-1', 'Alice']]), caseId: 'case-1',
+  });
+  assert.equal(result.nodes.find((node) => node.ref === 'SERVICE_BOOKING:onward-service')?.semanticState, 'FAILED');
+  assert.equal(
+    result.edges.find((edge) => edge.id === 'MUST_HAPPEN_BEFORE:TIMING:inbound:ARRIVAL:SERVICE_BOOKING:onward-service')?.semanticState,
+    'FAILED',
+  );
+  assert.equal(
+    result.edges.find((edge) => edge.id === 'MUST_HAPPEN_BEFORE:TIMING:onward:ARRIVAL:SERVICE_BOOKING:inbound-service'),
+    undefined,
   );
 });
 
@@ -760,4 +789,26 @@ test('reprotected arrival shows the displaced baseline and the readiness shortfa
   assert.match(timing?.detail ?? '', /60 minutes available/);
   assert.match(timing?.detail ?? '', /150 minutes required/);
   assert.match(timing?.detail ?? '', /90 minutes short/);
+});
+
+test('A5 enrichment: proposed SELECT_OFFER rebinds SERVICE_BOOKING to the recommended service', () => {
+  const result = projectFocusedCaseGraphEnrichment({
+    caseSubjects: [{ subject_kind: 'JOURNEY', subject_id: 'journey-1', role: 'AFFECTED_TRAVELLER' }],
+    journeys: [{ id: 'journey-1', trip_id: 'trip-1', traveller_id: 'traveller-1', lifecycle_status: 'ACTIVE', intended_window_start: null, intended_window_end: null }],
+    journeyItems: [{ id: 'item-1', journey_id: 'journey-1', kind: 'TRANSPORT', order_key: '001', lifecycle_status: 'PLANNED', intended_window_start: null, intended_window_end: null, selectedServiceId: 'service-old' }],
+    transportServices: [
+      { id: 'service-old', mode: 'FLIGHT', operator: 'ZG', origin_place_id: 'NRT', destination_place_id: 'SIN', origin_place_name: 'Narita', destination_place_name: 'Singapore', published_departure: null, published_arrival: null, service_code: 'ZG053' },
+      { id: 'service-new', mode: 'FLIGHT', operator: 'TR', origin_place_id: 'NRT', destination_place_id: 'SIN', origin_place_name: 'Narita', destination_place_name: 'Singapore', published_departure: null, published_arrival: null, service_code: 'TR885' },
+    ],
+    participations: [],
+    programmeItems: [],
+    objectives: [],
+    assessmentViews: new Map(),
+    travellerLabelsByJourney: new Map([['journey-1', 'Jordan']]),
+    caseId: 'case-1',
+    proposedServiceByJourneyItem: new Map([['item-1', 'service-new']]),
+  });
+  assert.equal(result.nodes.some((node) => node.ref === 'SERVICE_BOOKING:service-new'), true);
+  assert.equal(result.nodes.some((node) => node.ref === 'SERVICE_BOOKING:service-old'), false);
+  assert.equal(result.edges.some((edge) => edge.toRef === 'SERVICE_BOOKING:service-new' && edge.kind === 'RELIES_ON'), true);
 });

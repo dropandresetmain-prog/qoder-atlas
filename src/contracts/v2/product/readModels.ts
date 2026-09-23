@@ -677,6 +677,7 @@ export const PlanningCostComparisonViewSchema = z.discriminatedUnion('status', [
     totalHomeAmount: z.strictObject({ amount: z.string().min(1), currency: z.string().length(3) }),
     newSpendHomeAmount: z.strictObject({ amount: z.string().min(1), currency: z.string().length(3) }).optional(),
     potentialLossHomeAmount: z.strictObject({ amount: z.string().min(1), currency: z.string().length(3) }).optional(),
+    creditHomeAmount: z.strictObject({ amount: z.string().min(1), currency: z.string().length(3) }).optional(),
     lines: z.array(PlanningCostLineViewSchema).default([]),
     selectedFxEvidence: z.array(PlanningFxEvidenceViewSchema).default([]),
     comparedAt: z.string().datetime({ offset: true }),
