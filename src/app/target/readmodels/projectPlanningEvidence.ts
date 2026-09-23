@@ -230,9 +230,9 @@ function projectCandidate(
 
 const COST_KIND_LABELS: Record<RecoveryCostLineEvidence['kind'], string> = {
   SELECT_OFFER: 'Replacement flight',
-  ADD_JOURNEY_STAY: 'New hotel booking',
+  ADD_JOURNEY_STAY: 'Additional hotel stay',
   POLICY_PENALTY_ESTIMATE: 'Cancellation fee',
-  DISPLACED_STAY_CREDIT: 'Refund (cancelled stay)',
+  DISPLACED_STAY_CREDIT: 'Recovered original stay value',
 };
 
 function projectCostComparison(cost: NonNullable<MaterialCandidateEvidence['costComparison']>) {

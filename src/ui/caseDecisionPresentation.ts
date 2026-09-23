@@ -132,8 +132,10 @@ export function changeSummary(change: RecoveryStrategyView['changes'][number]): 
     if (change.cancellationPenalty) {
       parts.push(`cancellation fee ${decisionMoney(change.cancellationPenalty)}`);
     }
-    if (change.scheduledCancellationPenalty) {
-      parts.push(`cancelled stay value ${decisionMoney(change.scheduledCancellationPenalty)}`);
+    // Recoverable value of the existing booking, never the future penalty
+    // that only applies after the free-cancellation deadline.
+    if (change.recoverableStayCredit) {
+      parts.push(`recovered booking value ${decisionMoney(change.recoverableStayCredit)}`);
     }
     return parts.join(' · ');
   }

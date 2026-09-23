@@ -78,18 +78,62 @@ function changesHtml(strategy: RecoveryStrategyView): string {
   }).join('')}</ul>`;
 }
 
+/**
+ * Cancellation-terms block. Three distinct money concepts stay visually and
+ * textually separate: the current fee (economics right now), the future
+ * provider penalty after the free-cancellation deadline (not a refund, not
+ * current loss), and the recoverable value of the existing booking (the only
+ * source of the DISPLACED_STAY_CREDIT cost line). Never derive one from another.
+ */
 function cancelStayNoteHtml(strategy: RecoveryStrategyView): string {
   const cancel = strategy.changes.find((change) => change.effectKind === 'CANCEL_STAY');
   if (!cancel) return '';
-  const parts = ['Cancellation of the displaced stay is proposed, not completed.'];
-  if (cancel.freeCancellationUntil && cancel.scheduledCancellationPenalty) {
-    parts.push(
-      `Free cancellation is available until ${decisionTime(cancel.freeCancellationUntil, cancel.timeZone)}; after that, potential loss ${decisionMoney(cancel.scheduledCancellationPenalty)}.`,
-    );
-  } else if (cancel.cancellationPenalty) {
-    parts.push(`Current cancellation fee ${decisionMoney(cancel.cancellationPenalty)}.`);
+  const lines = ['Cancellation of the displaced stay is proposed, not completed.'];
+  if (cancel.freeCancellationUntil) {
+    lines.push(`Free cancellation until ${decisionTime(cancel.freeCancellationUntil, cancel.timeZone)}.`);
   }
-  return `<p class="cw-muted" data-test="cancel-stay-economics">${e(parts.join(' '))}</p>`;
+  if (cancel.cancellationPenalty) {
+    lines.push(`Current cancellation fee: ${decisionMoney(cancel.cancellationPenalty)}.`);
+  }
+  if (cancel.scheduledCancellationPenalty) {
+    lines.push(`Future penalty after deadline: ${decisionMoney(cancel.scheduledCancellationPenalty)}.`);
+  }
+  if (cancel.recoverableStayCredit) {
+    lines.push(`Recoverable booking value: ${decisionMoney(cancel.recoverableStayCredit)}.`);
+  }
+  return `<p class="cw-muted" data-test="cancel-stay-economics">${lines.map((line) => e(line)).join(' ')}</p>`;
+}
+
+/**
+ * Human-readable label for a cost line. A hotel addition takes the proposed
+ * stay's own property/place label (matched positionally against the
+ * candidate's proposed stays) so distinct hotel lines read as "Hotel" rather
+ * than a generic bucket name; unavailable falls back to a generic name.
+ * Never hardcodes a specific property, city or supplier.
+ */
+function costLineLabel(
+  line: { kind: { code?: string; label?: string } },
+  candidate: PlanningCandidateView | undefined,
+  hotelSeen: { count: number },
+): string {
+  if (line.kind.code === 'ADD_JOURNEY_STAY') {
+    const stay = candidate?.proposal?.stays[hotelSeen.count];
+    hotelSeen.count += 1;
+    const label = stay ? decisionText(stay.propertyLabel ?? stay.placeLabel, '') : '';
+    return label || 'Additional hotel stay';
+  }
+  if (line.kind.code === 'SELECT_OFFER') return decisionText(line.kind.label, 'Replacement flight');
+  return decisionText(line.kind.label, 'Spend');
+}
+
+/**
+ * NET COST can be negative (a net saving). `decisionMoney` embeds the sign in
+ * the amount (e.g. "USD -125.07"); re-render that as a leading minus before
+ * the currency ("−USD 125.07") so a saving reads unambiguously at a glance.
+ */
+function formatNetAmount(value: string): string {
+  const match = /^([A-Z]{3}) -(.+)$/.exec(value);
+  return match ? `−${match[1]} ${match[2]}` : value;
 }
 
 /** Compact net + line items for the decision panel and recommendation card. */
@@ -101,17 +145,18 @@ function moneySummaryHtml(candidate: PlanningCandidateView | undefined): string 
     </div>
     <p class="cw-muted" data-test="cost-unavailable">${e(cost.unavailable)}</p>`;
   }
+  const hotelSeen = { count: 0 };
   const lineRows = [
-    ...cost.spend.map((line) => ({ label: decisionText(line.kind.label, 'Spend'), amount: decisionMoney(line.homeAmount), credit: false })),
+    ...cost.spend.map((line) => ({ label: costLineLabel(line, candidate, hotelSeen), amount: decisionMoney(line.homeAmount), credit: false })),
     ...cost.exposure.map((line) => ({ label: decisionText(line.kind.label, 'Cancellation fee'), amount: decisionMoney(line.homeAmount), credit: false })),
-    ...cost.credit.map((line) => ({ label: decisionText(line.kind.label, 'Refund'), amount: decisionMoney(line.homeAmount), credit: true })),
+    ...cost.credit.map((line) => ({ label: decisionText(line.kind.label, 'Recovered original stay value'), amount: decisionMoney(line.homeAmount), credit: true })),
   ];
   const linesHtml = lineRows.length
     ? `<ul class="cw-cost-lines" data-test="cost-line-items">${lineRows.map((row) =>
       `<li data-test="cost-line"><span>${e(row.label)}</span><strong>${row.credit ? '−' : ''}${e(row.amount)}</strong></li>`).join('')}</ul>`
     : '';
   return `<div class="cw-metrics" data-test="cost-separated">
-    <div class="cw-metric cw-metric-net" data-test="cost-net"><small>NET COST</small><strong>${e(cost.net?.join(' + ') ?? 'Not supplied')}</strong><span class="cw-metric-note">New spend + cancellation fee − refund · home currency</span></div>
+    <div class="cw-metric cw-metric-net" data-test="cost-net"><small>NET COST</small><strong>${e(cost.net?.map(formatNetAmount).join(' + ') ?? 'Not supplied')}</strong><span class="cw-metric-note">New spend + cancellation fee − recovered original stay value · home currency</span></div>
   </div>
   ${linesHtml}
   ${cost.providerSpend ? `<p class="cw-muted">Original provider currency: ${e(cost.providerSpend.join(' + '))}.</p>` : ''}`;
@@ -120,12 +165,13 @@ function moneySummaryHtml(candidate: PlanningCandidateView | undefined): string 
 function costBreakdownHtml(candidate: PlanningCandidateView | undefined, key: string): string {
   const cost = decisionCosts(candidate?.costComparison);
   if (cost.unavailable || !cost.comparison) return '';
+  const hotelSeen = { count: 0 };
   const rows = (lines: typeof cost.spend, category: 'spend' | 'exposure' | 'credit' | 'other'): string => lines.map((line) => `<tr>
-    <td>${e(decisionText(line.kind.label, 'Comparison item'))}${category === 'exposure' ? '<br>Cancellation fee · estimate only' : category === 'credit' ? '<br>Refund credit · not yet received' : category === 'spend' ? '<br>Proposed expenditure' : '<br>Other recorded comparison item'}</td>
+    <td>${e(category === 'spend' ? costLineLabel(line, candidate, hotelSeen) : decisionText(line.kind.label, 'Comparison item'))}${category === 'exposure' ? '<br>Cancellation fee · estimate only' : category === 'credit' ? '<br>Recovered original stay value · not yet received' : category === 'spend' ? '<br>Proposed expenditure' : '<br>Other recorded comparison item'}</td>
     <td>${e(decisionMoney(line.providerAmount))}</td><td>${category === 'credit' ? '−' : ''}${e(decisionMoney(line.homeAmount))}</td></tr>`).join('');
   const fx = cost.comparison.selectedFxEvidence ?? [];
   return details(`cost-evidence-${key}`, 'Cost breakdown and FX evidence',
-    `<p class="cw-muted">Net figures include refund credit from the cancelled stay when a free-cancellation window recovers that stay's value.</p>
+    `<p class="cw-muted">Net figures include the recovered original stay value from the cancelled stay when a free-cancellation window recovers that booking's value.</p>
     <table class="cw-cost-table"><thead><tr><th scope="col">Item</th><th scope="col">Provider currency</th><th scope="col">Home comparison</th></tr></thead>
     <tbody>${rows(cost.spend, 'spend')}${rows(cost.exposure, 'exposure')}${rows(cost.credit, 'credit')}${rows(cost.other, 'other')}</tbody></table>
     <p>Net total: <strong>${e(decisionMoney(cost.comparison.totalHomeAmount))}</strong> · ${e(formatInstant(cost.comparison.comparedAt))}</p>
@@ -269,14 +315,15 @@ function glanceCostsCell(candidate: PlanningCandidateView | undefined): string {
   if (cost.unavailable) return 'Not compared';
   const net = cost.net?.join(' + ') ?? 'Not supplied';
   const parts: string[] = [];
+  const hotelSeen = { count: 0 };
   for (const line of cost.spend) {
-    parts.push(`${decisionText(line.kind.label, 'Item')} ${decisionMoney(line.homeAmount)}`);
+    parts.push(`${costLineLabel(line, candidate, hotelSeen)} ${decisionMoney(line.homeAmount)}`);
   }
   for (const line of cost.exposure) {
     parts.push(`${decisionText(line.kind.label, 'Fee')} ${decisionMoney(line.homeAmount)}`);
   }
   for (const line of cost.credit) {
-    parts.push(`${decisionText(line.kind.label, 'Refund')} −${decisionMoney(line.homeAmount)}`);
+    parts.push(`${decisionText(line.kind.label, 'Recovered original stay value')} −${decisionMoney(line.homeAmount)}`);
   }
   const sub = parts.length ? `<span class="v5-glance-sub">${e(parts.join(' · '))}</span>` : '';
   return `Net ${e(net)}${sub}`;
@@ -291,13 +338,14 @@ function cancelledStayArticles(strategy: RecoveryStrategyView): string {
   return strategy.changes.filter((change) => change.effectKind === 'CANCEL_STAY').map((change) => {
     const label = decisionText(change.subjectLabel, 'Existing stay');
     const fee = change.cancellationPenalty
-      ? `<p>Cancellation fee ${e(decisionMoney(change.cancellationPenalty))}</p>` : '';
-    const booked = change.scheduledCancellationPenalty
-      ? `<p class="cw-muted">Cancelled stay value ${e(decisionMoney(change.scheduledCancellationPenalty))}</p>` : '';
+      ? `<p>Current cancellation fee ${e(decisionMoney(change.cancellationPenalty))}</p>` : '';
+    // Recoverable value of the existing booking — never the future penalty.
+    const recovered = change.recoverableStayCredit
+      ? `<p class="cw-muted">Recoverable booking value ${e(decisionMoney(change.recoverableStayCredit))}</p>` : '';
     const window = change.currentWindow
       ? `<p>${e(decisionTime(change.currentWindow.start, change.timeZone))} → ${e(decisionTime(change.currentWindow.end, change.timeZone))}</p>`
       : '';
-    return `<article data-test="cancelled-stay"><p class="cw-kicker">Cancelled stay</p><h4>${e(label)}</h4>${window}${fee}${booked}</article>`;
+    return `<article data-test="cancelled-stay"><p class="cw-kicker">Cancelled stay</p><h4>${e(label)}</h4>${window}${fee}${recovered}</article>`;
   }).join('');
 }
 
