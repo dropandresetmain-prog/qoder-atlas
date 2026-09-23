@@ -1075,6 +1075,14 @@ export function normalizeStayContext(raw: NuiteeRetrieveRaw): StayContext {
       ...(checkOut ? { end: checkOut } : {}),
     };
   }
+  // Nuitée exposes no machine-readable no-show / late-arrival terms (only free
+  // text hotel remarks), so noShowCutoff and lateArrivalSupported stay absent.
+  const bookedPrice = toNumber(data.price);
+  const bookedCurrency = toCurrency(data.currency);
+  if (data.status === 'CONFIRMED' && bookedPrice !== undefined && bookedPrice > 0
+    && bookedCurrency !== undefined && /^[A-Z]{3}$/.test(bookedCurrency)) {
+    context.bookedTotal = { amount: bookedPrice, currency: bookedCurrency };
+  }
   const policies = data.cancellationPolicies;
   if (policies && typeof policies.refundableTag === 'string') {
     const posture = cancellationPosture(policies.cancelPolicyInfos, {

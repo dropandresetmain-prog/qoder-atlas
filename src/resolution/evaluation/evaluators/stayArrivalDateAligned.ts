@@ -1,9 +1,10 @@
 /**
- * Required destination-stay policy: an original booked stay must either still
- * cover the selected arrival's local date (check-in through night before
- * checkout — late arrival into a multi-night stay is allowed), or be retired
- * and replaced by an equally located stay whose start aligns with arrival and
- * whose checkout matches the original.
+ * Required destination-stay policy: an original booked stay must either start
+ * on the selected arrival's local date, or — when arrival falls on a later
+ * night inside the booked window — be shown by evidence to survive the
+ * first-night no-show; otherwise it must be retired and replaced by an equally
+ * located stay whose start aligns with arrival and whose checkout matches the
+ * original. Date coverage alone never proves a late-arrival booking survives.
  */
 import type { TypedRef } from '../../../domain/v2/shared/identity.ts';
 import type { CapturedWorld, WConstraintDefinition } from '../../world/world.ts';
@@ -21,6 +22,10 @@ function localDate(instant: string, timeZone: string): string | undefined {
     const year = values.get('year'); const month = values.get('month'); const day = values.get('day');
     return year && month && day ? `${year}-${month}-${day}` : undefined;
   } catch { return undefined; }
+}
+
+function operand(constraint: WConstraintDefinition, key: string) {
+  return constraint.operands.find((candidate) => candidate.key === key);
 }
 
 function operandItemId(constraint: WConstraintDefinition, key: string): string | undefined {
@@ -69,19 +74,35 @@ function evaluateConstraint(subject: TypedRef, world: CapturedWorld, context: Ev
   }
   const related = [{ kind: 'CONSTRAINT_DEFINITION' as const, id: constraint.id }, original.itemRef, arrival.itemRef];
   if (original.active) {
-    // YYYY-MM-DD lexicographic order matches calendar order.
-    const coversArrival = arrivalDate >= originalStart && arrivalDate < originalCheckout;
-    if (coversArrival) {
+    const facts = { arrivalLocalDate: arrivalDate, stayStartLocalDate: originalStart, checkoutLocalDate: originalCheckout };
+    if (arrivalDate === originalStart) {
       return explain({
-        evaluatorId: EVALUATOR_ID,
-        dimension: 'stay_arrival_date_aligned',
-        status: 'PASS',
-        reasonCode: originalStart === arrivalDate ? 'original_stay_arrival_aligned' : 'original_stay_covers_arrival',
-        cause: { kind: 'WORLD_STATE', subjectRef: original.itemRef },
-        affectedSubject: subject,
-        relatedSubjects: related,
-        facts: { arrivalLocalDate: arrivalDate, stayStartLocalDate: originalStart, checkoutLocalDate: originalCheckout },
+        evaluatorId: EVALUATOR_ID, dimension: 'stay_arrival_date_aligned', status: 'PASS', reasonCode: 'original_stay_arrival_aligned',
+        cause: { kind: 'WORLD_STATE', subjectRef: original.itemRef }, affectedSubject: subject, relatedSubjects: related, facts,
       });
+    }
+    // YYYY-MM-DD lexicographic order matches calendar order.
+    if (arrivalDate > originalStart && arrivalDate < originalCheckout) {
+      // Arrival after the check-in date is a first-night no-show. The booking
+      // counts only when reviewed/provider evidence shows it survives.
+      const cutoff = operand(constraint, 'no_show_cutoff')?.instant ?? null;
+      const retained = operand(constraint, 'late_arrival_retained')?.boolean ?? null;
+      const survives = cutoff !== null ? Date.parse(arrival.end.value) <= Date.parse(cutoff) : retained;
+      if (survives === true) {
+        return explain({
+          evaluatorId: EVALUATOR_ID, dimension: 'stay_arrival_date_aligned', status: 'PASS', reasonCode: 'original_stay_survives_late_arrival',
+          cause: { kind: 'WORLD_STATE', subjectRef: original.itemRef }, affectedSubject: subject, relatedSubjects: related,
+          facts: { ...facts, ...(cutoff !== null ? { noShowCutoff: cutoff } : { lateArrivalRetained: true }) },
+        });
+      }
+      if (survives === false) {
+        return explain({
+          evaluatorId: EVALUATOR_ID, dimension: 'stay_arrival_date_aligned', status: 'FAIL', reasonCode: 'original_stay_forfeited_by_late_arrival',
+          cause: { kind: 'REQUIREMENT', subjectRef: { kind: 'CONSTRAINT_DEFINITION', id: constraint.id } }, affectedSubject: subject, relatedSubjects: related,
+          facts: { ...facts, ...(cutoff !== null ? { noShowCutoff: cutoff } : { lateArrivalRetained: false }) },
+        });
+      }
+      return unknown(subject, constraint, 'original_stay_late_arrival_survival_unknown', related);
     }
     return explain({
       evaluatorId: EVALUATOR_ID, dimension: 'stay_arrival_date_aligned', status: 'FAIL', reasonCode: 'active_original_stay_misaligned',

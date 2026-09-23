@@ -34,8 +34,8 @@ export interface RecoveryCostComparison {
   /** Maximum cancellation / policy loss exposure — not a confirmed new purchase. */
   potentialLossHomeAmount: ExactMoney;
   /**
-   * Recovered value when cancelling a displaced stay (scheduled booking value
-   * minus the current cancellation fee). Subtracted when forming net cost.
+   * Recovered value of a displaced existing booking (its confirmed total less
+   * the current cancellation fee). Subtracted when forming net cost.
    */
   creditHomeAmount: ExactMoney;
   /**
@@ -118,19 +118,11 @@ function effectCosts(effect: ScenarioEffect): Array<{ kind: RecoveryCostKind; am
       const lines: Array<{ kind: RecoveryCostKind; amount: ExactMoney; observed: boolean }> = [
         { kind: 'POLICY_PENALTY_ESTIMATE', amount: effect.cancellationPenalty, observed: false },
       ];
-      // When a free-cancel window still applies, scheduledCancellationPenalty is
-      // the displaced booking value recovered on cancel (full refund less any
-      // current fee). Net = fee − that recovered value.
-      const scheduled = effect.scheduledCancellationPenalty;
-      if (scheduled && scheduled.currency === effect.cancellationPenalty.currency) {
-        try {
-          const credit = addExactMoney(scheduled, negateExactMoney(effect.cancellationPenalty));
-          if (!/^-?0+(?:\.0+)?$/.test(credit.amount) && !credit.amount.startsWith('-')) {
-            lines.push({ kind: 'DISPLACED_STAY_CREDIT', amount: credit, observed: false });
-          }
-        } catch {
-          // Currency/precision mismatch: omit credit rather than invent net.
-        }
+      // Credit comes only from the existing booking's recoverable value. The
+      // future (post-deadline) penalty is exposure, never a refund.
+      const credit = effect.recoverableStayCredit;
+      if (credit && !/^-?0+(?:\.0+)?$/.test(credit.amount) && !credit.amount.startsWith('-')) {
+        lines.push({ kind: 'DISPLACED_STAY_CREDIT', amount: credit, observed: false });
       }
       return lines;
     }

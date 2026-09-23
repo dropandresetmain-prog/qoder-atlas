@@ -268,6 +268,17 @@ export const DatasetStayArrivalDateAlignedRequirementSchema = z.strictObject({
   kind: z.literal('STAY_ARRIVAL_DATE_ALIGNED'),
   originalStayItemRef: DatasetJourneyItemSourceRefSchema,
   arrivalTransportItemRef: DatasetJourneyItemSourceRefSchema,
+  /**
+   * Reviewed booking/property evidence on whether the original booking survives
+   * arrival after its check-in date. Absent means UNKNOWN, never "survives".
+   */
+  lateArrivalEvidence: z.strictObject({
+    retained: z.boolean().optional(),
+    noShowCutoff: z.iso.datetime({ offset: true }).optional(),
+    sourceRef: NonEmpty,
+  }).refine((value) => value.retained !== undefined || value.noShowCutoff !== undefined, {
+    message: 'late-arrival evidence must state retention or a no-show cutoff',
+  }).optional(),
 });
 export type DatasetStayArrivalDateAlignedRequirement = z.infer<typeof DatasetStayArrivalDateAlignedRequirementSchema>;
 

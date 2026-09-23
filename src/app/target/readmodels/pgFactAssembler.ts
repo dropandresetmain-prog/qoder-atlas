@@ -478,6 +478,7 @@ async function projectCaseStrategies(
     cancellationPenalty?: { amount: string; currency: string };
     freeCancellationUntil?: string;
     scheduledCancellationPenalty?: { amount: string; currency: string };
+    recoverableStayCredit?: { amount: string; currency: string };
   }
   const effectsByStrategy = new Map<string, EffectFact[]>();
   const programmeItemIds = new Set<string>();
@@ -495,6 +496,7 @@ async function projectCaseStrategies(
       const proposedWindow = windowOf(effect.proposedWindow);
       const cancellationPenalty = moneyOf(effect.cancellationPenalty);
       const scheduledCancellationPenalty = moneyOf(effect.scheduledCancellationPenalty);
+      const recoverableStayCredit = moneyOf(effect.recoverableStayCredit);
       const freeCancellationUntil = typeof effect.freeCancellationUntil === 'string'
         ? effect.freeCancellationUntil
         : undefined;
@@ -505,6 +507,7 @@ async function projectCaseStrategies(
         ...(cancellationPenalty ? { cancellationPenalty } : {}),
         ...(freeCancellationUntil ? { freeCancellationUntil } : {}),
         ...(scheduledCancellationPenalty ? { scheduledCancellationPenalty } : {}),
+        ...(recoverableStayCredit ? { recoverableStayCredit } : {}),
       });
     }
     effectsByStrategy.set(row.recovery_strategy_id, list);
@@ -555,6 +558,7 @@ async function projectCaseStrategies(
         ...(effect.scheduledCancellationPenalty
           ? { scheduledCancellationPenalty: effect.scheduledCancellationPenalty }
           : {}),
+        ...(effect.recoverableStayCredit ? { recoverableStayCredit: effect.recoverableStayCredit } : {}),
       };
     });
     const projectedPeople = summaries.map((entry) => ({

@@ -1,57 +1,41 @@
-# ACTIVE TASK — Hero E2E recording closure (demo reset + Jordan economics)
+# ACTIVE TASK — Jordan final closure (fresh baseline → protected execution → RESOLVED)
 
 ## Identity
 
 - Repo: `dropandresetmain-prog/qoder-atlas`
-- Worktree: `C:\Dev\qoder-atlas-a5-hero-e2e-closure`
-- Branch: `fix/a5-hero-e2e-closure`
-- Starting SHA: `7d4b1f5e3525294ab0585d08ae40d49e7ba3da24`
-- Current HEAD: `7720880`
-- Founder acceptance draft: see [Draft final PASS report](c52bb9ad-8869-4508-a0f2-78cba2173681) — clone IDs in JSON are mid-run; post-acceptance Reset left `ns_demo_cl_90dbd69cb03742ea`
+- Worktree: `C:\Dev\qoder-atlas\.worktrees\a5-jordan-transaction-recording`
+- Branch: `fix/a5-jordan-transaction-recording`
+- Starting SHA: `b67d0d7a54b04f6918064dea0d1a01ec406edf95`
+- Sarah is frozen on `finish/sarah-programme-recovery` @ `3e35c6c` — do not touch.
 
-## Mission
+## Scenario truth (recording world)
 
-Close remaining demo/runtime defects for founder video recording.
+- TODAY 2026-09-23; original lyf Bugis 29 Sep → 3 Oct (4 nights) booked TODAY as a
+  fresh Nuitée sandbox booking. Disruption on 29 Sep.
+- Indicative LIVE: original 4n USD 976.04, replacement 3n USD 698.83, Narita USD 35.18,
+  TR885 USD 116.96. The CONFIRMED booking amount overrides 976.04.
+- `z-xdzAxcv` / USD 670.77 is historical and cancelled — never the active baseline.
 
-## Parked (CP2+)
+## Semantics decided (CP1)
 
-- **Unified all-provider LIVE/RECORD profile** — single env switch composing LIVE or RECORD across Atlas, Nuitée, Frankfurter, Google Routes, and intelligence providers together. **Deferred**; Jordan founder path uses `NORTHSTAR_DEMO_PROFILE=record` / `npm run demo:record` only (Atlas RECORD + sandbox markers + Nuitée credentials preflight). Revisit after provider-parity audit closure.
+- `cancellationPenalty` = current fee at planning now (0 inside the free window).
+- `scheduledCancellationPenalty` = post-deadline exposure. Never a refund.
+- `recoverableStayCredit` (+ basis `CONFIRMED_BOOKING_TOTAL_LESS_CURRENT_FEE`) = the
+  existing booking's provider-confirmed `bookedTotal` less the current fee. The only
+  source of `DISPLACED_STAY_CREDIT`.
+- `stay_arrival_date_aligned`: arrival after check-in date needs evidence
+  (`late_arrival_retained` / `no_show_cutoff` operands, dataset `lateArrivalEvidence`).
+  None → UNKNOWN. Nuitée exposes no machine-readable no-show terms.
 
 ## Checkpoint ledger
 
-- [x] CP-A — Cancellation semantics + Jordan economic proof (`29e1ae1`)
-- [x] CP-B/C — Shared production baseline clone + Reset (`17f62f9`)
-- [x] CP-D runtime — wall grants + INPUT_CHANGED claim + quiesce swap (`b6651b9`, `2df12e4`, `eac5cc8`)
-- [x] CP-D acceptance — 3× Sarah RESOLVED + Jordan REPLAY plan (evidence in `docs/work/a5-founder-acceptance-report.json`)
+- [ ] CP1 — hotel contract + no-show/refund semantics
+- [ ] CP2 — fresh sandbox baseline booking + canonical binding (explicit bootstrap)
+- [ ] CP3 — Path A/B cost ranking + Case cost UX with fresh evidence
+- [ ] CP4 — focused graph spine + proposed-service preview
+- [ ] CP5 — Chromium D1/D2/D3 acceptance
+- [ ] CP6 — protected sandbox execution → RESOLVED + sanitized recordings + REPLAY proof
 
-## Founder acceptance evidence (2026-09-22)
+## Parked
 
-Reset times (ms): 6039 / 10474 / 3378 / Jordan 4880 — all CLONE_FROM_TEMPLATE.
-
-Sarah ×3: PROGRAMME, exposure 0, blast 3, final RESOLVED, openCases=[], READY/VIABLE each time.
-
-Jordan D2 AT_RISK → D3 DISRUPTED; recommendation AWAITING_AUTHORITY; `Cost not compared` absent;
-CANCEL_STAY current penalty USD 0, freeCancellationUntil 2026-09-29T23:59:59Z,
-scheduledCancellationPenalty USD 670.77; 167.69 absent.
-
-Founder URL: `http://127.0.0.1:8787/`
-Active clone (after hung-server restart, pristine TEMPLATE clone): `ns_demo_cl_f267d541469946d9`
-Workspace: `b96791c7-189f-4a59-ae30-b7cb5e6068b4`
-
-## Sarah disruption stall vs server truth (2026-09-22)
-
-Founder Sarah disruption **appeared stalled** in the UI/session, but the **server log** showed **drain + plan completed** through to **`AWAITING_AUTHORITY`**. This was **not** a DB clash with parallel agent probe scripts: normal dev is `node src/main.ts` (**no watch reload**).
-
-Root causes of the “stall” feel:
-1. Demo Console apply holds the HTTP request up to ~**62.5s** (2.5s intentional pause + up to **60s** `wakeEvaluation` drain); the popover stays on Triggering until the response returns.
-2. After plan completes, the case sits at **`AWAITING_AUTHORITY`** until operator **Approve** — execution idle by design, not a hung worker.
-
-**Product Reset** restored Sarah to **READY / VIABLE**. Apply still does not take the workspace operation lease (**Park** overlap with Reset).
-
-## Post-acceptance triage (Park / Accept — not recording-blocking)
-
-- Overview `summary.ready=0` with READY population: **Clarified** — `summary` is case-queue counts; use `populationSummary` (comment + unit assert).
-- Gates: anti-hardcoding CLEAN, boundary CLEAN, focused a5 units 13/13 ([Anti-hardcoding + unit gates](cbb9902f-971c-49bd-97ee-78bb61745b8a)).
-- Reset lease-before-swap race: **Park** for sequential founder Reset; hold mutex later ([Branch diff risk review](bf71f0ac-d1f5-461d-8a0a-a428f42ae3f2)).
-- Wall-time authority under CONTROLLED: **Accept Risk** for demo execute; document split later (same review).
-- Jordan D1 overview clock: **Done** (`7720880`) — overview HTTP passes `evaluationClock.now()` into facts. Residual: `overallVerdict=UNKNOWN` with `CURRENT` still possible; case route still passes `undefined` for `at` (**Park**). Founder process restart required to load the handler.
+- Unified all-provider LIVE/RECORD master switch — deferred (unchanged).

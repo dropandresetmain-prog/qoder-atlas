@@ -136,6 +136,7 @@
       "test/a5-founder-qc-progression.test.ts",
       "test/a5-hero-seed-truth.test.ts",
       "test/a5-timed-cancellation-policy.test.ts",
+      "test/a5-stay-recovery-economics.test.ts",
       "test/a5-demo-baseline-identity.test.ts",
       "test/a5-database-template-clone-guards.test.ts",
       "test/a5-swappable-pool.test.ts",

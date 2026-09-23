@@ -158,7 +158,7 @@ export function createTargetRecoveryCostContext(
         journeyIds.add(item.journeyId);
         if (effect.effectKind === 'CANCEL_STAY') {
           currencies.add(effect.cancellationPenalty.currency);
-          if (effect.scheduledCancellationPenalty) currencies.add(effect.scheduledCancellationPenalty.currency);
+          if (effect.recoverableStayCredit) currencies.add(effect.recoverableStayCredit.currency);
         } else if (effect.offerPrice) currencies.add(effect.offerPrice.currency);
       }
     }

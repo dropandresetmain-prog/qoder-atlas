@@ -962,6 +962,10 @@ export async function materializeDataset(params: MaterializeDatasetParams): Prom
           operands: [
             { key: 'original_stay_item', kind: 'SUBJECT_REF', value: { kind: 'JOURNEY_ITEM', id: ids.id('journey-item', traveller.draftId, aligned.originalStayIndex) } },
             { key: 'arrival_item', kind: 'SUBJECT_REF', value: { kind: 'JOURNEY_ITEM', id: ids.id('journey-item', traveller.draftId, aligned.arrivalTransportIndex) } },
+            ...(aligned.requirement.lateArrivalEvidence?.retained !== undefined
+              ? [{ key: 'late_arrival_retained', kind: 'BOOLEAN' as const, value: aligned.requirement.lateArrivalEvidence.retained }] : []),
+            ...(aligned.requirement.lateArrivalEvidence?.noShowCutoff !== undefined
+              ? [{ key: 'no_show_cutoff', kind: 'INSTANT' as const, value: aligned.requirement.lateArrivalEvidence.noShowCutoff }] : []),
           ],
         }),
         `recordConstraintDefinition(${requirement.id})`,

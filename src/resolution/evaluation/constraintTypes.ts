@@ -42,8 +42,12 @@ export const CONSTRAINT_TYPES: readonly ConstraintTypeRegistration[] = [
     operands: {
       original_stay_item: { kind: 'SUBJECT_REF', required: true, subjectKind: 'JOURNEY_ITEM' },
       arrival_item: { kind: 'SUBJECT_REF', required: true, subjectKind: 'JOURNEY_ITEM' },
+      /** Reviewed/provider evidence that the booking survives arrival after its check-in date. */
+      late_arrival_retained: { kind: 'BOOLEAN', required: false },
+      /** Reviewed/provider no-show cutoff: arriving later forfeits the booking. */
+      no_show_cutoff: { kind: 'INSTANT', required: false },
     },
-    meaning: 'the required destination stay starts on the selected arrival local date and preserves the original stay checkout local date',
+    meaning: 'the required destination stay starts on the selected arrival local date and preserves the original stay checkout local date; an original booking reached after its check-in date counts only when evidence shows it survives that late arrival',
   },
   {
     registeredType: 'travel_together',

@@ -1486,11 +1486,25 @@ test('CANCEL_STAY retires only intent and an arrival-aligned replacement is requ
   const lateOnly = applyScenarioOverlay({ baseWorld: world, scenarioChange: change([lateSelect]), resolvedOffers });
   assert.equal(lateOnly.ok, true);
   if (!lateOnly.ok) return;
-  assert.equal(verdict(lateOnly.value.proposedWorld).verdict, 'PASS', 'late arrival still covered by the multi-night original stay');
+  assert.equal(verdict(lateOnly.value.proposedWorld).verdict, 'UNKNOWN', 'date coverage alone never proves the booking survives a first-night no-show');
   assert.equal(
     verdict(lateOnly.value.proposedWorld).explanations[0]?.reasonCode,
-    'original_stay_covers_arrival',
+    'original_stay_late_arrival_survival_unknown',
   );
+  const withOperand = (extra: WConstraintDefinition['operands'][number]) => {
+    const evidenced = structuredClone(lateOnly.value.proposedWorld);
+    evidenced.constraints[0]!.operands.push(extra);
+    return verdict(evidenced);
+  };
+  const operandBase = { kind: 'BOOLEAN', subject: null, text: null, number: null, boolean: null, instant: null, localDate: null };
+  const retained = withOperand({ ...operandBase, key: 'late_arrival_retained', boolean: true });
+  assert.equal(retained.verdict, 'PASS', 'reviewed evidence that the booking survives late arrival keeps it');
+  assert.equal(retained.explanations[0]?.reasonCode, 'original_stay_survives_late_arrival');
+  assert.equal(withOperand({ ...operandBase, key: 'late_arrival_retained', boolean: false }).verdict, 'FAIL', 'evidence that late arrival forfeits the booking fails');
+  const beforeArrivalCutoff = withOperand({ ...operandBase, key: 'no_show_cutoff', kind: 'INSTANT', instant: '2030-06-02T12:00:00.000Z' });
+  assert.equal(beforeArrivalCutoff.verdict, 'FAIL', 'arrival after the no-show cutoff forfeits the booking');
+  assert.equal(beforeArrivalCutoff.explanations[0]?.reasonCode, 'original_stay_forfeited_by_late_arrival');
+  assert.equal(withOperand({ ...operandBase, key: 'no_show_cutoff', kind: 'INSTANT', instant: '2030-06-03T12:00:00.000Z' }).verdict, 'PASS', 'arrival before the no-show cutoff keeps the booking');
   const afterCheckoutService = service({
     id: id(), originPlaceId, destinationPlaceId,
     published: { departure: observed('2030-06-06T04:00:00.000Z'), arrival: observed('2030-06-06T08:00:00.000Z') },
@@ -1514,7 +1528,7 @@ test('CANCEL_STAY retires only intent and an arrival-aligned replacement is requ
   const addOnly = applyScenarioOverlay({ baseWorld: world, scenarioChange: change([lateSelect, add]), resolvedOffers, resolvedStayOffers });
   assert.equal(addOnly.ok, true);
   if (!addOnly.ok) return;
-  assert.equal(verdict(addOnly.value.proposedWorld).verdict, 'PASS', 'original stay still covers arrival; an extra stay without cancel is not required to pass alignment');
+  assert.equal(verdict(addOnly.value.proposedWorld).verdict, 'UNKNOWN', 'an extra stay does not establish that the active original booking survives late arrival');
   const replacement = applyScenarioOverlay({ baseWorld: world, scenarioChange: change([lateSelect, cancel, add]), resolvedOffers, resolvedStayOffers });
   assert.equal(replacement.ok, true);
   if (!replacement.ok) return;
@@ -1751,7 +1765,7 @@ test(`hotel planning combines overnight and destination-stay replacement with ca
     assert.equal(missingPolicyEvaluation.ok, true);
     if (missingPolicyEvaluation.ok) {
       const assessment = missingPolicyEvaluation.value.strategy.candidateAssessmentResults.find((row) => row.subjects[0]?.subjectRef.id === journey.id)!;
-      assert.equal(assessment.dimensions.find((dimension) => dimension.dimension === 'stay_arrival_date_aligned')?.verdict, 'PASS', 'keeping the original multi-night stay is viable when arrival still falls inside its window');
+      assert.equal(assessment.dimensions.find((dimension) => dimension.dimension === 'stay_arrival_date_aligned')?.verdict, 'UNKNOWN', 'keeping the original stay after a first-night no-show is unproven without late-arrival evidence');
     }
   }
   const wrongReplacementSearch = searchResults.map((result, index) => index === 1 ? {

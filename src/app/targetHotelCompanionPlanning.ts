@@ -12,7 +12,7 @@ import type { PlanningToolProvenance, PlanningToolRequest, PlanningToolResult } 
 import { PlanningToolProvenanceSchema, PlanningToolRequestSchema, planningToolRequestFingerprint, type PlanningResearchBudget } from '../contracts/v2/planning/planningTool.ts';
 import type { DomainProposerInput, DomainStrategyProposer } from '../contracts/v2/planning/proposerAdaptation.ts';
 import type { ScenarioEffect } from '../contracts/v2/scenario/scenarioChange.ts';
-import { ExactMoneySchema, compareExactMoney, currencyExponent, type CurrencyCode, type ExactMoney } from '../domain/v2/shared/money.ts';
+import { ExactMoneySchema, compareExactMoney, currencyExponent, subtractExactMoney, type CurrencyCode, type ExactMoney } from '../domain/v2/shared/money.ts';
 import { InstantIntervalSchema, type Instant } from '../domain/v2/shared/time.ts';
 import type { CapturedWorld } from '../resolution/world/world.ts';
 import { projectEffectiveWorld } from '../resolution/world/effectiveItinerary.ts';
@@ -119,6 +119,8 @@ export interface CapturedHotelQuote {
     cancellationPenaltyBasis: 'PROVIDER_POLICY' | 'NONREFUNDABLE_BOOKING_PRICE_CEILING';
     freeCancellationUntil?: Instant;
     scheduledCancellationPenalty?: ExactMoney;
+    recoverableStayCredit?: ExactMoney;
+    recoverableStayCreditBasis?: RecoverableStayCreditBasis;
     provider: {
       stayElementId: string;
       policyProvenance: PlanningToolProvenance;
@@ -163,13 +165,45 @@ function exactPrice(price: unknown): ExactMoney | undefined {
   return parsed.success && !parsed.data.amount.startsWith('-') ? parsed.data : undefined;
 }
 
-/** Current cancellation loss at `now` from normalized stay-context evidence. */
-export function evaluateStayCancellationPenalty(value: unknown, now: Instant): {
+export type RecoverableStayCreditBasis = 'CONFIRMED_BOOKING_TOTAL_LESS_CURRENT_FEE';
+
+export interface StayCancellationEvaluation {
+  /** Current cancellation fee: the loss if cancelled at `now`. */
   amount: ExactMoney;
   basis: 'PROVIDER_POLICY' | 'NONREFUNDABLE_BOOKING_PRICE_CEILING';
   freeCancellationUntil?: Instant;
+  /** Provider penalty that applies only after the free window. Never a refund. */
   scheduledCancellationPenalty?: ExactMoney;
-} | undefined {
+  /**
+   * Value of the EXISTING booking recovered if cancelled at `now`: the
+   * provider-confirmed booked total less the current fee. Absent when the
+   * booking total or an exact current fee is not established.
+   */
+  recoverableStayCredit?: ExactMoney;
+  recoverableStayCreditBasis?: RecoverableStayCreditBasis;
+}
+
+/**
+ * Current cancellation fee, future penalty and recoverable booking value at
+ * `now` from normalized stay-context evidence. The three are distinct: the
+ * future penalty is never used to derive the refund.
+ */
+export function evaluateStayCancellationPenalty(value: unknown, now: Instant): StayCancellationEvaluation | undefined {
+  const current = evaluateCurrentCancellationFee(value, now);
+  if (!current || current.basis !== 'PROVIDER_POLICY' || value === null || typeof value !== 'object') return current;
+  const booked = exactPrice((value as { bookedTotal?: unknown }).bookedTotal);
+  if (!booked || booked.currency !== current.amount.currency) return current;
+  try {
+    // fee > booked total would mean the policy and booking disagree; do not invent a credit.
+    if (compareExactMoney(current.amount, booked) > 0) return current;
+    const credit = subtractExactMoney(booked, current.amount);
+    return { ...current, recoverableStayCredit: credit, recoverableStayCreditBasis: 'CONFIRMED_BOOKING_TOTAL_LESS_CURRENT_FEE' };
+  } catch {
+    return current;
+  }
+}
+
+function evaluateCurrentCancellationFee(value: unknown, now: Instant): StayCancellationEvaluation | undefined {
   if (value === null || typeof value !== 'object') return undefined;
   const cancellation = (value as { cancellation?: unknown }).cancellation;
   if (cancellation === null || typeof cancellation !== 'object') return undefined;
@@ -630,6 +664,9 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
                   ...(penalty.scheduledCancellationPenalty
                     ? { scheduledCancellationPenalty: penalty.scheduledCancellationPenalty }
                     : {}),
+                  ...(penalty.recoverableStayCredit && penalty.recoverableStayCreditBasis
+                    ? { recoverableStayCredit: penalty.recoverableStayCredit, recoverableStayCreditBasis: penalty.recoverableStayCreditBasis }
+                    : {}),
                   policyProvenance: contextResult.provenance,
                 }
                 : undefined;
@@ -639,6 +676,8 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
               cancellationPenaltyBasis: 'PROVIDER_POLICY' | 'NONREFUNDABLE_BOOKING_PRICE_CEILING';
               freeCancellationUntil?: Instant;
               scheduledCancellationPenalty?: ExactMoney;
+              recoverableStayCredit?: ExactMoney;
+              recoverableStayCreditBasis?: RecoverableStayCreditBasis;
               policyProvenance: PlanningToolProvenance;
             } => candidate !== undefined)
           : undefined;
@@ -662,6 +701,9 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
               ...(policy.freeCancellationUntil ? { freeCancellationUntil: policy.freeCancellationUntil } : {}),
               ...(policy.scheduledCancellationPenalty
                 ? { scheduledCancellationPenalty: policy.scheduledCancellationPenalty }
+                : {}),
+              ...(policy.recoverableStayCredit && policy.recoverableStayCreditBasis
+                ? { recoverableStayCredit: policy.recoverableStayCredit, recoverableStayCreditBasis: policy.recoverableStayCreditBasis }
                 : {}),
               provider: { stayElementId: replacement.stayElementId, policyProvenance: policy.policyProvenance },
             },
@@ -743,6 +785,12 @@ export function createHotelCompanionPlanning(input: TransportPassengerSource & {
                 : {}),
               ...(quote.replacement.scheduledCancellationPenalty
                 ? { scheduledCancellationPenalty: quote.replacement.scheduledCancellationPenalty }
+                : {}),
+              ...(quote.replacement.recoverableStayCredit && quote.replacement.recoverableStayCreditBasis
+                ? {
+                  recoverableStayCredit: quote.replacement.recoverableStayCredit,
+                  recoverableStayCreditBasis: quote.replacement.recoverableStayCreditBasis,
+                }
                 : {}),
             },
             { effectKind: 'ADD_JOURNEY_STAY', proposedJourneyItemId: quote.context.proposedJourneyItemId, journeyId: quote.journeyId, orderKey: quote.context.orderKey, offerId: quote.offer.offerId, offerPrice: quote.offer.price, visit: quote.context.visit, replacesReservationLineId: quote.replacement.reservationLineId },

@@ -202,6 +202,16 @@ export function addExactMoney(a: ExactMoney, b: ExactMoney, exponent?: number): 
   return { amount: fromMinorUnits(sum, exp), currency: a.currency };
 }
 
+/** Subtracts `b` from `a` in the SAME currency (result may be negative). */
+export function subtractExactMoney(a: ExactMoney, b: ExactMoney, exponent?: number): ExactMoney {
+  if (a.currency !== b.currency) {
+    throw new RangeError(`cannot subtract ${b.currency} from ${a.currency} without a dated FX conversion`);
+  }
+  const exp = exponent ?? currencyExponent(a.currency);
+  const difference = toMinorUnits(a.amount, exp) - toMinorUnits(b.amount, exp);
+  return { amount: fromMinorUnits(difference, exp), currency: a.currency };
+}
+
 export function compareExactMoney(a: ExactMoney, b: ExactMoney, exponent?: number): -1 | 0 | 1 {
   if (a.currency !== b.currency) {
     throw new RangeError(`cannot compare ${a.currency} to ${b.currency} without a dated FX conversion`);

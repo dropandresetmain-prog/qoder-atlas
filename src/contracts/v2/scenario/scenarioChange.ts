@@ -82,9 +82,16 @@ export const ScenarioEffectSchema = z.discriminatedUnion('effectKind', [
     /**
      * Provider-stated penalty that becomes current after `freeCancellationUntil`.
      * Never counted as current recovery spend or current loss while the free
-     * window remains open.
+     * window remains open, and never used to derive a refund.
      */
     scheduledCancellationPenalty: ExactMoneySchema.optional(),
+    /**
+     * Value of the existing booking recovered by cancelling at planning now,
+     * from that booking's confirmed total less the current fee. The only
+     * source of displaced-stay credit in recovery economics.
+     */
+    recoverableStayCredit: ExactMoneySchema.optional(),
+    recoverableStayCreditBasis: z.enum(['CONFIRMED_BOOKING_TOTAL_LESS_CURRENT_FEE']).optional(),
   }),
   z.strictObject({
     effectKind: z.literal('PROPOSE_ALLOCATION'),

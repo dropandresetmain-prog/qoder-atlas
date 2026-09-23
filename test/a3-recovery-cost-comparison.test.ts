@@ -112,6 +112,8 @@ test('Path A (cancel+rebook+Narita+flight) nets below Path B (keep+Narita+flight
         cancellationPenalty: { amount: '0', currency: 'USD' },
         freeCancellationUntil: '2026-09-29T23:59:59Z',
         scheduledCancellationPenalty: { amount: '976.04', currency: 'USD' },
+        recoverableStayCredit: { amount: '976.04', currency: 'USD' },
+        recoverableStayCreditBasis: 'CONFIRMED_BOOKING_TOTAL_LESS_CURRENT_FEE',
       },
     ],
     homeCurrency: 'USD',

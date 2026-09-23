@@ -202,6 +202,8 @@ export const RecoveryStrategyChangeViewSchema = z.strictObject({
   freeCancellationUntil: z.iso.datetime({ offset: true }).optional(),
   /** Provider-stated penalty after the free window; not current loss. */
   scheduledCancellationPenalty: z.strictObject({ amount: z.string().min(1), currency: z.string().length(3) }).optional(),
+  /** Existing booking value recovered by cancelling now; never the future penalty. */
+  recoverableStayCredit: z.strictObject({ amount: z.string().min(1), currency: z.string().length(3) }).optional(),
 });
 export type RecoveryStrategyChangeView = z.infer<typeof RecoveryStrategyChangeViewSchema>;
 

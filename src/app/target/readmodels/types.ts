@@ -205,6 +205,8 @@ export interface RecoveryStrategyChangeFact {
   cancellationPenalty?: { amount: string; currency: string };
   freeCancellationUntil?: string;
   scheduledCancellationPenalty?: { amount: string; currency: string };
+  /** Existing booking value recovered by cancelling now (confirmed total less current fee). */
+  recoverableStayCredit?: { amount: string; currency: string };
 }
 
 export interface RecoveryStrategyFact {

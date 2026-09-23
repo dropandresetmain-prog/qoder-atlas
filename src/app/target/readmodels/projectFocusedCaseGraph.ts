@@ -396,7 +396,7 @@ export function projectFocusedCaseGraphEnrichment(
   const programmeItemById = new Map(input.programmeItems.map((p) => [p.id, p]));
   const resolvedServiceIdFor = (item: JourneyItemRow): string | undefined =>
     item.kind === 'TRANSPORT'
-      ? (input.proposedServiceByJourneyItem?.get(item.id) ?? item.selectedServiceId)
+      ? (input.proposedServiceByJourneyItem?.get(item.id) ?? item.selectedServiceId ?? undefined)
       : undefined;
   const selectedJourneysByService = new Map<string, Set<string>>();
   for (const item of input.journeyItems) {

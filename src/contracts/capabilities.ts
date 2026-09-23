@@ -608,6 +608,11 @@ export interface StayContext {
   checkInWindow?: { start?: IsoDateTime; end?: IsoDateTime };
   noShowCutoff?: IsoDateTime;
   lateArrivalSupported?: boolean;
+  /**
+   * Confirmed booked total of THIS existing booking, as the provider reports it.
+   * The only basis for recoverable booking value; never a market re-quote.
+   */
+  bookedTotal?: Money;
   cancellation?: {
     refundable: boolean;
     /**
