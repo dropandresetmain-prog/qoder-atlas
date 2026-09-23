@@ -1824,8 +1824,6 @@
           "cmt-ait-d1-build-interview",
           "cmt-ait-d1-search-chat",
           "cmt-ait-d1-recovery-fireside",
-          "cmt-ait-d1-distribution-debate",
-          "cmt-ait-d1-day1-close",
           "cmt-ait-d2-jtb-chat",
           "cmt-ait-d2-lcc-chat",
           "cmt-ait-d2-loyalty-panel",
@@ -1905,18 +1903,6 @@
           {
             "commitmentId": "cmt-ait-d1-recovery-fireside",
             "role": "INTERVIEWER",
-            "importance": "REQUIRED",
-            "flexibility": "FIXED"
-          },
-          {
-            "commitmentId": "cmt-ait-d1-distribution-debate",
-            "role": "REFEREE",
-            "importance": "REQUIRED",
-            "flexibility": "FIXED"
-          },
-          {
-            "commitmentId": "cmt-ait-d1-day1-close",
-            "role": "HOST",
             "importance": "REQUIRED",
             "flexibility": "FIXED"
           },
@@ -2117,7 +2103,8 @@
         ],
         "accessibilityStatements": [],
         "anchorCommitmentIds": [
-          "cmt-ait-d1-future-provocation"
+          "cmt-ait-d1-future-provocation",
+          "cmt-ait-d1-search-chat"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
         "declaredTravel": [
@@ -2159,6 +2146,12 @@
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d1-future-provocation",
+            "role": "SPEAKER",
+            "importance": "REQUIRED",
+            "flexibility": "FIXED"
+          },
+          {
+            "commitmentId": "cmt-ait-d1-search-chat",
             "role": "SPEAKER",
             "importance": "REQUIRED",
             "flexibility": "FIXED"
@@ -2290,8 +2283,8 @@
           {
             "commitmentId": "cmt-ait-d1-distribution-debate",
             "role": "REFEREE",
-            "importance": "REQUIRED",
-            "flexibility": "FIXED"
+            "importance": "PREFERRED",
+            "flexibility": "CHANGEABLE"
           },
           {
             "commitmentId": "cmt-ait-d2-closing-debate",
@@ -2537,14 +2530,10 @@
             "itemKind": "STAY",
             "stayPlaceRef": {
               "system": "place-id",
-              "value": "place-hotel-lyf-bugis"
+              "value": "place-hotel-bayview"
             },
             "checkIn": "2026-09-29T15:00:00+08:00",
             "checkOut": "2026-10-03T11:00:00+08:00",
-            "bookingRef": {
-              "system": "nuitee-booking-id",
-              "reference": "z-xdzAxcv"
-            },
             "reservationState": "CONFIRMED"
           }
         ],
@@ -3006,8 +2995,7 @@
         "anchorCommitmentIds": [
           "cmt-ait-d0-state-of-ai",
           "cmt-ait-d0-pitch-practice",
-          "cmt-ait-d0-seedup-showcase",
-          "cmt-ait-d1-trust-research"
+          "cmt-ait-d0-seedup-showcase"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
         "declaredTravel": [
@@ -3062,12 +3050,6 @@
           {
             "commitmentId": "cmt-ait-d0-seedup-showcase",
             "role": "FACILITATOR",
-            "importance": "REQUIRED",
-            "flexibility": "FIXED"
-          },
-          {
-            "commitmentId": "cmt-ait-d1-trust-research",
-            "role": "SPEAKER",
             "importance": "REQUIRED",
             "flexibility": "FIXED"
           }
@@ -3242,7 +3224,10 @@
           "ID"
         ],
         "notes": [
-          "Founder; hotel-stack fireside and bootcamp participant"
+          "Founder; hotel-stack fireside and bootcamp participant",
+          "Founder; hotel-stack fireside Day 0; ticketed CGK→SIN on ID7128 (outside ID7159 disruption cohort)",
+          "Founder; hotel-stack fireside Day 0; ticketed CGK→SIN on ID7128 (outside ID7159 disruption cohort)",
+          "Founder; hotel-stack fireside Day 0; ticketed CGK→SIN on ID7128 (outside ID7159 disruption cohort)"
         ],
         "accessibilityStatements": [],
         "anchorCommitmentIds": [
@@ -3250,6 +3235,30 @@
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
         "declaredTravel": [
+          {
+            "itemKind": "TRANSPORT_LEG",
+            "mode": "FLIGHT",
+            "originRef": {
+              "system": "airport-code",
+              "value": "CGK"
+            },
+            "destinationRef": {
+              "system": "airport-code",
+              "value": "SIN"
+            },
+            "scheduledDeparture": "2026-09-29T19:30:00+07:00",
+            "scheduledArrival": "2026-09-29T22:15:00+08:00",
+            "carrierRef": {
+              "system": "flight-number",
+              "value": "ID7128"
+            },
+            "bookingRef": {
+              "system": "pnr",
+              "reference": "IDSYN19"
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
+          },
           {
             "itemKind": "STAY",
             "stayPlaceRef": {
@@ -3608,7 +3617,8 @@
         "accessibilityStatements": [],
         "anchorCommitmentIds": [
           "cmt-ait-d1-data-provocation",
-          "cmt-ait-d2-asian-traveller"
+          "cmt-ait-d2-asian-traveller",
+          "cmt-ait-d1-trust-research"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
         "declaredTravel": [
@@ -3680,6 +3690,12 @@
           },
           {
             "commitmentId": "cmt-ait-d2-asian-traveller",
+            "role": "SPEAKER",
+            "importance": "REQUIRED",
+            "flexibility": "FIXED"
+          },
+          {
+            "commitmentId": "cmt-ait-d1-trust-research",
             "role": "SPEAKER",
             "importance": "REQUIRED",
             "flexibility": "FIXED"
@@ -4159,7 +4175,8 @@
         "accessibilityStatements": [],
         "anchorCommitmentIds": [
           "cmt-ait-d0-investment-panel",
-          "cmt-ait-d0-seedup-showcase"
+          "cmt-ait-d0-seedup-showcase",
+          "cmt-ait-d1-day1-close"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
         "declaredTravel": [
@@ -4174,11 +4191,11 @@
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-09-29T10:30:00+02:00",
-            "scheduledArrival": "2026-09-30T06:40:00+08:00",
+            "scheduledDeparture": "2026-10-01T00:45:00+02:00",
+            "scheduledArrival": "2026-10-01T10:30:00+08:00",
             "carrierRef": {
               "system": "flight-number",
-              "value": "MN249"
+              "value": "MN251"
             },
             "bookingRef": {
               "system": "pnr",
@@ -4210,6 +4227,12 @@
             "role": "DRAGON",
             "importance": "PREFERRED",
             "flexibility": "CHANGEABLE"
+          },
+          {
+            "commitmentId": "cmt-ait-d1-day1-close",
+            "role": "HOST",
+            "importance": "REQUIRED",
+            "flexibility": "FIXED"
           }
         ]
       },
@@ -4244,11 +4267,11 @@
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-09-29T10:55:00+07:00",
-            "scheduledArrival": "2026-09-29T14:25:00+08:00",
+            "scheduledDeparture": "2026-10-01T07:00:00+07:00",
+            "scheduledArrival": "2026-10-01T10:30:00+08:00",
             "carrierRef": {
               "system": "flight-number",
-              "value": "TR625"
+              "value": "TR626"
             },
             "bookingRef": {
               "system": "pnr",
@@ -4296,7 +4319,6 @@
         "anchorCommitmentIds": [
           "cmt-ait-d0-hackathon-lab",
           "cmt-ait-d0-hackathon-finals",
-          "cmt-ait-d1-search-chat",
           "cmt-ait-d2-hack-awards"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
@@ -4350,12 +4372,6 @@
             "flexibility": "FIXED"
           },
           {
-            "commitmentId": "cmt-ait-d1-search-chat",
-            "role": "SPEAKER",
-            "importance": "REQUIRED",
-            "flexibility": "FIXED"
-          },
-          {
             "commitmentId": "cmt-ait-d2-hack-awards",
             "role": "FINALIST",
             "importance": "REQUIRED",
@@ -4394,18 +4410,18 @@
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-09-29T12:00:00+02:00",
-            "scheduledArrival": "2026-09-30T06:35:00+08:00",
+            "scheduledDeparture": "2026-10-01T01:20:00+02:00",
+            "scheduledArrival": "2026-10-01T10:30:00+08:00",
             "carrierRef": {
               "system": "flight-number",
-              "value": "MN241"
+              "value": "MN239"
             },
-            "flexibility": "CHANGEABLE",
-            "reservationState": "CONFIRMED",
             "bookingRef": {
               "system": "pnr",
               "reference": "MNSYN35"
-            }
+            },
+            "flexibility": "CHANGEABLE",
+            "reservationState": "CONFIRMED"
           },
           {
             "itemKind": "TRANSPORT_LEG",
@@ -4483,35 +4499,11 @@
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-09-29T10:15:00+01:00",
-            "scheduledArrival": "2026-09-30T06:25:00+08:00",
+            "scheduledDeparture": "2026-10-01T00:05:00+01:00",
+            "scheduledArrival": "2026-10-01T10:30:00+08:00",
             "carrierRef": {
               "system": "flight-number",
-              "value": "MN245"
-            },
-            "bookingRef": {
-              "system": "pnr",
-              "reference": "MNSYN36"
-            },
-            "flexibility": "CHANGEABLE",
-            "reservationState": "CONFIRMED"
-          },
-          {
-            "itemKind": "TRANSPORT_LEG",
-            "mode": "FLIGHT",
-            "originRef": {
-              "system": "airport-code",
-              "value": "SIN"
-            },
-            "destinationRef": {
-              "system": "airport-code",
-              "value": "LHR"
-            },
-            "scheduledDeparture": "2026-10-02T23:55:00+08:00",
-            "scheduledArrival": "2026-10-03T06:40:00+01:00",
-            "carrierRef": {
-              "system": "flight-number",
-              "value": "MN244"
+              "value": "MN237"
             },
             "bookingRef": {
               "system": "pnr",
@@ -4534,9 +4526,9 @@
         "engagementImportance": [
           {
             "commitmentId": "cmt-ait-d1-distribution-debate",
-            "role": "PANELLIST",
-            "importance": "PREFERRED",
-            "flexibility": "CHANGEABLE"
+            "role": "REFEREE",
+            "importance": "REQUIRED",
+            "flexibility": "FIXED"
           }
         ]
       },
@@ -4557,7 +4549,8 @@
         ],
         "accessibilityStatements": [],
         "anchorCommitmentIds": [
-          "cmt-ait-d1-distribution-debate"
+          "cmt-ait-d1-distribution-debate",
+          "cmt-ait-d1-trust-research"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
         "declaredTravel": [
@@ -4572,11 +4565,11 @@
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-09-28T13:00:00+10:00",
-            "scheduledArrival": "2026-09-28T19:30:00+08:00",
+            "scheduledDeparture": "2026-10-01T06:45:00+10:00",
+            "scheduledArrival": "2026-10-01T10:30:00+08:00",
             "carrierRef": {
               "system": "flight-number",
-              "value": "TR011"
+              "value": "TR013"
             },
             "bookingRef": {
               "system": "pnr",
@@ -4602,6 +4595,12 @@
             "role": "PANELLIST",
             "importance": "PREFERRED",
             "flexibility": "CHANGEABLE"
+          },
+          {
+            "commitmentId": "cmt-ait-d1-trust-research",
+            "role": "SPEAKER",
+            "importance": "REQUIRED",
+            "flexibility": "FIXED"
           }
         ]
       },
@@ -4710,7 +4709,8 @@
         ],
         "accessibilityStatements": [],
         "anchorCommitmentIds": [
-          "cmt-ait-d1-distribution-debate"
+          "cmt-ait-d1-distribution-debate",
+          "cmt-ait-d1-search-chat"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED",
         "declaredTravel": [
@@ -4725,11 +4725,11 @@
               "system": "airport-code",
               "value": "SIN"
             },
-            "scheduledDeparture": "2026-09-29T23:15:00+05:30",
-            "scheduledArrival": "2026-09-30T07:20:00+08:00",
+            "scheduledDeparture": "2026-10-01T00:30:00+05:30",
+            "scheduledArrival": "2026-10-01T10:30:00+08:00",
             "carrierRef": {
               "system": "flight-number",
-              "value": "MN262"
+              "value": "MN263"
             },
             "bookingRef": {
               "system": "pnr",
@@ -4755,6 +4755,12 @@
             "role": "PANELLIST",
             "importance": "PREFERRED",
             "flexibility": "CHANGEABLE"
+          },
+          {
+            "commitmentId": "cmt-ait-d1-search-chat",
+            "role": "SPEAKER",
+            "importance": "REQUIRED",
+            "flexibility": "FIXED"
           }
         ]
       },

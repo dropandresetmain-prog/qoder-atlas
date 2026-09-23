@@ -98,20 +98,6 @@
     },
     {
       "draftId": "ait-draft-01",
-      "commitmentId": "cmt-ait-d1-distribution-debate",
-      "role": "REFEREE",
-      "importance": "REQUIRED",
-      "flexibility": "FIXED"
-    },
-    {
-      "draftId": "ait-draft-01",
-      "commitmentId": "cmt-ait-d1-day1-close",
-      "role": "HOST",
-      "importance": "REQUIRED",
-      "flexibility": "FIXED"
-    },
-    {
-      "draftId": "ait-draft-01",
       "commitmentId": "cmt-ait-d2-jtb-chat",
       "role": "INTERVIEWER",
       "importance": "REQUIRED",
@@ -254,8 +240,8 @@
       "draftId": "ait-draft-06",
       "commitmentId": "cmt-ait-d1-distribution-debate",
       "role": "REFEREE",
-      "importance": "REQUIRED",
-      "flexibility": "FIXED"
+      "importance": "PREFERRED",
+      "flexibility": "CHANGEABLE"
     },
     {
       "draftId": "ait-draft-06",
@@ -401,13 +387,6 @@
       "draftId": "ait-draft-16",
       "commitmentId": "cmt-ait-d0-seedup-showcase",
       "role": "FACILITATOR",
-      "importance": "REQUIRED",
-      "flexibility": "FIXED"
-    },
-    {
-      "draftId": "ait-draft-16",
-      "commitmentId": "cmt-ait-d1-trust-research",
-      "role": "SPEAKER",
       "importance": "REQUIRED",
       "flexibility": "FIXED"
     },
@@ -609,13 +588,6 @@
     },
     {
       "draftId": "ait-draft-34",
-      "commitmentId": "cmt-ait-d1-search-chat",
-      "role": "SPEAKER",
-      "importance": "REQUIRED",
-      "flexibility": "FIXED"
-    },
-    {
-      "draftId": "ait-draft-34",
       "commitmentId": "cmt-ait-d2-hack-awards",
       "role": "FINALIST",
       "importance": "REQUIRED",
@@ -631,9 +603,9 @@
     {
       "draftId": "ait-draft-36",
       "commitmentId": "cmt-ait-d1-distribution-debate",
-      "role": "PANELLIST",
-      "importance": "PREFERRED",
-      "flexibility": "CHANGEABLE"
+      "role": "REFEREE",
+      "importance": "REQUIRED",
+      "flexibility": "FIXED"
     },
     {
       "draftId": "ait-draft-37",
@@ -865,6 +837,27 @@
       "role": "INTERVIEWER",
       "importance": "REQUIRED",
       "flexibility": "CHANGEABLE"
+    },
+    {
+      "draftId": "ait-draft-32",
+      "commitmentId": "cmt-ait-d1-day1-close",
+      "role": "HOST",
+      "importance": "REQUIRED",
+      "flexibility": "FIXED"
+    },
+    {
+      "draftId": "ait-draft-37",
+      "commitmentId": "cmt-ait-d1-trust-research",
+      "role": "SPEAKER",
+      "importance": "REQUIRED",
+      "flexibility": "FIXED"
+    },
+    {
+      "draftId": "ait-draft-39",
+      "commitmentId": "cmt-ait-d1-search-chat",
+      "role": "SPEAKER",
+      "importance": "REQUIRED",
+      "flexibility": "FIXED"
     }
   ],
   "blanketEntries": [

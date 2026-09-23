@@ -76,6 +76,19 @@ const CORRIDORS = {
       }),
     ],
   },
+  /** Non-cohort managed CGK travellers (e.g. Nadia): distinct from ID7159 disruption ticket. */
+  CGK_NON_COHORT: {
+    legs: (pnr) => [
+      flightLeg({
+        origin: 'CGK',
+        dest: 'SIN',
+        dep: '2026-09-29T19:30:00+07:00',
+        arr: '2026-09-29T22:15:00+08:00',
+        flight: 'ID7128',
+        pnr,
+      }),
+    ],
+  },
   HND: {
     legs: (pnr) => [
       flightLeg({
@@ -317,6 +330,48 @@ const CORRIDORS = {
     ],
   },
 };
+
+/** Shared 1 Oct ~10:30 SGT arrival — clears afternoon slots (≥13:30) under 150min, fails 11:30. */
+const LATE_MORNING_SIN_ARRIVAL = '2026-10-01T10:30:00+08:00';
+
+/** Per-origin same-day inbound using existing MN/TR/AK naming patterns (synthetic). */
+const LATE_MORNING_OCT1_BY_ORIGIN = {
+  BKK: { flight: 'TR626', dep: '2026-10-01T07:00:00+07:00' },
+  AMS: { flight: 'MN239', dep: '2026-10-01T01:20:00+02:00' },
+  MAD: { flight: 'MN251', dep: '2026-10-01T00:45:00+02:00' },
+  NRT: { flight: 'TR897', dep: '2026-10-01T06:30:00+09:00' },
+  LHR: { flight: 'MN237', dep: '2026-10-01T00:05:00+01:00' },
+  ICN: { flight: 'MN257', dep: '2026-10-01T06:05:00+09:00' },
+  SYD: { flight: 'TR013', dep: '2026-10-01T06:45:00+10:00' },
+  BOM: { flight: 'MN263', dep: '2026-10-01T00:30:00+05:30' },
+};
+
+function lateMorningOct1Legs(origin, pnr) {
+  const spec = LATE_MORNING_OCT1_BY_ORIGIN[origin];
+  if (!spec) {
+    throw new Error(`No late-morning 1 Oct corridor for origin ${origin}`);
+  }
+  return [
+    flightLeg({
+      origin,
+      dest: 'SIN',
+      dep: spec.dep,
+      arr: LATE_MORNING_SIN_ARRIVAL,
+      flight: spec.flight,
+      pnr,
+    }),
+  ];
+}
+
+/** Managed travellers whose inbound must fail the 11:30 overlay after ID7153-class arrivals. */
+const LATE_MORNING_OCT1_DRAFTS = new Set([
+  'ait-draft-33', // Aisha — build-interview REQUIRED speaker
+  'ait-draft-35', // Jonas — recovery-fireside REQUIRED speaker
+  'ait-draft-32', // Carlos — day1-close REQUIRED host
+  'ait-draft-37', // David — trust-research REQUIRED speaker (debate-only otherwise)
+  'ait-draft-39', // Zara — search-chat REQUIRED speaker (debate-only otherwise)
+  'ait-draft-36', // Nina — distribution-debate REQUIRED referee
+]);
 
 function originFromTraveller(t) {
   const legs = (t.declaredTravel || []).filter((x) => x.itemKind === 'TRANSPORT_LEG');
@@ -680,6 +735,81 @@ for (const draftId of ['ait-draft-11', 'ait-draft-30']) {
   }
 }
 
+// --- CP1: Daniel-only viable programme swap (seed/data) ---
+function dropEngagement(traveller, commitmentId) {
+  if (!traveller) return;
+  traveller.engagementImportance = (traveller.engagementImportance || []).filter(
+    (e) => e.commitmentId !== commitmentId,
+  );
+  traveller.anchorCommitmentIds = (traveller.anchorCommitmentIds || []).filter(
+    (id) => id !== commitmentId,
+  );
+}
+
+function addEngagement(traveller, entry) {
+  if (!traveller) return;
+  dropEngagement(traveller, entry.commitmentId);
+  traveller.engagementImportance = [...(traveller.engagementImportance || []), entry];
+  traveller.anchorCommitmentIds = Array.from(
+    new Set([...(traveller.anchorCommitmentIds || []), entry.commitmentId]),
+  );
+}
+
+{
+  const elena = travellers.find((x) => x.draftId === 'ait-draft-01');
+  dropEngagement(elena, 'cmt-ait-d1-day1-close');
+  dropEngagement(elena, 'cmt-ait-d1-distribution-debate');
+
+  const hugo = travellers.find((x) => x.draftId === 'ait-draft-16');
+  dropEngagement(hugo, 'cmt-ait-d1-trust-research');
+
+  const ethan = travellers.find((x) => x.draftId === 'ait-draft-34');
+  dropEngagement(ethan, 'cmt-ait-d1-search-chat');
+
+  addEngagement(travellers.find((x) => x.draftId === 'ait-draft-37'), {
+    commitmentId: 'cmt-ait-d1-trust-research',
+    role: 'SPEAKER',
+    importance: 'REQUIRED',
+    flexibility: 'FIXED',
+  });
+  addEngagement(travellers.find((x) => x.draftId === 'ait-draft-39'), {
+    commitmentId: 'cmt-ait-d1-search-chat',
+    role: 'SPEAKER',
+    importance: 'REQUIRED',
+    flexibility: 'FIXED',
+  });
+  addEngagement(travellers.find((x) => x.draftId === 'ait-draft-32'), {
+    commitmentId: 'cmt-ait-d1-day1-close',
+    role: 'HOST',
+    importance: 'REQUIRED',
+    flexibility: 'FIXED',
+  });
+  addEngagement(travellers.find((x) => x.draftId === 'ait-draft-36'), {
+    commitmentId: 'cmt-ait-d1-distribution-debate',
+    role: 'REFEREE',
+    importance: 'REQUIRED',
+    flexibility: 'FIXED',
+  });
+
+  const victor = travellers.find((x) => x.draftId === 'ait-draft-06');
+  if (victor) {
+    for (const e of victor.engagementImportance || []) {
+      if (e.commitmentId === 'cmt-ait-d1-distribution-debate') {
+        e.importance = 'PREFERRED';
+        e.flexibility = 'CHANGEABLE';
+      }
+    }
+  }
+
+  const nadia = travellers.find((x) => x.draftId === 'ait-draft-19');
+  if (nadia) {
+    nadia.notes = [
+      ...(nadia.notes || []).filter((n) => !/stay-only|ID7159 cohort/i.test(n)),
+      'Founder; hotel-stack fireside Day 0; ticketed CGK→SIN on ID7128 (outside ID7159 disruption cohort)',
+    ];
+  }
+}
+
 // Assign declared travel for all NORTHSTAR_ARRANGED
 //
 // S1 supplier-disruption SSOT: exactly five CGK travellers are ticketed on the
@@ -716,9 +846,7 @@ for (const t of travellers) {
   const existingLegs = (t.declaredTravel || []).filter((x) => x.itemKind === 'TRANSPORT_LEG');
   let legs;
   if (origin === 'CGK' && !CGK_ID7159_COHORT.has(t.draftId)) {
-    // CGK-origin but outside the ticketed cohort: no captured flight. The
-    // traveller keeps only their stay; no synthetic PNR is minted for them.
-    legs = [];
+    legs = CORRIDORS.CGK_NON_COHORT.legs(pnr);
   } else if (t.draftId === 'ait-draft-09') {
     legs = CORRIDORS.LAX.legs('ZGSYN09');
   } else if (t.draftId === 'ait-draft-38' && existingLegs.length >= 2) {
@@ -726,11 +854,13 @@ for (const t of travellers) {
       ...l,
       bookingRef: l.bookingRef || { system: 'pnr', reference: pnr },
     }));
-  } else if (t.draftId === 'ait-draft-35' && existingLegs.length >= 2) {
-    legs = existingLegs.map((l) => ({
-      ...l,
-      bookingRef: l.bookingRef || { system: 'pnr', reference: pnr },
-    }));
+  } else if (t.draftId === 'ait-draft-35') {
+    const outbound =
+      existingLegs.find((l) => l.originRef?.value === 'SIN') ||
+      CORRIDORS.AMS.legs(pnr).find((l) => l.originRef?.value === 'SIN');
+    legs = [...lateMorningOct1Legs(origin, pnr), ...(outbound ? [outbound] : [])];
+  } else if (LATE_MORNING_OCT1_DRAFTS.has(t.draftId)) {
+    legs = lateMorningOct1Legs(origin, pnr);
   } else {
     legs = corridor.legs(pnr);
   }
@@ -851,6 +981,25 @@ const MANIFEST_ROOT = path.join(ROOT, 'fixtures/acceptance/manifests');
   }
   const localHost = roles.get('cmt-ait-d1-local-host-session');
   if (localHost) localHost.roles = [{ role: 'HOST', draftIds: ['ait-draft-02'] }];
+  const trust = roles.get('cmt-ait-d1-trust-research');
+  if (trust) trust.roles = [{ role: 'SPEAKER', draftIds: ['ait-draft-37'] }];
+  const searchChat = roles.get('cmt-ait-d1-search-chat');
+  if (searchChat) {
+    searchChat.roles = searchChat.roles.map((role) =>
+      role.role === 'SPEAKER' ? { ...role, draftIds: ['ait-draft-39'] } : role,
+    );
+  }
+  const day1Close = roles.get('cmt-ait-d1-day1-close');
+  if (day1Close) day1Close.roles = [{ role: 'HOST', draftIds: ['ait-draft-32'] }];
+  const debate = roles.get('cmt-ait-d1-distribution-debate');
+  if (debate) {
+    debate.roles = debate.roles.map((role) => {
+      if (role.role === 'REFEREE') {
+        return { ...role, draftIds: ['ait-draft-06', 'ait-draft-36'] };
+      }
+      return role;
+    });
+  }
   writeJson(programmeFile, programmePack);
 }
 
@@ -861,7 +1010,16 @@ const MANIFEST_ROOT = path.join(ROOT, 'fixtures/acceptance/manifests');
   importance.entries = importance.entries.filter(
     (entry) =>
       !(entry.draftId === 'ait-draft-03' && entry.commitmentId === 'cmt-ait-d1-india-fireside') &&
-      !(entry.draftId === 'ait-draft-09' && entry.commitmentId === 'cmt-ait-d0-hackathon-lab'),
+      !(entry.draftId === 'ait-draft-09' && entry.commitmentId === 'cmt-ait-d0-hackathon-lab') &&
+      !(entry.draftId === 'ait-draft-16' && entry.commitmentId === 'cmt-ait-d1-trust-research') &&
+      !(entry.draftId === 'ait-draft-25' && entry.commitmentId === 'cmt-ait-d1-trust-research') &&
+      !(entry.draftId === 'ait-draft-34' && entry.commitmentId === 'cmt-ait-d1-search-chat') &&
+      !(entry.draftId === 'ait-draft-04' && entry.commitmentId === 'cmt-ait-d1-search-chat') &&
+      !(
+        entry.draftId === 'ait-draft-01' &&
+        (entry.commitmentId === 'cmt-ait-d1-day1-close' ||
+          entry.commitmentId === 'cmt-ait-d1-distribution-debate')
+      ),
   );
   const upsert = (entry) => {
     const index = importance.entries.findIndex(
@@ -894,6 +1052,41 @@ const MANIFEST_ROOT = path.join(ROOT, 'fixtures/acceptance/manifests');
       flexibility: 'CHANGEABLE',
     });
   }
+  upsert({
+    draftId: 'ait-draft-37',
+    commitmentId: 'cmt-ait-d1-trust-research',
+    role: 'SPEAKER',
+    importance: 'REQUIRED',
+    flexibility: 'FIXED',
+  });
+  upsert({
+    draftId: 'ait-draft-39',
+    commitmentId: 'cmt-ait-d1-search-chat',
+    role: 'SPEAKER',
+    importance: 'REQUIRED',
+    flexibility: 'FIXED',
+  });
+  upsert({
+    draftId: 'ait-draft-32',
+    commitmentId: 'cmt-ait-d1-day1-close',
+    role: 'HOST',
+    importance: 'REQUIRED',
+    flexibility: 'FIXED',
+  });
+  upsert({
+    draftId: 'ait-draft-36',
+    commitmentId: 'cmt-ait-d1-distribution-debate',
+    role: 'REFEREE',
+    importance: 'REQUIRED',
+    flexibility: 'FIXED',
+  });
+  upsert({
+    draftId: 'ait-draft-06',
+    commitmentId: 'cmt-ait-d1-distribution-debate',
+    role: 'REFEREE',
+    importance: 'PREFERRED',
+    flexibility: 'CHANGEABLE',
+  });
   writeJson(file, importance);
 }
 

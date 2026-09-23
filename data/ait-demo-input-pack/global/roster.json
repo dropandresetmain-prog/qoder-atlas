@@ -40,8 +40,6 @@
           "cmt-ait-d1-build-interview",
           "cmt-ait-d1-search-chat",
           "cmt-ait-d1-recovery-fireside",
-          "cmt-ait-d1-distribution-debate",
-          "cmt-ait-d1-day1-close",
           "cmt-ait-d2-jtb-chat",
           "cmt-ait-d2-lcc-chat",
           "cmt-ait-d2-loyalty-panel",
@@ -112,7 +110,8 @@
           "Future provocation speaker"
         ],
         "anchorCommitmentIds": [
-          "cmt-ait-d1-future-provocation"
+          "cmt-ait-d1-future-provocation",
+          "cmt-ait-d1-search-chat"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED"
       },
@@ -360,8 +359,7 @@
         "anchorCommitmentIds": [
           "cmt-ait-d0-state-of-ai",
           "cmt-ait-d0-pitch-practice",
-          "cmt-ait-d0-seedup-showcase",
-          "cmt-ait-d1-trust-research"
+          "cmt-ait-d0-seedup-showcase"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED"
       },
@@ -420,7 +418,10 @@
           "ID"
         ],
         "notes": [
-          "Founder; hotel-stack fireside and bootcamp participant"
+          "Founder; hotel-stack fireside and bootcamp participant",
+          "Founder; hotel-stack fireside Day 0; ticketed CGK→SIN on ID7128 (outside ID7159 disruption cohort)",
+          "Founder; hotel-stack fireside Day 0; ticketed CGK→SIN on ID7128 (outside ID7159 disruption cohort)",
+          "Founder; hotel-stack fireside Day 0; ticketed CGK→SIN on ID7128 (outside ID7159 disruption cohort)"
         ],
         "anchorCommitmentIds": [
           "cmt-ait-d0-founder-fireside-b"
@@ -539,7 +540,8 @@
         ],
         "anchorCommitmentIds": [
           "cmt-ait-d1-data-provocation",
-          "cmt-ait-d2-asian-traveller"
+          "cmt-ait-d2-asian-traveller",
+          "cmt-ait-d1-trust-research"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED"
       },
@@ -679,7 +681,8 @@
         ],
         "anchorCommitmentIds": [
           "cmt-ait-d0-investment-panel",
-          "cmt-ait-d0-seedup-showcase"
+          "cmt-ait-d0-seedup-showcase",
+          "cmt-ait-d1-day1-close"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED"
       },
@@ -720,7 +723,6 @@
         "anchorCommitmentIds": [
           "cmt-ait-d0-hackathon-lab",
           "cmt-ait-d0-hackathon-finals",
-          "cmt-ait-d1-search-chat",
           "cmt-ait-d2-hack-awards"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED"
@@ -780,7 +782,8 @@
           "Distribution debate panellist"
         ],
         "anchorCommitmentIds": [
-          "cmt-ait-d1-distribution-debate"
+          "cmt-ait-d1-distribution-debate",
+          "cmt-ait-d1-trust-research"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED"
       },
@@ -819,7 +822,8 @@
           "Distribution debate panellist"
         ],
         "anchorCommitmentIds": [
-          "cmt-ait-d1-distribution-debate"
+          "cmt-ait-d1-distribution-debate",
+          "cmt-ait-d1-search-chat"
         ],
         "travelArrangement": "NORTHSTAR_ARRANGED"
       },

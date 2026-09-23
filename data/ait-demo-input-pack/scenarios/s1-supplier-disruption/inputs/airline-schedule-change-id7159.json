@@ -9,7 +9,7 @@
   "issuedAt": "2026-09-21T09:40:00+08:00",
   "carrier": {
     "code": "ID",
-    "name": "Batik Air"
+    "name": "Batik Air (simulated)"
   },
   "flight": {
     "flightNumber": "ID7159",
