@@ -200,10 +200,14 @@ export async function bootstrapProviderStayBaseline(input: ProviderStayBaselineI
   )).rows[0];
   if (!name) return fail('GUEST_NAME_MISSING', 'the stay traveller has no structured guest name');
 
-  // Deterministic per world + stay, so REPLAY reproduces the recorded request
-  // and a retried RECORD run can find a booking an interrupted run created.
+  // Deterministic per dataset stay identity (never per internal reservation
+  // uuid, which is only stable within one seed lineage and can legitimately
+  // differ between a product boot and a test fixture importing the same
+  // dataset) so REPLAY reproduces the recorded request in any world that
+  // imports this stay, and a retried RECORD run can find a booking an
+  // interrupted run created.
   const clientReference = `ns-baseline-${createHash('sha256')
-    .update(`${input.workspaceId}|${stay.reservation_id}|${checkInDate}|${checkOutDate}`).digest('hex').slice(0, 24)}`;
+    .update(`${input.binding.sourceBookingReference}|${checkInDate}|${checkOutDate}`).digest('hex').slice(0, 24)}`;
 
   let bookingId: string | undefined;
   if (input.mode !== 'REPLAY' && input.hotel.findBookingsByClientReference) {

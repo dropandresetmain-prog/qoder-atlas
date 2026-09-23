@@ -114,6 +114,23 @@ test('Phase B: rebook vs keep economics from the confirmed booking', () => {
   assert.deepEqual(pathB.totalHomeAmount, { amount: '152.14', currency: 'USD' });
 });
 
+test('Phase B: after the free-cancel deadline, full forfeiture nets to the new spend alone (no double count)', () => {
+  // bookedTotal === current fee (full forfeiture): recoverableStayCredit is
+  // established at exactly 0. The cancellation fee must not additionally be
+  // added on top of a zero credit — that would double the cancellation loss
+  // (once as POLICY_PENALTY_ESTIMATE, once by not crediting it back).
+  const context = normalizeStayContext(retrieve(955.69));
+  const cancel = cancelEffect(context, AFTER_DEADLINE);
+  assert.deepEqual(cancel.cancellationPenalty, { amount: '955.69', currency: 'USD' });
+  assert.deepEqual(cancel.recoverableStayCredit, { amount: '0.00', currency: 'USD' });
+  const pathA = net([flight, overnight, replacementStay, cancel]);
+  assert.deepEqual(pathA.newSpendHomeAmount, { amount: '850.97', currency: 'USD' });
+  // Still visible for the operator as the current loss, just not double-counted.
+  assert.deepEqual(pathA.potentialLossHomeAmount, { amount: '955.69', currency: 'USD' });
+  assert.deepEqual(pathA.creditHomeAmount, { amount: '0', currency: 'USD' });
+  assert.deepEqual(pathA.totalHomeAmount, { amount: '850.97', currency: 'USD' }, 'must equal newSpend, not newSpend + 955.69');
+});
+
 test('Phase B: a different confirmed amount drives the credit, not a quote or stale fixture value', () => {
   const confirmed = cancelEffect(normalizeStayContext(retrieve(981.1)), PLANNING_NOW);
   assert.deepEqual(confirmed.recoverableStayCredit, { amount: '981.10', currency: 'USD' });

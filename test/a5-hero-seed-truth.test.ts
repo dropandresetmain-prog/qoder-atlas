@@ -113,10 +113,10 @@ test('reviewed SG passport Japan short-visit policy passes the seeded conditions
   assert.equal(evaluateRuleExpression(policy.expression, context('US')).status, 'FAIL');
 });
 
-test('Jordan four-night stay is the confirmed lyf Bugis booking, with its real cancel tier', () => {
+test('Jordan four-night stay carries only a source-booking reference; the provider baseline binds its real cancel tier', () => {
   const programme = readJson('../fixtures/programmes/ait-summit-2026/programme.json') as {
     context: { places: Array<{ id: string; externalRefs?: Array<{ system: string; value: string }> }> };
-    importDraft: { travellers: Array<{ draftId: string; declaredTravel: Array<{ itemKind: string; stayPlaceRef?: { value: string }; checkIn?: string; checkOut?: string; bookingRef?: { reference: string } }> }> };
+    importDraft: { travellers: Array<{ draftId: string; declaredTravel: Array<{ itemKind: string; stayPlaceRef?: { value: string }; checkIn?: string; checkOut?: string; bookingRef?: { system: string; reference: string } }> }> };
   };
   const stay = programme.importDraft.travellers.find((traveller) => traveller.draftId === 'ait-draft-09')
     ?.declaredTravel.find((item) => item.itemKind === 'STAY');
@@ -124,7 +124,11 @@ test('Jordan four-night stay is the confirmed lyf Bugis booking, with its real c
   assert.equal(stay.stayPlaceRef?.value, 'place-hotel-lyf-bugis');
   assert.equal(stay.checkIn, '2026-09-29T15:00:00+08:00');
   assert.equal(stay.checkOut, '2026-10-03T11:00:00+08:00');
-  assert.equal(stay.bookingRef?.reference, 'z-xdzAxcv');
+  // The dataset never hardcodes a provider booking identity: it carries only a
+  // source-binding reference. providerStayBaseline resolves the real provider
+  // booking (and its real cancel tier) at bootstrap time.
+  assert.equal(stay.bookingRef?.system, 'source-booking-ref');
+  assert.equal(stay.bookingRef?.reference, 'ait-draft-09-destination-stay');
   const place = programme.context.places.find((entry) => entry.id === 'place-hotel-lyf-bugis');
   assert.equal(place?.externalRefs?.find((ref) => ref.system === 'nuitee-hotel-id')?.value, 'lp6d67d');
   assert.equal(
@@ -132,14 +136,20 @@ test('Jordan four-night stay is the confirmed lyf Bugis booking, with its real c
     true,
   );
 
-  const recording = readJson('../fixtures/recordings/nuitee/retrieve/rec_09c4c22e006e5e2df8408247c4716fe8.json') as {
+  const research = readJson('../fixtures/programmes/ait-summit-2026/recovery-research.json') as {
+    stayReplacementBinding?: { sourceBookingReference?: string };
+  };
+  assert.equal(research.stayReplacementBinding?.sourceBookingReference, stay.bookingRef?.reference);
+
+  // The recovery-research binding is resolved against the fresh sandbox
+  // booking the provider-baseline bootstrap actually attaches (DpnZRH43H),
+  // not a hardcoded historical booking id or fixture.
+  const recording = readJson('../recordings/nuitee/stay_context/rec_90f019777a2ae8c099191e1e4176e70d.json') as {
     raw: Parameters<typeof normalizeStayContext>[0];
   };
   const context = normalizeStayContext(recording.raw);
   assert.equal(context.cancellation?.refundable, true);
-  assert.equal(context.cancellation?.deadline, '2026-09-29T23:59:59Z');
-  assert.deepEqual(context.cancellation?.fee, { amount: 670.77, currency: 'USD' });
-  assert.deepEqual(context.cancellation?.penaltySchedule, [
-    { effectiveFrom: '2026-09-29T23:59:59Z', fee: { amount: 670.77, currency: 'USD' } },
-  ]);
+  assert.equal(context.cancellation?.deadline, '2026-09-26T10:00:00Z');
+  assert.deepEqual(context.cancellation?.fee, { amount: 955.69, currency: 'USD' });
+  assert.deepEqual(context.bookedTotal, { amount: 955.69, currency: 'USD' });
 });

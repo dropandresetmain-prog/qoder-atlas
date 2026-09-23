@@ -20,6 +20,7 @@
       "postgres-integration/a3JordanConnectionFoundation.pgtest.ts",
       "postgres-integration/a5JordanD3Planning.pgtest.ts",
       "postgres-integration/a5HeroSameWorldSequential.pgtest.ts",
+      "postgres-integration/a5ProviderStayBaseline.pgtest.ts",
       "postgres-integration/t2F3HttpValidation.pgtest.ts",
       "postgres-integration/t2F5ServiceIdentity.pgtest.ts",
       "postgres-integration/t2F7SelectionGuard.pgtest.ts",
@@ -275,6 +276,7 @@
       "postgres-integration/t2ProviderDisruptionReprotection.pgtest.ts",
       "postgres-integration/a5JordanD3Planning.pgtest.ts",
       "postgres-integration/a5HeroSameWorldSequential.pgtest.ts",
+      "postgres-integration/a5ProviderStayBaseline.pgtest.ts",
       "postgres-integration/tenantIntegrity.pgtest.ts",
       "postgres-integration/witLiveReadModelContract.pgtest.ts"
     ],

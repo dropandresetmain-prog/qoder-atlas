@@ -107,22 +107,45 @@ function negateExactMoney(amount: ExactMoney): ExactMoney {
   };
 }
 
-function effectCosts(effect: ScenarioEffect): Array<{ kind: RecoveryCostKind; amount: ExactMoney; observed: boolean }> {
+interface EffectCostLine {
+  kind: RecoveryCostKind;
+  amount: ExactMoney;
+  observed: boolean;
+  /**
+   * Whether this line's home amount contributes to totalHomeAmount. Once a
+   * CANCEL_STAY effect's recoverableStayCredit is established (bookedTotal is
+   * known, even if the credit nets to zero under full forfeiture), the credit
+   * line already carries the fee's net economic effect (bookedTotal − fee).
+   * Also counting the raw current-fee (POLICY_PENALTY_ESTIMATE) line toward
+   * the total would double the cancellation loss. The fee still contributes
+   * to potentialLossHomeAmount for display so the current loss stays visible
+   * on its own — it just does not additionally reduce/inflate the net total.
+   */
+  countsTowardTotal: boolean;
+}
+
+function effectCosts(effect: ScenarioEffect): EffectCostLine[] {
   switch (effect.effectKind) {
     case 'SELECT_OFFER':
       if (!effect.offerPrice) return [];
-      return [{ kind: 'SELECT_OFFER', amount: effect.offerPrice, observed: false }];
+      return [{ kind: 'SELECT_OFFER', amount: effect.offerPrice, observed: false, countsTowardTotal: true }];
     case 'ADD_JOURNEY_STAY':
-      return [{ kind: 'ADD_JOURNEY_STAY', amount: effect.offerPrice, observed: false }];
+      return [{ kind: 'ADD_JOURNEY_STAY', amount: effect.offerPrice, observed: false, countsTowardTotal: true }];
     case 'CANCEL_STAY': {
-      const lines: Array<{ kind: RecoveryCostKind; amount: ExactMoney; observed: boolean }> = [
-        { kind: 'POLICY_PENALTY_ESTIMATE', amount: effect.cancellationPenalty, observed: false },
+      const credit = effect.recoverableStayCredit;
+      const creditEstablished = credit !== undefined;
+      const lines: EffectCostLine[] = [
+        {
+          kind: 'POLICY_PENALTY_ESTIMATE',
+          amount: effect.cancellationPenalty,
+          observed: false,
+          countsTowardTotal: !creditEstablished,
+        },
       ];
       // Credit comes only from the existing booking's recoverable value. The
       // future (post-deadline) penalty is exposure, never a refund.
-      const credit = effect.recoverableStayCredit;
       if (credit && !/^-?0+(?:\.0+)?$/.test(credit.amount) && !credit.amount.startsWith('-')) {
-        lines.push({ kind: 'DISPLACED_STAY_CREDIT', amount: credit, observed: false });
+        lines.push({ kind: 'DISPLACED_STAY_CREDIT', amount: credit, observed: false, countsTowardTotal: true });
       }
       return lines;
     }
@@ -191,7 +214,7 @@ export function compareRecoveryCosts(input: {
     }
     parsedRates.push(rate);
   }
-  const costs: Array<{ kind: RecoveryCostKind; amount: ExactMoney; observed: boolean }> = [];
+  const costs: EffectCostLine[] = [];
   for (const rawEffect of input.effects) {
     const parsed = ScenarioEffectSchema.safeParse(rawEffect);
     if (!parsed.success) return unavailable('INVALID_INPUT', 'scenario effects must be validated closed effects');
@@ -203,6 +226,12 @@ export function compareRecoveryCosts(input: {
   let newSpendHomeAmount: ExactMoney = { amount: '0', currency: input.homeCurrency };
   let potentialLossHomeAmount: ExactMoney = { amount: '0', currency: input.homeCurrency };
   let creditHomeAmount: ExactMoney = { amount: '0', currency: input.homeCurrency };
+  // Accumulated independently of the three display buckets above: a line
+  // that is excluded from the net total (countsTowardTotal: false) still
+  // shows up in its display bucket — e.g. a current cancellation fee once
+  // netted into an established recoverableStayCredit — so the operator can
+  // see the loss without it also shifting the net recovery cost.
+  let totalHomeAmount: ExactMoney = { amount: '0', currency: input.homeCurrency };
   const lines: RecoveryCostLine[] = [];
   const selectedFxEvidence: string[] = [];
   for (const cost of costs) {
@@ -211,25 +240,19 @@ export function compareRecoveryCosts(input: {
     try {
       if (cost.kind === 'POLICY_PENALTY_ESTIMATE') {
         potentialLossHomeAmount = addExactMoney(potentialLossHomeAmount, converted.homeAmount);
+        if (cost.countsTowardTotal) totalHomeAmount = addExactMoney(totalHomeAmount, converted.homeAmount);
       } else if (cost.kind === 'DISPLACED_STAY_CREDIT') {
         creditHomeAmount = addExactMoney(creditHomeAmount, converted.homeAmount);
+        if (cost.countsTowardTotal) totalHomeAmount = addExactMoney(totalHomeAmount, negateExactMoney(converted.homeAmount));
       } else {
         newSpendHomeAmount = addExactMoney(newSpendHomeAmount, converted.homeAmount);
+        if (cost.countsTowardTotal) totalHomeAmount = addExactMoney(totalHomeAmount, converted.homeAmount);
       }
     } catch {
       return unavailable('UNSUPPORTED_MONEY_PRECISION', 'an amount exceeds the supported currency precision');
     }
     if (converted.fxEvidenceId && !selectedFxEvidence.includes(converted.fxEvidenceId)) selectedFxEvidence.push(converted.fxEvidenceId);
     lines.push({ kind: cost.kind, providerAmount: cost.amount, homeAmount: converted.homeAmount, ...(converted.fxEvidenceId ? { fxEvidenceId: converted.fxEvidenceId } : {}), observed: cost.observed });
-  }
-  let totalHomeAmount: ExactMoney;
-  try {
-    totalHomeAmount = addExactMoney(
-      addExactMoney(newSpendHomeAmount, potentialLossHomeAmount),
-      negateExactMoney(creditHomeAmount),
-    );
-  } catch {
-    return unavailable('UNSUPPORTED_MONEY_PRECISION', 'an amount exceeds the supported currency precision');
   }
   return {
     ok: true,

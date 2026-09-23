@@ -14,6 +14,9 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { acceptProviderShapedDemoEvent } from '../src/app/target/applicationCommands.ts';
+import { bootstrapProviderStayBaseline } from '../src/app/demo/providerStayBaseline.ts';
+import { NuiteeAdapter } from '../src/providers/hotel/nuiteeAdapter.ts';
+import { FileRecordingStore } from '../src/providers/recordingStore.ts';
 import { runCaseEscalation } from '../src/app/target/caseEscalation.ts';
 import { runCaseResolutionPass } from '../src/app/target/caseResolutionPass.ts';
 import { approveRecoveryStrategy } from '../src/app/target/recoveryApproval.ts';
@@ -321,10 +324,40 @@ describe('A5 Jordan D3 planning (composed REPLAY transport research)', () => {
            ON line.workspace_id = rsv.workspace_id AND line.reservation_id = rsv.id AND line.product_type = 'STAY'
         WHERE er.workspace_id = $1
           AND er.record_type = 'SOURCE_BOOKING_REFERENCE'
-          AND er.external_id = 'z-xdzAxcv'`,
+          AND er.external_id = 'ait-draft-09-destination-stay'`,
       [workspaceId],
     );
-    assert.equal(stay.rowCount, 1, 'the confirmed lyf booking is one stay reservation line');
+    assert.equal(stay.rowCount, 1, 'the lyf stay is one stay reservation line bound by source reference');
+
+    // The dataset stay carries only a source-booking reference; the provider
+    // stay element is never configured. REPLAY the same explicit bootstrap
+    // normal boot uses to attach the fresh sandbox booking (DpnZRH43H) before
+    // recovery research can resolve a stay element to replace it.
+    const baselineHotel = new NuiteeAdapter({
+      mode: 'REPLAY',
+      store: new FileRecordingStore({ readDirs: [resolve('recordings'), resolve('fixtures/recordings')] }),
+    });
+    const baseline = await bootstrapProviderStayBaseline({
+      pool,
+      uow: () => new PgUnitOfWork(pool, workspaceId),
+      workspaceId,
+      actorPrincipalId: ACTOR,
+      hotel: baselineHotel,
+      mode: 'REPLAY',
+      binding: {
+        sourceBookingReference: 'ait-draft-09-destination-stay',
+        propertyExternalRef: { system: 'nuitee-hotel-id', value: 'lp6d67d' },
+        guestNationality: 'SG',
+        guests: { adults: 1, rooms: 1 },
+      },
+      observedAt: d3.at,
+    });
+    assert.equal(baseline.ok, true, JSON.stringify(baseline));
+    if (!baseline.ok) return;
+    assert.ok(baseline.status === 'ATTACHED' || baseline.status === 'ALREADY_ATTACHED', baseline.status);
+    // Domain logic never depends on the exact provider booking id; only that
+    // one was attached and reads back with confirmed terms.
+    assert.ok(baseline.bookingId.length > 0);
     const jurisdiction = await pool.query<{ id: string }>(
       `SELECT l.canonical_subject_id AS id
          FROM external_records r
@@ -393,9 +426,10 @@ describe('A5 Jordan D3 planning (composed REPLAY transport research)', () => {
         guestNationality: 'SG',
       }],
       stayReplacementBinding: {
-        reservationId: stay.rows[0]!.reservation_id,
-        reservationLineId: stay.rows[0]!.line_id,
-        stayElementId: 'z-xdzAxcv',
+        // Reservation/line/provider stay element are never configured: they
+        // resolve from the source-booking reference and whatever provider
+        // booking the bootstrap above attached (see completeStayBinding).
+        sourceBookingReference: 'ait-draft-09-destination-stay',
         propertyExternalRef: { system: 'nuitee-hotel-id', value: 'lp6d67d' },
         passport: {
           credentialId: passport.rows[0]!.credential_id,
@@ -407,7 +441,7 @@ describe('A5 Jordan D3 planning (composed REPLAY transport research)', () => {
         provenance: {
           mode: 'REPLAY',
           observedAt: '2026-09-21T01:40:00.000Z',
-          sourceRefs: ['z-xdzAxcv'],
+          sourceRefs: ['ait-draft-09-destination-stay'],
         },
       },
     }));
@@ -468,6 +502,7 @@ describe('A5 Jordan D3 planning (composed REPLAY transport research)', () => {
           cancellationPenalty?: { amount?: string; currency?: string };
           freeCancellationUntil?: string;
           scheduledCancellationPenalty?: { amount?: string; currency?: string };
+          recoverableStayCredit?: { amount?: string; currency?: string };
         }>;
       };
     }>(
@@ -486,11 +521,17 @@ describe('A5 Jordan D3 planning (composed REPLAY transport research)', () => {
     assert.ok(replayKinds.includes('ADD_JOURNEY_STAY'), JSON.stringify(replayKinds));
     const replayCancel = replayEffects.find((effect) => effect.effectKind === 'CANCEL_STAY');
     assert.ok(replayCancel, JSON.stringify(replayKinds));
+    // The fresh booking's free-cancel deadline (2026-09-26T10:00:00Z) is
+    // already behind D3 (29 Sep): the current fee is the full confirmed
+    // total, nothing is scheduled for later, and nothing is recoverable.
+    // See recoveryCostComparison.ts — this fee must not also inflate the
+    // strategy's net cost once recoverableStayCredit nets it to zero.
     assert.equal(replayCancel.cancellationPenalty?.currency, 'USD');
-    assert.equal(Number(replayCancel.cancellationPenalty?.amount), 0);
-    assert.equal(replayCancel.freeCancellationUntil, '2026-09-29T23:59:59Z');
-    assert.equal(Number(replayCancel.scheduledCancellationPenalty?.amount), 670.77);
-    assert.equal(replayCancel.scheduledCancellationPenalty?.currency, 'USD');
+    assert.equal(Number(replayCancel.cancellationPenalty?.amount), 955.69);
+    assert.equal(replayCancel.freeCancellationUntil, undefined);
+    assert.equal(replayCancel.scheduledCancellationPenalty, undefined);
+    assert.equal(Number(replayCancel.recoverableStayCredit?.amount), 0);
+    assert.equal(replayCancel.recoverableStayCredit?.currency, 'USD');
     // Sandbox book/cancel is destructive and was already proven with this flag set.
     // The default gate stops at the replayed recommendation so a second run does not
     // cancel the same provider booking again.

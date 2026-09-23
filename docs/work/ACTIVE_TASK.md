@@ -43,14 +43,50 @@
 ## Checkpoint ledger
 
 - [x] CP1 — hotel contract + no-show/refund semantics (`1a19749`)
-- [~] CP2 — fresh sandbox baseline booking + canonical binding (explicit bootstrap) — booking MADE,
-  attach proven via HTTP on RECORD clone; PG test + REPLAY migration of D3 test NOT done
+- [x] CP2 — fresh sandbox baseline booking + canonical binding (explicit bootstrap), completed
   - Fresh booking `DpnZRH43H` (Nuitée sandbox, lyf Bugis 2026-09-29→10-03, 1 adult), confirmed USD 955.69,
-    RFN, free cancel until 2026-09-26T10:00:00Z, then USD 955.69 (full). Attached on clone
-    `ns_demo_cl_c1e467c8ce574a92`, reservation `39e6f1f7-17a6-5cc8-8d87-93f895b1c875`.
-  - NOTE: at simulated D3 (2026-09-29) the free window is CLOSED → current fee 955.69, recoverable 0.
-    Economics must be recomputed from this; the brief's −125.07 assumed an open window.
-- [ ] CP3 — Path A/B cost ranking + Case cost UX with fresh evidence
+    RFN, free cancel until 2026-09-26T10:00:00Z, then USD 955.69 (full).
+  - Fixed real bug found while wiring REPLAY into the D3 planning test: `bootstrapProviderStayBaseline`'s
+    deterministic `ns-baseline-…` clientReference was keyed on the internal `reservation_id` uuid, which
+    is only stable within one seed lineage — the actual sandbox RECORD run (clone
+    `ns_demo_cl_c1e467c8ce574a92`, reservation `39e6f1f7-…`) used a different reservation uuid than the
+    canonical `aitFixtureClone.ts` PG test fixture (`bfb1eaa9-…`), so REPLAY of `book` always missed.
+    Re-keyed on the stable dataset-level `sourceBookingReference` + stay dates instead; renamed the two
+    affected recordings (`nuitee/book`, `nuitee/booking_lookup`) to their corrected content hash —
+    same real sandbox response payloads, corrected addressing only.
+  - Stale `z-xdzAxcv` tests fixed: `test/a5-hero-seed-truth.test.ts` now asserts the source-binding model
+    against the fresh REPLAY stay-context recording; `postgres-integration/a5JordanD3Planning.pgtest.ts`
+    now calls `bootstrapProviderStayBaseline` in REPLAY before composing recovery research, resolves the
+    stay via `sourceBookingReference` (never asserts the provider booking id), and asserts the corrected
+    D3 economics (see below).
+  - Repaired local scratch `postgres-integration/a5ProviderStayBaseline.pgtest.ts` (stub HotelCapability,
+    5 focused cases: RECORD attach+idempotent, client-reference-lookup recovery, REPLAY never looks up by
+    client reference, PROVIDER_CONTEXT_FAILED attaches nothing, unknown source ref fails STAY_NOT_FOUND)
+    and registered it in `test/suites.json` (`current` + `postgresFast` + `aitFixtureCloneConsumers`).
+  - Point 9 (reset never auto-bootstraps) verified structurally: `src/app/demo/demoReset.ts` has zero
+    references to `providerStayBaseline`/`runProviderStayBaseline`; every fixture-clone test in the suite
+    starts with no attached `HOTEL_BOOKING` unless it explicitly bootstraps, which is exercised by every
+    test above. No dedicated `resetDemoWorkspace` test added — low marginal value over the structural
+    guarantee given remaining CP3-CP6 scope.
+- [x] CP3 economics fix (accounting double-count, fixed **before** CP3 proper) —
+  `src/resolution/planning/recoveryCostComparison.ts`: a CANCEL_STAY effect's current-fee
+  (`POLICY_PENALTY_ESTIMATE`) line no longer also lands in `totalHomeAmount` once
+  `recoverableStayCredit` is established (even when it nets to exactly zero under full forfeiture) —
+  it stays visible in `potentialLossHomeAmount`/`lines` for operator transparency, but the credit line
+  alone carries the net effect now. Regression test added in `test/a5-stay-recovery-economics.test.ts`
+  proving the exact D3 case (bookedTotal = fee = 955.69) nets to `newSpend` alone, not `newSpend + 955.69`.
+  Proven end-to-end at the PG planning level too: the D3 planning pgtest now asserts
+  `cancellationPenalty=955.69`, `freeCancellationUntil=undefined`, `scheduledCancellationPenalty=undefined`,
+  `recoverableStayCredit=0.00` on the recommended strategy's CANCEL_STAY effect.
+  All 22 focused economics/seed-truth unit tests + both PG tests pass; `gate:test-boundary` and full
+  `tsc --noEmit` are clean.
+- [ ] CP3 (remaining) — Path A/B cost ranking + Case cost UX with fresh evidence. NOTE: Path B UNKNOWN
+  gating already exists from CP1 (`src/resolution/evaluation/evaluators/stayArrivalDateAligned.ts`,
+  `stay_arrival_date_aligned` dimension, `blocking: true`) — no `lateArrivalEvidence` dataset entries
+  exist anywhere for Jordan/lyf-bugis, so `survives` resolves to `null` → UNKNOWN, which should already
+  block Path B from auto-recommendation. Remaining CP3 work is Case cost-UX copy (reference
+  `lane/a5-cp3-case-cost-ux` @ `d9ab9e2`, do not blindly merge) + confirming end-to-end Path A/B ranking
+  behavior in the real Jordan scenario.
 - [ ] CP4 — focused graph spine + proposed-service preview
 - [ ] CP5 — Chromium D1/D2/D3 acceptance
 - [ ] CP6 — protected sandbox execution → RESOLVED + sanitized recordings + REPLAY proof
