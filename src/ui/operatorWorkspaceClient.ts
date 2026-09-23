@@ -60,6 +60,27 @@ export function renderCaseWorkspaceScript(): string {
     });
     try { sessionStorage.setItem(key, name); } catch (e) {}
   }
+  function programmeImpactDialog() {
+    return document.querySelector('[data-programme-impact-dialog]');
+  }
+  function syncProgrammeImpactBody() {
+    var dialog = programmeImpactDialog();
+    if (!dialog) return;
+    var body = dialog.querySelector('[data-programme-impact-body]');
+    var source = document.querySelector('[data-programme-impact-source]');
+    if (!body || !source) return;
+    body.innerHTML = source.innerHTML;
+  }
+  function openProgrammeImpact() {
+    var dialog = programmeImpactDialog();
+    if (!dialog || typeof dialog.showModal !== 'function') return;
+    syncProgrammeImpactBody();
+    if (!dialog.open) dialog.showModal();
+  }
+  function closeProgrammeImpact() {
+    var dialog = programmeImpactDialog();
+    if (dialog && dialog.open) dialog.close();
+  }
   function bind() {
     document.querySelectorAll('[data-case-tab]').forEach(function(tab) {
       if (tab.getAttribute('data-bound') === 'true') return;
@@ -88,6 +109,25 @@ export function renderCaseWorkspaceScript(): string {
     var saved = 'recovery';
     try { saved = sessionStorage.getItem(key) || 'recovery'; } catch (e) {}
     show(saved);
+    // Keep an open programme-impact dialog in sync after Case region patches.
+    var impact = programmeImpactDialog();
+    if (impact && impact.open) syncProgrammeImpactBody();
+  }
+  if (!window.__northstarProgrammeImpactBound) {
+    window.__northstarProgrammeImpactBound = true;
+    document.addEventListener('click', function(event) {
+      var target = event.target;
+      if (!target || !target.closest) return;
+      if (target.closest('[data-open-programme-impact]')) {
+        event.preventDefault();
+        openProgrammeImpact();
+        return;
+      }
+      if (target.closest('[data-programme-impact-close]')) {
+        event.preventDefault();
+        closeProgrammeImpact();
+      }
+    });
   }
   document.addEventListener('northstar:patched', bind);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);

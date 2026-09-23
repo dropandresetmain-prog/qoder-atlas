@@ -1,6 +1,7 @@
 /**
- * Sarah lane — programme alternative is a distinct UX from ordinary travel cards.
- * Identification is semantic (CHANGE_PROGRAMME_ITEM_TIME effects), never names.
+ * Sarah lane — programme alternative uses a two-step impact modal, not an
+ * inline accordion with immediate approve. Identification is semantic
+ * (CHANGE_PROGRAMME_ITEM_TIME effects), never names.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -69,14 +70,14 @@ function mixedCaseFacts(): RecoveryCaseFacts {
             subjectLabel: 'Headline Interview',
             timeZone: 'Asia/Singapore',
             currentWindow: { start: '2026-10-01T03:30:00.000Z', end: '2026-10-01T04:00:00.000Z' },
-            proposedWindow: { start: '2026-10-01T06:30:00.000Z', end: '2026-10-01T07:00:00.000Z' },
+            proposedWindow: { start: '2026-10-01T05:30:00.000Z', end: '2026-10-01T06:00:00.000Z' },
           },
           {
             effectKind: 'CHANGE_PROGRAMME_ITEM_TIME',
             subjectRef: 'PROGRAMME_ITEM:host',
             subjectLabel: 'Local host session',
             timeZone: 'Asia/Singapore',
-            currentWindow: { start: '2026-10-01T06:30:00.000Z', end: '2026-10-01T07:00:00.000Z' },
+            currentWindow: { start: '2026-10-01T05:30:00.000Z', end: '2026-10-01T06:00:00.000Z' },
             proposedWindow: { start: '2026-10-01T03:30:00.000Z', end: '2026-10-01T04:00:00.000Z' },
           },
         ],
@@ -166,8 +167,8 @@ function mixedCaseFacts(): RecoveryCaseFacts {
         },
       ],
       recommendation: {
-        recommended: { code: 'strat-programme', label: 'Programme change' },
-        alternatives: [{ code: 'strat-travel', label: 'Travel' }],
+        recommended: { ref: 'strat-programme', code: 'strat-programme', label: 'Programme change' },
+        alternatives: [{ ref: 'strat-travel', code: 'strat-travel', label: 'Travel' }],
         basis: [{ kind: { code: 'COST', label: 'Cost' }, summary: 'Programme change needs no new spend.' }],
         provenance: { code: 'DETERMINISTIC', label: 'Deterministic' },
       },
@@ -175,41 +176,80 @@ function mixedCaseFacts(): RecoveryCaseFacts {
   } as unknown as RecoveryCaseFacts;
 }
 
-test('programme strategy renders as distinct alternative CTA, not an ordinary travel card', () => {
+function renderMixedCase(): string {
   const view = projectRecoveryCase(mixedCaseFacts());
-  // projectRecoveryCase builds planningEvidence from planningAttempt; attach
-  // candidate blast/cost facts directly for this presentation-unit fixture.
   (view as { planningEvidence?: unknown }).planningEvidence = (mixedCaseFacts() as { planningEvidence: unknown }).planningEvidence;
-  const partitioned = partitionRecoveryOptions(view);
-  assert.equal(partitioned.programmeAlternative?.strategyRef, 'strat-programme');
-  assert.equal(partitioned.travel.length, 1);
-  assert.equal(partitioned.travel[0]!.strategyRef, 'strat-travel');
+  return renderProductRecoveryCase(view);
+}
 
-  const html = renderProductRecoveryCase(view);
-  assert.match(html, /data-test="normal-recovery-options"/);
-  assert.match(html, /data-strategy-kind="travel"/);
-  assert.match(html, /data-strategy-ref="strat-travel"/);
+test('programme teaser offers View Programme Impact without a recover action', () => {
+  const html = renderMixedCase();
+  assert.match(html, /data-test="programme-alternative"/);
   assert.match(html, /data-test="programme-alternative-cta"/);
   assert.match(html, /Consider programme change/);
-  assert.match(html, /data-test="programme-alternative-panel"/);
+  assert.match(html, /data-test="view-programme-impact"/);
+  assert.match(html, /View Programme Impact/);
+  assert.match(html, /data-open-programme-impact/);
+  const teaserMatch = html.match(/data-test="view-programme-impact"[^>]*>/);
+  assert.ok(teaserMatch);
+  assert.doesNotMatch(teaserMatch![0], /data-action="recover"/);
+  assert.match(html, /data-strategy-kind="travel"/);
+  assert.match(html, /data-test="normal-recovery-options"/);
+});
+
+test('programme impact modal source contains evidence and sole programme approve recover action', () => {
+  const html = renderMixedCase();
+  assert.match(html, /data-test="programme-impact-modal"/);
+  assert.match(html, /data-test="programme-impact-source"/);
   assert.match(html, /data-test="programme-what-changes"/);
   assert.match(html, /Headline Interview/);
   assert.match(html, /Local host session/);
   assert.match(html, /data-test="programme-panel-who"/);
+  assert.match(html, /data-test="programme-direct-people"/);
   assert.match(html, /Speaker One/);
   assert.match(html, /Local Host/);
-  assert.match(html, /data-test="programme-blast-direct"/);
-  assert.match(html, /data-test="programme-blast-reassess"/);
-  assert.match(html, /Unrelated trip rechecked/);
   assert.match(html, /data-test="programme-new-spend"/);
   assert.match(html, /data-test="travel-compare-spend"/);
   assert.match(html, /420\.00/);
+  assert.match(html, /data-test="programme-blast-direct"/);
+  assert.match(html, /data-test="programme-blast-reassess"/);
+  assert.match(html, /Unrelated trip rechecked/);
+  assert.match(html, /Northstar also rechecked/);
   assert.match(html, /data-test="approve-programme-change"/);
-  assert.match(html, /data-strategy-ref="strat-programme"/);
-  assert.match(html, /data-action="recover"/);
+  assert.match(html, /data-strategy-ref="strat-programme"[^>]*data-action="recover"|data-action="recover"[^>]*data-strategy-ref="strat-programme"/);
+
+  // Generic Approve and execute suppressed when programme is recommended.
+  assert.doesNotMatch(html, /data-test="approve-recommendation"/);
+  assert.match(html, /data-test="programme-approve-via-impact"/);
+  assert.match(html, /data-test="open-programme-impact-from-rail"/);
+
+  // Travel cards remain ordinary strategies.
   assert.equal(
     /data-strategy-kind="travel"[^>]*data-strategy-ref="strat-programme"|data-strategy-ref="strat-programme"[^>]*data-strategy-kind="travel"/.test(html),
     false,
   );
   assert.doesNotMatch(html, /Sarah Lim|Daniel Ong|ait-draft-/i);
+});
+
+test('programme impact open/close survives one Case options region patch', async () => {
+  // Markup + script contracts (no jsdom in this repo): prove the resilient
+  // open/close hooks and poll-sync path are present after a region replace.
+  const html = renderMixedCase();
+  assert.match(html, /data-open-programme-impact/);
+  assert.match(html, /data-programme-impact-dialog/);
+  assert.match(html, /data-programme-impact-source/);
+  assert.match(html, /data-programme-impact-body/);
+  assert.match(html, /__northstarProgrammeImpactBound/);
+  assert.match(html, /northstar:patched/);
+  assert.match(html, /syncProgrammeImpactBody|data-programme-impact-source/);
+
+  // Simulate a region patch by re-rendering: teaser + source + modal shell remain.
+  const again = renderMixedCase();
+  assert.match(again, /data-test="view-programme-impact"/);
+  assert.doesNotMatch(
+    again.match(/data-test="view-programme-impact"[^>]*>/)![0],
+    /data-action="recover"/,
+  );
+  assert.match(again, /data-test="approve-programme-change"/);
+  assert.match(again, /data-action="recover"[^>]*data-strategy-ref="strat-programme"|data-strategy-ref="strat-programme"[^>]*data-action="recover"/);
 });

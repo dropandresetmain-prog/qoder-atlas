@@ -419,21 +419,38 @@ export const OPERATOR_WORKSPACE_STYLES = `<style data-operator-workspace-styles>
   font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-soft);
 }
 
-/* Programme alternative: distinct from ordinary travel option cards. */
-.case-workspace .v5-programme-alternative {
-  margin-top: 18px; border: 1px dashed var(--line-soft); border-radius: 12px; padding: 0;
+/* Programme alternative: compact teaser + impact modal (not an accordion). */
+.case-workspace .v5-programme-teaser {
+  margin-top: 18px; display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
+  gap: 14px 18px; padding: 16px 18px; border: 1px dashed var(--line-soft); border-radius: 12px;
   background: var(--surface-2, var(--paper-warm));
 }
-.case-workspace .v5-programme-alternative > summary {
-  cursor: pointer; list-style: none; padding: 14px 18px; font-weight: 600; font-size: 14px;
-}
-.case-workspace .v5-programme-alternative > summary::-webkit-details-marker { display: none; }
-.case-workspace .v5-programme-alternative[open] > summary { border-bottom: 1px solid var(--line-soft); }
-.case-workspace .cw-programme-alt { border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+.case-workspace .v5-programme-teaser-copy { flex: 1 1 220px; min-width: 0; }
+.case-workspace .v5-programme-teaser-copy p { margin: 0 0 6px; }
+.case-workspace .v5-programme-teaser-copy .cw-muted { margin: 0; }
 .case-workspace .v5-programme-changes { display: grid; gap: 14px; }
 .case-workspace .v5-programme-change-row { padding: 10px 0; border-top: 1px solid var(--line-soft); }
 .case-workspace .v5-programme-change-row:first-child { border-top: 0; padding-top: 0; }
-.case-workspace .v5-programme-approve { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
+.case-workspace .v5-programme-time-move { margin: 6px 0 0; font-size: 15px; font-variant-numeric: tabular-nums; }
+.case-workspace .v5-programme-impact-counts { display: flex; flex-wrap: wrap; gap: 10px 18px; margin: 0 0 10px; }
+.case-workspace .v5-programme-approve { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line-soft); display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.case-workspace .v5-programme-impact-dialog {
+  border: 0; padding: 0; max-width: min(720px, calc(100vw - 32px)); width: 100%;
+  background: transparent;
+}
+.case-workspace .v5-programme-impact-dialog::backdrop { background: rgba(20, 23, 28, 0.42); }
+.case-workspace .v5-programme-impact-panel {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+  box-shadow: 0 24px 64px -16px rgba(16, 22, 30, 0.35); max-height: calc(100vh - 96px); overflow: auto;
+}
+.case-workspace .v5-programme-impact-head {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+  padding: 20px 22px 12px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface); z-index: 1;
+}
+.case-workspace .v5-programme-impact-head h2 { margin: 0; font-size: 20px; letter-spacing: -0.02em; }
+.case-workspace .v5-programme-impact-body { padding: 8px 22px 22px; }
+.case-workspace .v5-programme-impact-body h3 { margin: 18px 0 8px; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-soft); }
+.case-workspace .v5-programme-impact-body .m-sub { margin: 8px 0 4px; color: var(--text-soft); font-size: 14px; line-height: 1.45; }
 
 .case-workspace .v5-rec-step > h4::before {
   content: ""; display: grid; place-items: center;

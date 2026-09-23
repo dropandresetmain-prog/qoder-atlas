@@ -18,7 +18,7 @@ import { presentAssessment } from '../semantics/adapter.ts';
 import {
   authorityLabel, candidateFor, changeSummary, decisionActionState, decisionCosts,
   decisionMoney, decisionOptions, decisionText, decisionTime, decisionTitle,
-  groupedResearch, partitionRecoveryOptions, rejectionSummary,
+  groupedResearch, isProgrammeStrategy, partitionRecoveryOptions, rejectionSummary,
 } from '../caseDecisionPresentation.ts';
 
 const e = escapeHtml;
@@ -331,7 +331,7 @@ function travelOptionCardHtml(strategy: RecoveryStrategyView, view: RecoveryCase
 
 function programmeSpendLabel(candidate: PlanningCandidateView | undefined): string {
   const cost = decisionCosts(candidate?.costComparison);
-  if (cost.unavailable) return '$0 potential new spend';
+  if (cost.unavailable) return '$0';
   return cost.newSpend?.join(' + ') ?? 'SGD 0';
 }
 
@@ -343,20 +343,19 @@ function programmeChangeRowsHtml(strategy: RecoveryStrategyView): string {
     const title = decisionText(change.subjectLabel, 'Programme item');
     const person = people[index] ?? people[0];
     const zone = change.timeZone;
-    const before = change.currentWindow
-      ? `${decisionTime(change.currentWindow.start, zone)} → ${decisionTime(change.currentWindow.end, zone)}`
-      : 'Current window not supplied';
-    const after = `${decisionTime(change.proposedWindow!.start, zone)} → ${decisionTime(change.proposedWindow!.end, zone)}`;
+    const from = change.currentWindow
+      ? decisionTime(change.currentWindow.start, zone)
+      : 'Current start not supplied';
+    const to = decisionTime(change.proposedWindow!.start, zone);
     return `<div class="v5-programme-change-row" data-test="programme-change-row">
-      ${person ? `<p class="cw-kicker">${e(person)}</p>` : ''}
-      <strong>${e(title)}</strong>
-      <p class="cw-muted">${e(before)}</p>
-      <p data-test="programme-change-after"><span class="cw-kicker">After</span> ${e(after)}</p>
+      ${person ? `<p class="cw-kicker" data-test="programme-change-person">${e(person)}</p>` : ''}
+      <strong data-test="programme-change-title">${e(title)}</strong>
+      <p class="v5-programme-time-move" data-test="programme-change-after"><span class="cw-muted">${e(from)}</span> → <strong>${e(to)}</strong></p>
     </div>`;
   }).join('')}</div>`;
 }
 
-function programmeAlternativePanelHtml(view: RecoveryCaseView, strategy: RecoveryStrategyView, travelComparators: readonly RecoveryStrategyView[]): string {
+function programmeImpactBodyHtml(view: RecoveryCaseView, strategy: RecoveryStrategyView, travelComparators: readonly RecoveryStrategyView[]): string {
   const candidate = candidateFor(view, strategy);
   const blast = candidate?.blastRadius;
   const directPeople = (blast?.directlyAffected ?? []).map((item) => decisionText(item.label, 'Participant')).filter(Boolean);
@@ -373,6 +372,14 @@ function programmeAlternativePanelHtml(view: RecoveryCaseView, strategy: Recover
       return cost.newSpend.join(' + ');
     })
     .find((value): value is string => Boolean(value));
+  const restored = strategy.resolves
+    .filter((person) => person.currentVerdict !== 'PASS' && person.projectedVerdict === 'PASS')
+    .map((person) => decisionText(person.personLabel, 'the affected traveller'));
+  const restoredLabel = restored[0] ?? 'the affected traveller';
+  const slotCount = strategy.changes.filter((c) => c.effectKind === 'CHANGE_PROGRAMME_ITEM_TIME').length;
+  const subcopy = slotCount >= 2
+    ? `Northstar found a lower-cost way to keep ${restoredLabel}'s trip viable by moving ${slotCount} programme slots.`
+    : `Northstar found a lower-cost way to keep ${restoredLabel}'s trip viable by adjusting the programme.`;
   const basis = (view.planningEvidence?.recommendation?.basis ?? [])
     .map((b) => decisionText(b.summary, ''))
     .filter((text) => text.length > 0 && text.length <= 240)
@@ -390,53 +397,70 @@ function programmeAlternativePanelHtml(view: RecoveryCaseView, strategy: Recover
       : `${strategy.projectedSummary.fail} projected failure${strategy.projectedSummary.fail === 1 ? '' : 's'} remain after reassessment`,
     ...basis,
   ].slice(0, 5);
-  // Approve only this programme strategy through the existing recover action.
   let approve = '';
   if (view.status === 'AWAITING_AUTHORITY' || view.status === 'OPEN') {
     if (strategy.executionBlocker) {
       approve = `<p class="cw-muted" data-test="programme-approve-blocked">${e(executionBlockerLine(strategy.executionBlocker))}</p>
-        <button type="button" class="btn btn-primary" data-test="approve-programme-change" disabled>Approve programme change</button>`;
+        <button type="button" class="btn btn-primary" data-test="approve-programme-change" disabled>Approve Programme Change</button>`;
     } else {
-      approve = `<button type="button" class="btn btn-primary" data-action="recover" data-test="approve-programme-change" data-strategy-ref="${e(strategy.strategyRef)}" data-case-ref="${e(view.caseRef)}" data-busy-label="Approving…">Approve programme change</button>`;
+      approve = `<button type="button" class="btn btn-primary" data-action="recover" data-test="approve-programme-change" data-strategy-ref="${e(strategy.strategyRef)}" data-case-ref="${e(view.caseRef)}" data-busy-label="Approving…">Approve Programme Change</button>`;
     }
   }
+  return `<div class="v5-programme-impact-content" data-test="programme-impact-content" data-strategy-ref="${e(strategy.strategyRef)}" data-strategy-kind="programme">
+    <p class="m-sub" data-test="programme-impact-subcopy">${e(subcopy)}</p>
+    <section data-test="programme-panel-what-changes"><h3>What changes</h3>${programmeChangeRowsHtml(strategy)}</section>
+    <section data-test="programme-panel-who"><h3>Direct impact</h3>
+      <p class="v5-programme-impact-counts"><strong data-test="programme-direct-people">${peopleCount || '—'} ${peopleCount === 1 ? 'person' : 'people'} affected</strong>
+        <strong data-test="programme-direct-items">${itemCount || '—'} programme ${itemCount === 1 ? 'item' : 'items'} changed</strong></p>
+      ${directPeople.length ? list(directPeople) : '<p class="cw-muted">Direct participants were not named on this candidate.</p>'}
+    </section>
+    <section data-test="programme-panel-economics"><h3>Cost comparison</h3>
+      <div class="cw-metrics" data-test="programme-cost-compare">
+        <div class="cw-metric" data-test="programme-new-spend"><small>PROGRAMME CHANGE</small><strong>${e(programmeSpend)}</strong><span class="cw-metric-note">New spend</span></div>
+        ${travelCompare
+          ? `<div class="cw-metric" data-test="travel-compare-spend"><small>TRAVEL RECOVERY</small><strong>${e(travelCompare)}</strong><span class="cw-metric-note">Provider-derived comparable</span></div>`
+          : '<p class="cw-muted">No priced travel alternative is available to compare.</p>'}
+      </div>
+    </section>
+    <section data-test="programme-panel-why"><h3>Why Northstar surfaced this</h3>${list(why)}</section>
+    <section data-test="programme-panel-blast">
+      <div data-test="programme-blast-direct"><h3>Direct changes</h3>
+        ${directItems.length || directPeople.length
+          ? list([
+            ...directItems.map((label) => `Programme item · ${label}`),
+            ...directPeople.map((label) => `Participant · ${label}`),
+          ])
+          : '<p class="cw-muted">No direct change set was recorded.</p>'}
+      </div>
+      <div data-test="programme-blast-reassess"><h3>Northstar also rechecked</h3>
+        ${reassessed.length
+          ? `<p class="cw-muted">Broader journeys/trips checked for regressions — not directly changed.</p>${list(reassessed)}`
+          : '<p class="cw-muted">No broader reassessment set was recorded.</p>'}
+      </div>
+    </section>
+    <section class="v5-programme-approve" data-test="programme-panel-approve">
+      ${approve}
+      <button type="button" class="btn btn-ghost" data-programme-impact-close data-test="programme-impact-back">Back</button>
+      <p data-test="recovery-controls-status" data-action-status role="status"></p>
+    </section>
+  </div>`;
+}
+
+function programmeAlternativeTeaserHtml(view: RecoveryCaseView, strategy: RecoveryStrategyView, travelComparators: readonly RecoveryStrategyView[]): string {
+  const candidate = candidateFor(view, strategy);
   const ctaSpend = programmeSpendLabel(candidate);
-  return `<details class="v5-programme-alternative" data-test="programme-alternative" data-region-key="programme-alternative">
-    <summary data-test="programme-alternative-cta">Consider programme change · ${e(ctaSpend)}</summary>
-    <article class="cw-card cw-programme-alt" data-test="programme-alternative-panel" data-strategy-ref="${e(strategy.strategyRef)}" data-strategy-kind="programme">
+  const impact = programmeImpactBodyHtml(view, strategy, travelComparators);
+  // Impact source (with Approve) stays outside the teaser so the callout never
+  // exposes a recover action until the modal opens.
+  return `<aside class="v5-programme-teaser" data-test="programme-alternative" data-region-key="programme-alternative">
+    <div class="v5-programme-teaser-copy">
       <p class="cw-kicker">Programme alternative</p>
-      <h3>Change the programme — not another flight purchase</h3>
-      <section data-test="programme-panel-what-changes"><h4>What changes</h4>${programmeChangeRowsHtml(strategy)}</section>
-      <section data-test="programme-panel-who"><h4>Who is directly affected</h4>
-        <p><strong>${peopleCount || '—'} ${peopleCount === 1 ? 'person' : 'people'}</strong> · <strong>${itemCount || '—'} programme ${itemCount === 1 ? 'item' : 'items'}</strong></p>
-        ${directPeople.length ? list(directPeople) : '<p class="cw-muted">Direct participants were not named on this candidate.</p>'}
-      </section>
-      <section data-test="programme-panel-economics"><h4>Economics</h4>
-        <div class="cw-metrics" data-test="programme-cost-compare">
-          <div class="cw-metric" data-test="programme-new-spend"><small>PROGRAMME CHANGE</small><strong>${e(programmeSpend)}</strong><span class="cw-metric-note">New spend</span></div>
-          ${travelCompare
-            ? `<div class="cw-metric" data-test="travel-compare-spend"><small>TRAVEL ALTERNATIVE</small><strong>${e(travelCompare)}</strong><span class="cw-metric-note">Provider-derived comparable</span></div>`
-            : '<p class="cw-muted">No priced travel alternative is available to compare.</p>'}
-        </div>
-      </section>
-      <section data-test="programme-panel-why"><h4>Why Northstar surfaced this</h4>${list(why)}</section>
-      <section data-test="programme-panel-blast">${details('programme-blast-radius', 'View blast radius', `
-        <div data-test="programme-blast-direct"><h5>Direct change</h5>
-          ${directItems.length || directPeople.length
-            ? list([...directItems.map((label) => `Programme item · ${label}`), ...directPeople.map((label) => `Participant · ${label}`)])
-            : '<p class="cw-muted">No direct change set was recorded.</p>'}
-        </div>
-        <div data-test="programme-blast-reassess"><h5>Reassessment</h5>
-          ${reassessed.length
-            ? `<p class="cw-muted">Broader journeys/trips Northstar rechecked to ensure nothing else broke.</p>${list(reassessed)}`
-            : '<p class="cw-muted">No broader reassessment set was recorded.</p>'}
-        </div>`)}
-      </section>
-      <section class="v5-programme-approve" data-test="programme-panel-approve">${approve}
-        <p data-test="recovery-controls-status" data-action-status role="status"></p>
-      </section>
-    </article>
-  </details>`;
+      <p data-test="programme-alternative-cta"><strong>Consider programme change</strong> · ${e(ctaSpend)} potential new spend</p>
+      <p class="cw-muted">Inspect who else is affected before approving a programme change.</p>
+    </div>
+    <button type="button" class="btn btn-primary" data-test="view-programme-impact" data-open-programme-impact>View Programme Impact</button>
+  </aside>
+  <div hidden data-programme-impact-source data-test="programme-impact-source">${impact}</div>`;
 }
 
 function recommendationHtml(view: RecoveryCaseView): string {
@@ -447,7 +471,7 @@ function recommendationHtml(view: RecoveryCaseView): string {
   const travelCards = partitioned.travel.slice(0, 3).map((strategy) =>
     travelOptionCardHtml(strategy, view, strategy === partitioned.recommendedTravel));
   const programme = partitioned.programmeAlternative
-    ? programmeAlternativePanelHtml(view, partitioned.programmeAlternative, partitioned.travel)
+    ? programmeAlternativeTeaserHtml(view, partitioned.programmeAlternative, partitioned.travel)
     : '';
   if (!travelCards.length && !programme) return '';
   return `<section class="section" id="cw-recommendation" data-test="recovery-options-split">
@@ -542,8 +566,14 @@ function approvalHtml(view: RecoveryCaseView, m: CaseWorkspaceModel): string {
   const candidate = strategy ? candidateFor(view, strategy) : undefined;
   const action = decisionActionState(view);
   const conditions = conditionsList(view, m, candidate);
+  const programmeRecommended = Boolean(strategy && isProgrammeStrategy(strategy));
   let actionControls = '';
-  if (action.kind === 'ready') {
+  if (programmeRecommended) {
+    // Programme recovery requires View Programme Impact → Approve inside the modal.
+    actionControls = `<p class="cw-muted" data-test="programme-approve-via-impact">Review programme impact before approving — who else is affected must be visible first.</p>
+      <button type="button" class="btn btn-primary" data-open-programme-impact data-test="open-programme-impact-from-rail">View Programme Impact</button>
+      <button type="button" class="btn btn-ghost" data-action="decline" data-test="decline-recommendation" data-case-ref="${e(view.caseRef)}" data-busy-label="Recording…">Reject</button>`;
+  } else if (action.kind === 'ready') {
     actionControls = `<button type="button" class="btn btn-primary" data-action="recover" data-test="approve-recommendation" data-strategy-ref="${e(action.strategyRef)}" data-case-ref="${e(view.caseRef)}" data-busy-label="Approving…">Approve and execute</button>
       <button type="button" class="btn btn-ghost" data-action="decline" data-test="decline-recommendation" data-case-ref="${e(view.caseRef)}" data-busy-label="Recording…">Reject</button>`;
   } else if (action.kind === 'blocked') {
@@ -702,6 +732,15 @@ export function renderProductRecoveryCase(view: RecoveryCaseView, options: { rea
     <dialog class="v5-drawer" data-v5-drawer>
       <div class="v5-drawer-head"><h2 data-v5-drawer-title>Details</h2><button type="button" data-v5-drawer-close>Close</button></div>
       <div class="v5-drawer-body" data-v5-drawer-body></div>
+    </dialog>
+    <dialog class="v5-programme-impact-dialog" data-programme-impact-dialog data-test="programme-impact-modal">
+      <div class="v5-programme-impact-panel">
+        <div class="v5-programme-impact-head">
+          <h2 data-test="programme-impact-title">Programme change impact</h2>
+          <button type="button" class="btn btn-ghost" data-programme-impact-close data-test="programme-impact-close">Close</button>
+        </div>
+        <div class="v5-programme-impact-body" data-programme-impact-body data-test="programme-impact-body"></div>
+      </div>
     </dialog>
   </main>${originalCurrentToggleScript()}${casePollingScript({ caseRef: view.caseRef })}${renderCaseWorkspaceScript()}`;
 }

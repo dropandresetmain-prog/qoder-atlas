@@ -306,26 +306,34 @@ try {
   const hasProgrammeCta = caseHtml.includes('data-test="programme-alternative"')
     || /Consider programme change/i.test(caseHtml);
   if (!hasProgrammeCta) fail('programme-cta-missing', { hasTravelCards });
-  note('options-split', { hasTravelCards, hasProgrammeCta });
+  const viewBtn = page.locator('[data-test="view-programme-impact"]').first();
+  if (!(await viewBtn.count())) fail('view-programme-impact-missing', {});
+  const teaserRecover = await page.locator('[data-test="programme-alternative"] [data-action="recover"]').count();
+  const viewHasRecover = await viewBtn.getAttribute('data-action');
+  if (teaserRecover > 0 || viewHasRecover === 'recover') {
+    fail('teaser-has-recover-action', { teaserRecover, viewHasRecover });
+  }
+  const railApprove = await page.locator('[data-test="approve-recommendation"]').count();
+  const viaImpact = await page.locator('[data-test="programme-approve-via-impact"]').count();
+  note('options-split', { hasTravelCards, hasProgrammeCta, teaserRecover, railApprove, viaImpact });
 
-  // Expand programme alternative
-  const cta = page.locator('[data-test="programme-alternative-cta"], summary:has-text("Consider programme change")').first();
-  await cta.click();
-  await sleep(500);
+  // Open Programme Impact modal (no mutation)
+  await viewBtn.click();
+  await sleep(400);
+  const dialog = page.locator('[data-test="programme-impact-modal"]');
+  if (!(await dialog.evaluate((el) => el.open).catch(() => false))) {
+    fail('programme-impact-modal-not-open', {});
+  }
   await page.screenshot({ path: `${OUT}/04-programme-panel.png`, fullPage: true });
 
-  const panel = await page.locator('[data-test="programme-alternative-panel"]').innerHTML().catch(() => '');
-  const whatChanges = await page.locator('[data-test="programme-panel-what-changes"]').innerText().catch(() => '');
-  const who = await page.locator('[data-test="programme-panel-who"]').innerText().catch(() => '');
-  const economics = await page.locator('[data-test="programme-panel-economics"]').innerText().catch(() => '');
-  const why = await page.locator('[data-test="programme-panel-why"]').innerText().catch(() => '');
-
-  // Open blast radius
-  const blastSummary = page.locator('[data-test="programme-blast-radius"] summary, details[data-test="programme-blast-radius"] summary').first();
-  if (await blastSummary.count()) await blastSummary.click();
-  await sleep(300);
-  const blastDirect = await page.locator('[data-test="programme-blast-direct"]').innerText().catch(() => '');
-  const blastReassess = await page.locator('[data-test="programme-blast-reassess"]').innerText().catch(() => '');
+  // Prefer the live dialog body — the hidden source stays display:none.
+  const modal = dialog;
+  const whatChanges = await modal.locator('[data-test="programme-panel-what-changes"]').innerText().catch(() => '');
+  const who = await modal.locator('[data-test="programme-panel-who"]').innerText().catch(() => '');
+  const economics = await modal.locator('[data-test="programme-panel-economics"]').innerText().catch(() => '');
+  const why = await modal.locator('[data-test="programme-panel-why"]').innerText().catch(() => '');
+  const blastDirect = await modal.locator('[data-test="programme-blast-direct"]').innerText().catch(() => '');
+  const blastReassess = await modal.locator('[data-test="programme-blast-reassess"]').innerText().catch(() => '');
   await page.screenshot({ path: `${OUT}/05-programme-blast.png`, fullPage: true });
 
   evidence.programme = {
@@ -335,9 +343,10 @@ try {
     why,
     blastDirect,
     blastReassess,
-    hasApprove: /Approve programme change/.test(await page.content()),
+    railApproveSuppressed: railApprove === 0 || viaImpact > 0,
+    hasApproveInModal: await modal.locator('[data-test="approve-programme-change"]').count() > 0,
   };
-  note('programme-panel', {
+  note('programme-impact-modal', {
     whatChangesLen: whatChanges.length,
     whoLen: who.length,
     economicsPreview: economics.slice(0, 200),
@@ -346,13 +355,30 @@ try {
   });
 
   if (!/SGD\s*0|0\s*new spend|\$0/i.test(economics) && !/SGD 0|0/.test(economics)) {
-    // Soft warn — still require some spend signal
     evidence.programme.costWarning = 'expected SGD 0 signal weak';
   }
   if (!blastDirect || !blastReassess) fail('blast-radius-incomplete', evidence.programme);
+  if (!whatChanges) fail('what-changes-missing', evidence.programme);
 
-  const approve = page.locator('[data-test="approve-programme-change"]:not([disabled])').first();
-  if (!(await approve.count())) fail('approve-unavailable', { panel: panel.slice(0, 400) });
+  // Close without mutation, then reopen
+  await modal.locator('[data-test="programme-impact-close"], [data-test="programme-impact-back"]').first().click();
+  await sleep(300);
+  if (await dialog.evaluate((el) => el.open).catch(() => true)) {
+    fail('programme-impact-modal-still-open', {});
+  }
+  note('programme-impact-closed-without-mutation');
+
+  await page.locator('[data-test="view-programme-impact"]').first().click();
+  await sleep(400);
+  if (!(await dialog.evaluate((el) => el.open).catch(() => false))) {
+    fail('programme-impact-modal-reopen-failed', {});
+  }
+  note('programme-impact-reopened');
+
+  const approve = modal.locator('[data-test="approve-programme-change"]:not([disabled])').first();
+  if (!(await approve.count())) fail('approve-unavailable', { whatChanges: whatChanges.slice(0, 400) });
+  const approveHasRecover = await approve.getAttribute('data-action');
+  if (approveHasRecover !== 'recover') fail('approve-missing-recover-action', { approveHasRecover });
   await approve.click();
   note('approve-clicked');
 
