@@ -28,7 +28,7 @@ import {
 import type { DemoControlCatalog, DemoControlDefinition } from './demoControlCatalog.ts';
 
 /** Demo-boundary hold between displaced bookings and airline reprotection. */
-export const DEMO_DISRUPTION_STAGE_HOLD_MS = 10_000;
+export const DEMO_DISRUPTION_STAGE_HOLD_MS = 12_000;
 
 export interface DemoControlApplyDeps {
   pool: Pool;
@@ -170,6 +170,20 @@ async function recordStageEvidence(
   return { ok: true, evidenceId: evidenceResult.value.evidenceId };
 }
 
+async function coerceAndEnqueueReassessment(deps: DemoControlApplyDeps, evaluationNow: Instant): Promise<void> {
+  await deps.pool.query(
+    `UPDATE scheduled_reassessments
+        SET next_run_at = $2::timestamptz,
+            updated_at = $2::timestamptz
+      WHERE workspace_id = $1
+        AND state <> 'DONE'
+        AND next_run_at > $2::timestamptz`,
+    [deps.workspaceId, evaluationNow],
+  );
+  await new PgReassessmentWorker(deps.pool, { actorId: deps.actorPrincipalId })
+    .enqueueDue(evaluationNow, deps.workspaceId);
+}
+
 async function applyConfiguredAirlineRebooking(
   deps: DemoControlApplyDeps,
   catalog: DemoControlCatalog,
@@ -199,15 +213,16 @@ async function applyConfiguredAirlineRebooking(
     uow: deps.uow,
     pool: deps.pool,
   };
+
+  // Stage A: displace shared bookings, enqueue reassessment, return HTTP so
+  // overview polling can paint the five-person checking state. Stage B
+  // (airline reprotection) is scheduled on the event loop after the demo hold
+  // — still one public trigger, two provider facts, hold only at this boundary.
   const ingress = await acceptProviderDisruptionDemoEvent(commandCtx, event, {
-    // One public trigger, two provider facts. The pause is only so a polling
-    // overview can show the displaced service while reassessment is still
-    // pending. It is not part of viability, authority, or execution.
-    // ~10s so founders can see Stage A (five travellers checking) before
-    // airline reprotection lands as Stage B.
-    afterDisruptionReceived: () => new Promise((resolve) => {
-      setTimeout(resolve, DEMO_DISRUPTION_STAGE_HOLD_MS);
-    }),
+    stopAfterDisplacement: true,
+    afterDisruptionReceived: async () => {
+      await coerceAndEnqueueReassessment(deps, evaluationNow);
+    },
   });
   if (!ingress.ok) {
     return {
@@ -216,20 +231,8 @@ async function applyConfiguredAirlineRebooking(
       message: ingress.error.message ?? 'Provider disruption ingress failed.',
     };
   }
-  // Ingress/scheduling may stamp next_run_at with wall time. Under a CONTROLLED
-  // evaluation clock those rows look "not due yet" forever, so coerce pending
-  // work onto the evaluation instant before drain.
-  await deps.pool.query(
-    `UPDATE scheduled_reassessments
-        SET next_run_at = $2::timestamptz,
-            updated_at = $2::timestamptz
-      WHERE workspace_id = $1
-        AND state <> 'DONE'
-        AND next_run_at > $2::timestamptz`,
-    [deps.workspaceId, evaluationNow],
-  );
-  await new PgReassessmentWorker(deps.pool, { actorId: deps.actorPrincipalId })
-    .enqueueDue(evaluationNow, deps.workspaceId);
+
+  await coerceAndEnqueueReassessment(deps, evaluationNow);
   let drained: unknown;
   let escalation: unknown;
   if (deps.driveLifecycle) {
@@ -237,7 +240,40 @@ async function applyConfiguredAirlineRebooking(
     drained = life.drained;
     escalation = life.escalation;
   }
-  await deps.wakeWorkers?.();
+  void deps.wakeWorkers?.();
+
+  const applyReplacement = async (): Promise<void> => {
+    const replacement = await acceptProviderDisruptionDemoEvent(commandCtx, event);
+    if (!replacement.ok) {
+      console.error(
+        `[atlas] deferred airline reprotection failed: ${replacement.error.code} ${replacement.error.message ?? ''}`,
+      );
+      return;
+    }
+    await coerceAndEnqueueReassessment(deps, evaluationNow);
+    if (deps.driveLifecycle) await drainAndEscalate(deps);
+    void deps.wakeWorkers?.();
+  };
+
+  if (ingress.status !== 'ALREADY_APPLIED') {
+    if (deps.driveLifecycle) {
+      // Harness path: keep the hold on this call so offline tests still see
+      // both provider facts before returning.
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, DEMO_DISRUPTION_STAGE_HOLD_MS);
+      });
+      await applyReplacement();
+    } else {
+      // Normal boot: return after Stage A displacement so overview polling can
+      // paint; schedule Stage B reprotection after the presentation hold.
+      setTimeout(() => {
+        void applyReplacement().catch((err) => {
+          console.error('[atlas] deferred airline reprotection crashed:', err);
+        });
+      }, DEMO_DISRUPTION_STAGE_HOLD_MS);
+    }
+  }
+
   return {
     ok: true,
     controlId: control.id,

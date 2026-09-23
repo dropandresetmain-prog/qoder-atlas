@@ -294,6 +294,12 @@ export interface ProviderDisruptionApplyOptions {
    * does not already exist. Domain recovery does not wait here.
    */
   afterDisruptionReceived?: () => Promise<void>;
+  /**
+   * Demo-boundary only: return after displacement (and after
+   * `afterDisruptionReceived`) without applying reprotection or completing the
+   * change signal. A later delivery of the same event continues replacement.
+   */
+  stopAfterDisplacement?: boolean;
 }
 
 export async function acceptProviderDisruptionDemoEvent(
@@ -718,6 +724,23 @@ export async function acceptProviderDisruptionDemoEvent(
     // displaced original settle on screen before that fact is applied.
     if (options.afterDisruptionReceived && existingReplacementService.rows.length === 0) {
       await options.afterDisruptionReceived();
+    }
+
+    if (options.stopAfterDisplacement && existingReplacementService.rows.length === 0) {
+      // Leave the change signal open so a later delivery can apply reprotection
+      // and complete. Cancelled lines are already durable CURRENT facts.
+      return {
+        ok: true,
+        status: 'APPLIED',
+        originalServiceId,
+        replacementServiceId,
+        cancelledLineIds,
+        replacementReservationIds: [],
+        affectedBookingCount: event.affectedBookings.length,
+        evidenceId,
+        sourceId,
+        changeSignalId,
+      };
     }
 
     // Step 5: Create replacement transport service (F5: identity is minted

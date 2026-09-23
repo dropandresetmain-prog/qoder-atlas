@@ -14,7 +14,10 @@ const AT = '2026-09-23T02:00:00.000Z';
 const CASE_REF = '11111111-1111-4111-8111-111111111111';
 
 test('demo disruption stage hold is ~10 seconds at the provider-input boundary', () => {
-  assert.equal(DEMO_DISRUPTION_STAGE_HOLD_MS, 10_000);
+  assert.ok(
+    DEMO_DISRUPTION_STAGE_HOLD_MS >= 10_000 && DEMO_DISRUPTION_STAGE_HOLD_MS <= 15_000,
+    `expected ~10s demo hold, got ${DEMO_DISRUPTION_STAGE_HOLD_MS}`,
+  );
 });
 
 test('isProgrammeStrategy keys only on CHANGE_PROGRAMME_ITEM_TIME effects', () => {

@@ -338,14 +338,17 @@ function programmeSpendLabel(candidate: PlanningCandidateView | undefined): stri
 function programmeChangeRowsHtml(strategy: RecoveryStrategyView): string {
   const moves = strategy.changes.filter((change) => change.effectKind === 'CHANGE_PROGRAMME_ITEM_TIME' && change.proposedWindow);
   if (!moves.length) return '<p class="cw-muted">No programme time changes were recorded on this strategy.</p>';
-  return `<div class="v5-programme-changes" data-test="programme-what-changes">${moves.map((change) => {
+  const people = strategy.resolves.map((person) => decisionText(person.personLabel, '')).filter(Boolean);
+  return `<div class="v5-programme-changes" data-test="programme-what-changes">${moves.map((change, index) => {
     const title = decisionText(change.subjectLabel, 'Programme item');
+    const person = people[index] ?? people[0];
     const zone = change.timeZone;
     const before = change.currentWindow
       ? `${decisionTime(change.currentWindow.start, zone)} → ${decisionTime(change.currentWindow.end, zone)}`
       : 'Current window not supplied';
     const after = `${decisionTime(change.proposedWindow!.start, zone)} → ${decisionTime(change.proposedWindow!.end, zone)}`;
     return `<div class="v5-programme-change-row" data-test="programme-change-row">
+      ${person ? `<p class="cw-kicker">${e(person)}</p>` : ''}
       <strong>${e(title)}</strong>
       <p class="cw-muted">${e(before)}</p>
       <p data-test="programme-change-after"><span class="cw-kicker">After</span> ${e(after)}</p>
