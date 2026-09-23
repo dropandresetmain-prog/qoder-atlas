@@ -1,0 +1,114 @@
+{
+  "id": "rec_8d9882ffbbb5bdfec4a664667f79aa2d",
+  "providerId": "nuitee",
+  "operation": "quote",
+  "recordedAt": "2026-09-23T11:28:45.488Z",
+  "sanitized": true,
+  "raw": {
+    "data": {
+      "prebookId": "dU7BK1tsd",
+      "offerId": "3gAYonJzkd4AEaRzcmlk2gJiR1kyVE1NWldNWTNHS05UR0daU0RPT0pTR0EzVElOWlhHWTRUTVpKU0dBM1RFTlRHR1pURE1aQlNNTVpEQU5URkdaVERNWkpTTVEzVEdOVEVHWlRETVlSV0hFM0dLTlJYR0lZRE1NUlhHVTNESU5SWEdZMlRPTkJTTVEzRE1OWlNHWTRUTU5KV01VM0RJTlRERzQ0VEVNQldHTTNHTU5aVkc0WURNWVpXR1UzVEdNUlhHSVlET01aWEdRM0RDTlpaTVVaRFNPTEJNRVpEQU5SWkdaU1RNTVpXTU0zVEtOUlVHWTJUT01aU0dBM0dHTlJSRzQyRE1OSlNHQTNER05SWUdZMlRNTVpXTUlaR0lOVEdHNDJUT05CU0dBM0RDTlpVR0lZREdNSlRHSVpEQU5aUUdaU0RFTUJTSEEzVEVOVEdHWlRETVpCU0dBM0dNTlRGR1pSVE9PSlNIRVpEQU5MQ0c0WkRNWlJXTVkzR0lNUlFHWlRETVpKV01NM1RTTkxFUFFZU0dNUlFHSTNEQU9KU0hGNkRFTUJTR1lZRFNNWlFQUlNXNFgyVktONkZHUjM0S1ZKVUk3QlJJRVlFRzdCVUdVWkRTN0RKS0JUVktTRDRHRTNUU01CUkdZWkRTTUJTSEEyRE9aUzJJVlRTR01SVEhFNFRDT0pER0VZVEtOWk5HSVpUU09KUkhGNkZFUlNPUFFaREFNUldHQTRURU5aUUdFWURBN0JTUFJKRENNSlRHNTZER05KUkhBUlZFVFpES0pERTRJWlNHQVpETUxKUUhFV1RFTlpBR0FZVFVNQlFFTaNwcmPLQEGXCj1wo9elb3JfcHLLAAAAAAAAAAClb3JfY23LAAAAAAAAAACiY23LAAAAAAAAAACjcGNkszIwMjYtMDktMjggMDE6MDA6MDCicnSjUkZOo2JyZKJST6RtcmlkwKNtcm7Ao2hkcMCjZnJuoKNzcm7ZeEVjb25vbXkgVHdpbiByb29tLCBOb24tc21va2luZyBCdWRnZXQtZnJpZW5kbHkgY291cGxlcycgc3RheeKZqiBJbmNsdWRlcyBsYXRlIGNoZWNrLW91dCBhdCAxMiBQTSAocm9vbSBvbmx5KSBbUm9vbSBvbmx5XaNvY24BpHBya3PAo2RldMsAAAAAAAAAAKJjcIKhcJKFoXSzMjAyNi0wOS0yNyAwMTowMDowMKFhy0AcKPXCj1wpoWOjVVNEonR5pmFtb3VudKJ0eqNHTVSFoXSzMjAyNi0wOS0yOCAwMTowMDowMKFhy0BBlwo9cKPXoWOjVVNEonR5pmFtb3VudKJ0eqNHTVSicnSjUkZOpHNoaWSmMjM5OTE5o3NpZAKjaGlkp2xwM2E5Mmajb2NjkYGhYQGjY3Vyo1VTRKJnbqJTR6JjaaoyMDI2LTA5LTI5omNvqjIwMjYtMDktMzCjZ2lkoKJjcssAAAAAAAAAAKRzc2lk2TBzZXNzaW9uXzAxYTBjZTA2MWYyZEQzZTdSQ0d5TjE1T3lEQ25sNXN2MnhRU3pubXKjaXNowqNzc3CucHJvdmlkZXJEaXJlY3SjaWZtwqVpZmNocsKjaWZywqVzZWFpZKdscDNhOTJmom5rsWxpdGVhcGlvbmJvYXJkaW5nonR4kYShacOhZLBUYXhBbmRTZXJ2aWNlRmVloWHLQA6j1wo9cKShY6NVU0SibHDAo2JrdAikbXNwYctARAAAAAAAAKRtc3Bjo1VTRA==",
+      "hotelId": "lp3a92f",
+      "currency": "USD",
+      "termsAndConditions": "",
+      "roomTypes": [
+        {
+          "rates": [
+            {
+              "rateId": "I5MTEVCNJVNFOTKZGNDUWTSUI5DVUU2EJ5HUUU2HIEZVISKOLJMEOWJUKRGVUSSTI5ATGVCFJZKEOR22KRCE2WSCKNGU2WSEIFHFIRSHLJKEITK2JJJU2UJTKRDU4VCFI5NFIRCNLFJFOSCFGNDUWTSSLBDUSWKEJVGVEWCHKUZUISKOKJMEOWJSKRHU4QSTJVITGRCNJZNFGR2ZGRKE2TSKK5GVKM2EJFHFIRCHGQ2FIRKNIJLUOTJTI5GU4WSWI42FSRCNLFNFOR2VGNKEOTKSLBDUSWKEJ5GVUWCHKEZUIQ2OLJNE2VK2IRJU6TCCJVCVURCBJZJFUR22KNKE2TK2K5GU2M2UJNHFEVKHLEZFIT2NLJJUOQJTI5DU4USSI42DERCNJZFFGR2BGNCEOTSSLFDVSMSUJVGVUV2NJFNEOSKOKRDUONBSKRHU4QSTI5ATGRCDJZNFKR2JLFCEOTKKKRDUSWSEIFHFUUKHLJJUIRKNIJJUQQJTKRCU4VCHI5NFIRCNLJBFGR2BGNDU2TSUIZDVUUSUJ5HUUU2IIVNEIQKOJRBUONC2IRGVUUSXJVMTGR2JJVJFCR22KRCE2WSKK5GU2M2UKNHEYRKQKFMVGR2NKJIUOSJTIRAU6SSTJBDDMRCFJVBFGR2ZLFCFGTK2KFIFEU2XGRMDEVSLJY3EMR2SGM2EWVSKKVETOQSSJFCVSRKHG5BFKR2VLJCFGN2EJJFUEVCWJNJUINCHIUZVIU2NIJJEOWK2IRJU2QSTJBATERCPLJJTESKWKRJUOTKSKREEKNCUINHUURCHIVMVIS2OLJHEOSK2KRJU6SSSJBDDMRSFKJJU6UCRLJCECTKSK5DUCNCUIVHFUUKHIVMUIQJXIJJVAUSKIRBU2SSUI42TMRCHJZFFESCBKJLEKVC2IRFUURCFGREVUU2HIFNEITKMJJIUQRKXKRCU4WSBI5AVSVCVJVBFCRKNPQZTKLRRHB6DEMBSGYWTAOJNGI4CAMBRHIYDAORQGB6FET34PR6HYRLDN5XG63LZEBKHO2LOEBZG633NFQQE433OFVZW233LNFXGOICCOVSGOZLUFVTHE2LFNZSGY6JAMNXXK4DMMVZSOIDTORQXTYUZVIQES3TDNR2WIZLTEBWGC5DFEBRWQZLDNMWW65LUEBQXIIBRGIQFATJAFBZG633NEBXW43DZFEQFWUTPN5WSA33ONR4V27BQFYYDA7BQFYYDA7D4GAXDAMD4GAXDAMA",
+              "occupancyNumber": 1,
+              "name": "Economy Twin room, Non-smoking Budget-friendly couples' stay♪ Includes late check-out at 12 PM (room only) [Room only]",
+              "maxOccupancy": 1,
+              "adultCount": 1,
+              "childCount": 0,
+              "childrenAges": [],
+              "boardType": "RO",
+              "boardName": "Room Only",
+              "remarks": "<br/><br/><br/>",
+              "priceType": "commission",
+              "commission": [
+                {
+                  "amount": 0,
+                  "currency": "USD"
+                }
+              ],
+              "retailRate": {
+                "total": [
+                  {
+                    "amount": 35.18,
+                    "currency": "USD"
+                  }
+                ],
+                "suggestedSellingPrice": [
+                  {
+                    "amount": 40,
+                    "currency": "USD",
+                    "source": "providerDirect"
+                  }
+                ],
+                "initialPrice": null,
+                "taxesAndFees": [
+                  {
+                    "included": true,
+                    "description": "TaxAndServiceFee",
+                    "amount": 3.83,
+                    "currency": "USD"
+                  }
+                ]
+              },
+              "cancellationPolicies": {
+                "cancelPolicyInfos": [
+                  {
+                    "cancelTime": "2026-09-27 01:00:00",
+                    "amount": 7.04,
+                    "currency": "USD",
+                    "type": "amount",
+                    "timezone": "GMT"
+                  },
+                  {
+                    "cancelTime": "2026-09-28 01:00:00",
+                    "amount": 35.18,
+                    "currency": "USD",
+                    "type": "amount",
+                    "timezone": "GMT"
+                  }
+                ],
+                "hotelRemarks": [],
+                "refundableTag": "RFN"
+              },
+              "paymentTypes": [
+                "NUITEE_PAY"
+              ],
+              "providerCommission": {
+                "amount": 0,
+                "currency": ""
+              },
+              "perks": [],
+              "promotions": null
+            }
+          ]
+        }
+      ],
+      "suggestedSellingPrice": 40,
+      "isPackageRate": false,
+      "commission": 0,
+      "price": 35.18,
+      "priceType": "commission",
+      "priceDifferencePercent": 0,
+      "cancellationChanged": false,
+      "boardChanged": false,
+      "supplier": "nuitee",
+      "supplierId": 2,
+      "paymentTypes": [
+        "NUITEE_PAY",
+        "ACC_CREDIT_CARD",
+        "WALLET"
+      ],
+      "checkin": "2026-09-29",
+      "checkout": "2026-09-30",
+      "sellingPriceToUser": 35.18
+    },
+    "guestLevel": 0,
+    "sandbox": true
+  }
+}

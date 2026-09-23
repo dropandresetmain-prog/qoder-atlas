@@ -47,7 +47,8 @@ export type StayExecutionInputs =
         | 'STAY_TRAVELLER_UNRESOLVED'
         | 'STAY_GUEST_NAME_MISSING'
         | 'STAY_TERMS_MISSING'
-        | 'STAY_BINDING_AMBIGUOUS';
+        | 'STAY_BINDING_AMBIGUOUS'
+        | 'STAY_CONNECTION_UNRESOLVED';
       detail: string;
     };
 
@@ -122,6 +123,46 @@ function requiredNights(window: { start: string; end: string }): number {
   return Math.max(1, Math.round((Date.parse(window.end) - Date.parse(window.start)) / 86_400_000));
 }
 
+/**
+ * Resolve the Nuitee external connection for a Journey.
+ *
+ * Prefer an organisation-scoped connection matching the Trip's business-context
+ * organisation. Fall back only when exactly one workspace Nuitee connection exists.
+ * Ambiguous (multiple unmatched) → undefined so callers fail closed.
+ */
+export async function resolveNuiteeConnectionIdForJourney(
+  db: Queryable,
+  workspaceId: string,
+  journeyId: string,
+): Promise<string | undefined> {
+  const orgMatched = (
+    await db.query<{ id: string }>(
+      `SELECT ec.id
+         FROM external_connections ec
+         JOIN journeys j ON j.workspace_id = ec.workspace_id AND j.id = $2
+         JOIN trips t ON t.workspace_id = j.workspace_id AND t.id = j.trip_id
+        WHERE ec.workspace_id = $1
+          AND ec.provider_kind = 'nuitee'
+          AND ec.organisation_id IS NOT NULL
+          AND ec.organisation_id = t.business_context_organisation_id
+        ORDER BY ec.id`,
+      [workspaceId, journeyId],
+    )
+  ).rows;
+  if (orgMatched.length === 1) return orgMatched[0]!.id;
+  if (orgMatched.length > 1) return undefined;
+
+  const workspaceWide = (
+    await db.query<{ id: string }>(
+      `SELECT id FROM external_connections
+        WHERE workspace_id = $1 AND provider_kind = 'nuitee'
+        ORDER BY id`,
+      [workspaceId],
+    )
+  ).rows;
+  return workspaceWide.length === 1 ? workspaceWide[0]!.id : undefined;
+}
+
 /** Persist only quoted terms that are actually used by a durable viable strategy. */
 export async function persistStayExecutionBindings(
   db: Queryable,
@@ -134,16 +175,6 @@ export async function persistStayExecutionBindings(
   },
 ): Promise<number> {
   let written = 0;
-  const connections = (
-    await db.query<{ id: string }>(
-      `SELECT id FROM external_connections
-        WHERE workspace_id = $1 AND provider_kind = 'nuitee'
-        ORDER BY id LIMIT 2`,
-      [params.workspaceId],
-    )
-  ).rows;
-  // Exactly one connection → bind it; zero or many → leave null and fail closed at resolve/canonical.
-  const connectionId = connections.length === 1 ? connections[0]!.id : null;
 
   for (const strategy of params.strategies) {
     for (const effect of strategy.scenarioChange.effects) {
@@ -170,6 +201,9 @@ export async function persistStayExecutionBindings(
         ) {
           continue;
         }
+        const connectionId = await resolveNuiteeConnectionIdForJourney(
+          db, params.workspaceId, effect.journeyId,
+        );
         const approvedVisit = await visitInput(db, params.workspaceId, quote);
         // Column count must match value expressions exactly (repaired from WIP).
         const result = await db.query(
@@ -194,7 +228,7 @@ export async function persistStayExecutionBindings(
             strategy.id,
             effect.journeyId,
             effect.offerId,
-            connectionId,
+            connectionId ?? null,
             quote.provider.propertyId,
             quote.provider.rateId,
             quote.provider.quoteId,
@@ -229,6 +263,9 @@ export async function persistStayExecutionBindings(
         ) {
           continue;
         }
+        const connectionId = await resolveNuiteeConnectionIdForJourney(
+          db, params.workspaceId, quote.journeyId,
+        );
         const result = await db.query(
           `INSERT INTO stay_execution_bindings (
              workspace_id, id, recovery_case_id, recovery_strategy_id, action, journey_id,
@@ -246,7 +283,7 @@ export async function persistStayExecutionBindings(
             params.recoveryCaseId,
             strategy.id,
             quote.journeyId,
-            connectionId,
+            connectionId ?? null,
             effect.journeyItemId,
             effect.reservationLineId,
             quote.replacement.provider.stayElementId,
@@ -374,14 +411,29 @@ export async function resolveStayExecutionInputs(
   }
 
   const bindingRow = matches[0]!;
-  const binding = mapBinding(bindingRow, action);
+  let binding = mapBinding(bindingRow, action);
+
+  // Bindings persisted while multiple Nuitee connections existed may lack
+  // provider_connection_id. Re-resolve from Journey org at read time.
+  if (!binding.providerConnectionId) {
+    const resolved = await resolveNuiteeConnectionIdForJourney(db, workspaceId, binding.journeyId);
+    if (!resolved) {
+      return {
+        ready: false,
+        reason: 'STAY_CONNECTION_UNRESOLVED',
+        detail: 'no unique Nuitee connection for the Journey organisation',
+      };
+    }
+    binding = { ...binding, providerConnectionId: resolved };
+  }
 
   if (action === 'BOOK') {
     if (!binding.quoteHandle || !LIVE_STAY_RESEARCH_MODES.includes(binding.researchMode as (typeof LIVE_STAY_RESEARCH_MODES)[number])) {
       return { ready: false, reason: 'STALE_STAY_QUOTE', detail: 'book action has no protected LIVE/RECORD quote handle' };
     }
     if (
-      !binding.providerPropertyId
+      !binding.providerConnectionId
+      || !binding.providerPropertyId
       || !binding.providerRateId
       || !binding.stayWindow
       || !binding.placeId
@@ -393,7 +445,7 @@ export async function resolveStayExecutionInputs(
       return {
         ready: false,
         reason: 'STAY_TERMS_MISSING',
-        detail: 'book binding is incomplete (property/rate/window/place/price/item/visit required)',
+        detail: 'book binding is incomplete (connection/property/rate/window/place/price/item/visit required)',
       };
     }
   }

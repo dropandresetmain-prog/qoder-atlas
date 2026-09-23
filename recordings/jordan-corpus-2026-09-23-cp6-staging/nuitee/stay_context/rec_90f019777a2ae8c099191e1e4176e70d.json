@@ -1,0 +1,193 @@
+{
+  "id": "rec_90f019777a2ae8c099191e1e4176e70d",
+  "providerId": "nuitee",
+  "operation": "stay_context",
+  "recordedAt": "2026-09-23T18:20:11.534Z",
+  "sanitized": true,
+  "raw": {
+    "data": {
+      "bookingId": "DpnZRH43H",
+      "clientReference": "ns-baseline-234f15d734459bc97da9b975",
+      "supplierBookingId": "DpnZRH43H",
+      "supplierBookingName": "nuitee",
+      "supplier": "nuitee",
+      "supplierId": 2,
+      "status": "CONFIRMED",
+      "hotelConfirmationCode": "test",
+      "checkin": "2026-09-29",
+      "checkout": "2026-10-03",
+      "hotel": {
+        "hotelId": "lp6d67d",
+        "name": "lyf Bugis Singapore managed by The Ascott Ltd",
+        "parentHotelId": "lp6d67d"
+      },
+      "bookedRooms": [
+        {
+          "roomType": {
+            "roomTypeId": "",
+            "name": "Test rate 1"
+          },
+          "boardType": "RO",
+          "boardName": "Room Only",
+          "adults": 1,
+          "children": 0,
+          "rate": {
+            "rateId": "",
+            "retailRate": {
+              "total": {
+                "amount": 955.69,
+                "currency": "USD"
+              },
+              "suggestedSellingPrice": {
+                "source": ""
+              },
+              "taxesAndFees": [
+                {
+                  "included": true,
+                  "description": "Property service charge",
+                  "amount": 95.57,
+                  "currency": "USD"
+                },
+                {
+                  "included": true,
+                  "description": "TAX",
+                  "amount": 86.01,
+                  "currency": "USD"
+                }
+              ]
+            },
+            "cancellationPolicies": {
+              "cancelPolicyInfos": [
+                {
+                  "cancelTime": "2026-09-26 10:00:00",
+                  "amount": 955.69,
+                  "type": "amount",
+                  "timezone": "GMT",
+                  "currency": "USD"
+                }
+              ],
+              "hotelRemarks": [],
+              "refundableTag": "RFN"
+            },
+            "maxOccupancy": 1,
+            "boardType": "RO",
+            "boardName": "Room Only",
+            "remarks": "",
+            "perks": []
+          },
+          "firstName": "Jordan",
+          "lastName": "Hale",
+          "childrenAges": [],
+          "board": "Room Only",
+          "boardCode": "RO",
+          "cancellationPolicies": {
+            "cancelPolicyInfos": [
+              {
+                "cancelTime": "2026-09-26 10:00:00",
+                "amount": 955.69,
+                "type": "amount",
+                "timezone": "GMT",
+                "currency": "USD"
+              }
+            ],
+            "hotelRemarks": [],
+            "refundableTag": "RFN"
+          },
+          "room_id": "I5NFGVCNJVFFOTKVGNDU2TKSKFDTIWKUJ5HEUV2HKUZUIS2OKRDFAUKZKNDU2USRI5ETGRCBJ5FFGSCGGZCEKTKCKNDVSWKUIFGUEVCQKJJVONCYGJLEWTRWIZDVEMZUJNLEUVKJG5BFESKFLFCUON2CKVDVKWSEKM3UISSLIJKFMS2TIQ2EORJTKRJU2QSSI5KVSVCFJVBFCR2RGNCEWU2LJNIEES2DI5HEEVKIIFMVIRKOJJCEOSKZKRBU4USOI5ITERCRJVFFGR2WGZDEKUSTJ5IFCWSEIFGVEV2HIE2FIRKOKJJEOQKZIRATOQSSKBJEURCDJVFFMR2CIJCFGT2KKZFFSWKGJNHUINCIIUZFIS2OKJNEKTSKIU3ESMSTJFNEQQ2HJVJFCR2JGNBTETKCLJDFKWSEJVEUEUSHIE2UIQKNIJCHYOJVGUXDMOL4GIYDENRNGA4S2MRWEAYTAORQGA5DAMD4KJHXY7D4PRHGC3TPEBIXKZLFNZ6DALRQGB6DALRQGB6HYMBOGAYHYMBOGAYA",
+          "occupancy_number": 1,
+          "amount": 955.69,
+          "currency": "USD",
+          "children_count": 0,
+          "remarks": "",
+          "guests": [
+            {
+              "firstName": "Jordan",
+              "lastName": "Hale",
+              "email": "[REDACTED]",
+              "phone": "",
+              "remarks": "",
+              "occupancyNumber": 1
+            }
+          ]
+        }
+      ],
+      "holder": {
+        "firstName": "Jordan",
+        "lastName": "Hale",
+        "email": "[REDACTED]",
+        "phone": "[REDACTED]"
+      },
+      "createdAt": "2026-09-23T08:13:31",
+      "updatedAt": "",
+      "cancellationPolicies": {
+        "cancelPolicyInfos": [
+          {
+            "cancelTime": "2026-09-26 10:00:00",
+            "amount": 955.69,
+            "type": "amount",
+            "timezone": "GMT",
+            "currency": "USD"
+          }
+        ],
+        "hotelRemarks": [],
+        "refundableTag": "RFN"
+      },
+      "specialRemarks": "",
+      "optionalFees": "",
+      "mandatoryFees": "",
+      "knowBeforeYouGo": "",
+      "price": 955.69,
+      "sellingPriceToUser": 955.69,
+      "commission": 0,
+      "addonsTotalAmount": 0,
+      "currency": "USD",
+      "remarks": "",
+      "voucherCode": "",
+      "voucherTotalAmount": 0,
+      "addons": null,
+      "guestId": 270753,
+      "distributorCommission": 0,
+      "distributorPrice": 0,
+      "trackingId": "",
+      "firstName": "Jordan",
+      "lastName": "Hale",
+      "adults": 1,
+      "children": "",
+      "childrenCount": 0,
+      "prebookId": "tEY9Tslr5",
+      "paymentStatus": "succeeded",
+      "paymentTransactionId": "tr_cts_PoQE9hzZyyYhnHoSuIQRg",
+      "sellingPrice": "955.69",
+      "exchangeRate": 0.871102856566769,
+      "exchangeRateUsd": 1,
+      "email": "[REDACTED]",
+      "tag": "RFN",
+      "lastFreeCancellationDate": "2026-09-26T10:00:00Z",
+      "userId": 383174,
+      "nationality": "SG",
+      "holderTitle": "",
+      "hotelId": "lp6d67d",
+      "hotelName": "lyf Bugis Singapore managed by The Ascott Ltd",
+      "cancelledAt": null,
+      "refundedAt": null,
+      "loyaltyGuestId": 270753,
+      "sandbox": 1,
+      "clientCommission": 0,
+      "voucherId": null,
+      "voucherTransationId": null,
+      "processingFee": 38.22,
+      "amountRefunded": 0,
+      "refundType": "",
+      "addonsRedemptions": null,
+      "rebookFrom": "",
+      "agentId": null,
+      "cancelledBy": null,
+      "feed": "liteapionboarding",
+      "goodwillPayment": null,
+      "newCharges": 0,
+      "compensationAmount": 0,
+      "hotelRemarks": "",
+      "payLaterDeadline": null
+    }
+  }
+}

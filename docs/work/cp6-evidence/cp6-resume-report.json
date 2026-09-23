@@ -1,0 +1,244 @@
+{
+  "cloneDb": "ns_ait_cl_74748a4c1901496f",
+  "passes": [
+    {
+      "pass": 0,
+      "flights": {
+        "at": "2026-09-29T12:00:00+09:00",
+        "candidates": 0,
+        "executed": 0,
+        "failed": 0,
+        "unknown": 0,
+        "deferred": 0,
+        "refused": 0,
+        "canonicalUpdates": 0,
+        "canonicalPending": [],
+        "outcomes": []
+      },
+      "stays": {
+        "at": "2026-09-29T12:00:00+09:00",
+        "candidates": 0,
+        "executed": 0,
+        "failed": 0,
+        "unknown": 0,
+        "refused": 0,
+        "deferred": 0,
+        "outcomes": [],
+        "canonicalPending": [],
+        "canonicalUpdates": 1
+      }
+    },
+    {
+      "pass": 1,
+      "flights": {
+        "at": "2026-09-29T12:00:00+09:00",
+        "candidates": 0,
+        "executed": 0,
+        "failed": 0,
+        "unknown": 0,
+        "deferred": 0,
+        "refused": 0,
+        "canonicalUpdates": 0,
+        "canonicalPending": [],
+        "outcomes": []
+      },
+      "stays": {
+        "at": "2026-09-29T12:00:00+09:00",
+        "candidates": 1,
+        "executed": 1,
+        "failed": 0,
+        "unknown": 0,
+        "refused": 0,
+        "deferred": 0,
+        "outcomes": [
+          {
+            "intentId": "fe22f248-691d-44ce-b34c-06f03207f751",
+            "result": "SUCCEEDED"
+          }
+        ],
+        "canonicalPending": [],
+        "canonicalUpdates": 1
+      }
+    },
+    {
+      "pass": 2,
+      "flights": {
+        "at": "2026-09-29T12:00:00+09:00",
+        "candidates": 0,
+        "executed": 0,
+        "failed": 0,
+        "unknown": 0,
+        "deferred": 0,
+        "refused": 0,
+        "canonicalUpdates": 0,
+        "canonicalPending": [],
+        "outcomes": []
+      },
+      "stays": {
+        "at": "2026-09-29T12:00:00+09:00",
+        "candidates": 0,
+        "executed": 0,
+        "failed": 0,
+        "unknown": 0,
+        "refused": 0,
+        "deferred": 0,
+        "outcomes": [],
+        "canonicalPending": [],
+        "canonicalUpdates": 0
+      }
+    },
+    {
+      "pass": 3,
+      "flights": {
+        "at": "2026-09-29T12:00:00+09:00",
+        "candidates": 0,
+        "executed": 0,
+        "failed": 0,
+        "unknown": 0,
+        "deferred": 0,
+        "refused": 0,
+        "canonicalUpdates": 0,
+        "canonicalPending": [],
+        "outcomes": []
+      },
+      "stays": {
+        "at": "2026-09-29T12:00:00+09:00",
+        "candidates": 0,
+        "executed": 0,
+        "failed": 0,
+        "unknown": 0,
+        "refused": 0,
+        "deferred": 0,
+        "outcomes": [],
+        "canonicalPending": [],
+        "canonicalUpdates": 0
+      }
+    },
+    {
+      "pass": 4,
+      "flights": {
+        "at": "2026-09-29T12:00:00+09:00",
+        "candidates": 0,
+        "executed": 0,
+        "failed": 0,
+        "unknown": 0,
+        "deferred": 0,
+        "refused": 0,
+        "canonicalUpdates": 0,
+        "canonicalPending": [],
+        "outcomes": []
+      },
+      "stays": {
+        "at": "2026-09-29T12:00:00+09:00",
+        "candidates": 0,
+        "executed": 0,
+        "failed": 0,
+        "unknown": 0,
+        "refused": 0,
+        "deferred": 0,
+        "outcomes": [],
+        "canonicalPending": [],
+        "canonicalUpdates": 0
+      }
+    },
+    {
+      "pass": 5,
+      "flights": {
+        "at": "2026-09-29T12:00:00+09:00",
+        "candidates": 0,
+        "executed": 0,
+        "failed": 0,
+        "unknown": 0,
+        "deferred": 0,
+        "refused": 0,
+        "canonicalUpdates": 0,
+        "canonicalPending": [],
+        "outcomes": []
+      },
+      "stays": {
+        "at": "2026-09-29T12:00:00+09:00",
+        "candidates": 0,
+        "executed": 0,
+        "failed": 0,
+        "unknown": 0,
+        "refused": 0,
+        "deferred": 0,
+        "outcomes": [],
+        "canonicalPending": [],
+        "canonicalUpdates": 0
+      }
+    },
+    {
+      "pass": 6,
+      "flights": {
+        "at": "2026-09-29T12:00:00+09:00",
+        "candidates": 0,
+        "executed": 0,
+        "failed": 0,
+        "unknown": 0,
+        "deferred": 0,
+        "refused": 0,
+        "canonicalUpdates": 0,
+        "canonicalPending": [],
+        "outcomes": []
+      },
+      "stays": {
+        "at": "2026-09-29T12:00:00+09:00",
+        "candidates": 0,
+        "executed": 0,
+        "failed": 0,
+        "unknown": 0,
+        "refused": 0,
+        "deferred": 0,
+        "outcomes": [],
+        "canonicalPending": [],
+        "canonicalUpdates": 0
+      }
+    },
+    {
+      "pass": 7,
+      "flights": {
+        "at": "2026-09-29T12:00:00+09:00",
+        "candidates": 0,
+        "executed": 0,
+        "failed": 0,
+        "unknown": 0,
+        "deferred": 0,
+        "refused": 0,
+        "canonicalUpdates": 0,
+        "canonicalPending": [],
+        "outcomes": []
+      },
+      "stays": {
+        "at": "2026-09-29T12:00:00+09:00",
+        "candidates": 0,
+        "executed": 0,
+        "failed": 0,
+        "unknown": 0,
+        "refused": 0,
+        "deferred": 0,
+        "outcomes": [],
+        "canonicalPending": [],
+        "canonicalUpdates": 0
+      }
+    }
+  ],
+  "afterView": {
+    "status": "CURRENT",
+    "verdict": "PASS"
+  },
+  "resolutionOutcomes": [
+    {
+      "caseId": "193487a7-c3b9-5086-af4d-71a159613454",
+      "status": "RESOLVED",
+      "result": "RESOLVED",
+      "detail": "All 1 case JOURNEY/TRIP subjects CURRENT+PASS after observation/reassessment"
+    }
+  ],
+  "finalCaseStatus": "RESOLVED",
+  "finalTripViability": {
+    "label": "Whole-trip viability",
+    "verdict": "PASS"
+  },
+  "finalVerdict": "CP6_RESOLVED_PASS"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "rec_021516a384b0590bf8a74f075c2f448b",
+  "providerId": "atlas",
+  "operation": "order_create",
+  "recordedAt": "2026-09-23T18:21:09.297Z",
+  "sanitized": true,
+  "raw": {
+    "status": 318,
+    "msg": "Duplicate booking: same passenger + flight already exists. Query orders before rebooking.",
+    "sessionId": "53687007-66a2-4e97-9166-cc17f52528e2",
+    "orderNo": null,
+    "pnrCode": null,
+    "totalPrice": null,
+    "totalTransactionFee": null,
+    "currency": null,
+    "tktLimitTime": null,
+    "paxTicketInfos": null,
+    "routing": null,
+    "duplicateOrders": [
+      "TESTA20260924021509634"
+    ]
+  }
+}

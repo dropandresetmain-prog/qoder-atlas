@@ -1,0 +1,12 @@
+{
+  "id": "rec_b92e556a48e8776d8211605aaeefa27d",
+  "providerId": "atlas",
+  "operation": "search",
+  "recordedAt": "2026-09-23T18:20:09.265Z",
+  "sanitized": true,
+  "raw": {
+    "status": 0,
+    "msg": null,
+    "routings": []
+  }
+}

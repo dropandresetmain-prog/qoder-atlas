@@ -1,0 +1,50 @@
+{
+  "caseStatus": "RESOLVED",
+  "tripViability": {
+    "label": "Whole-trip viability",
+    "verdict": "PASS"
+  },
+  "attempts": [
+    {
+      "capability_ref": "external:offer.select",
+      "status": "OBSERVED_SUCCESS",
+      "request_ref": "atlas:order:TESTA20260924021509634",
+      "response_ref": "atlas:order:TESTA20260924021509634"
+    },
+    {
+      "capability_ref": "external:stay.book",
+      "status": "OBSERVED_SUCCESS",
+      "request_ref": "nuitee:clientref:ns-stay-be52cbf32a60fb6ae7473769",
+      "response_ref": "nuitee:booking:pvFqDBknF"
+    },
+    {
+      "capability_ref": "external:stay.cancel",
+      "status": "OBSERVED_SUCCESS",
+      "request_ref": "nuitee:cancel:DpnZRH43H",
+      "response_ref": "nuitee:cancel:DpnZRH43H"
+    }
+  ],
+  "spa": [
+    {
+      "attempt_id": "cb38294e-9965-4e81-a228-dd9be6f26bac",
+      "command_namespace": "JOURNEY_ITEM_UPDATED",
+      "idempotency_key": "offer-select:10057804-77cc-4cc9-9d49-dab503f7e2c8:select"
+    },
+    {
+      "attempt_id": "4435b536-984c-4b83-acc7-dc4e4766c10a",
+      "command_namespace": "OBSERVED_STAY_ATTACHED",
+      "idempotency_key": "stay:2870b036-0f54-473c-a50e-8fe8ce87834e:attach"
+    },
+    {
+      "attempt_id": "579569ad-1918-4c90-86e8-ea0ee87032ac",
+      "command_namespace": "OBSERVED_STAY_CANCELLED",
+      "idempotency_key": "stay:fe22f248-691d-44ce-b34c-06f03207f751:canonical-cancel"
+    }
+  ],
+  "canonicalTravellerNames": [
+    {
+      "given_name": "Jordan",
+      "family_name": "Hale"
+    }
+  ]
+}
