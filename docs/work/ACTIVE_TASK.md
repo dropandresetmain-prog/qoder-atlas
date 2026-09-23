@@ -80,13 +80,24 @@
   `recoverableStayCredit=0.00` on the recommended strategy's CANCEL_STAY effect.
   All 22 focused economics/seed-truth unit tests + both PG tests pass; `gate:test-boundary` and full
   `tsc --noEmit` are clean.
-- [ ] CP3 (remaining) — Path A/B cost ranking + Case cost UX with fresh evidence. NOTE: Path B UNKNOWN
-  gating already exists from CP1 (`src/resolution/evaluation/evaluators/stayArrivalDateAligned.ts`,
-  `stay_arrival_date_aligned` dimension, `blocking: true`) — no `lateArrivalEvidence` dataset entries
-  exist anywhere for Jordan/lyf-bugis, so `survives` resolves to `null` → UNKNOWN, which should already
-  block Path B from auto-recommendation. Remaining CP3 work is Case cost-UX copy (reference
-  `lane/a5-cp3-case-cost-ux` @ `d9ab9e2`, do not blindly merge) + confirming end-to-end Path A/B ranking
-  behavior in the real Jordan scenario.
+- [x] CP3 complete (`2856a6e` + Case-cost-UX/Path-A-B durable-assertion commit).
+  - Case cost UX (`4ff2efe`'s follow-up, `2856a6e`): reimplemented `lane/a5-cp3-case-cost-ux` cleanly
+    (not merged) on `caseDecisionPresentation.ts`/`product-recovery-case.ts`/`projectPlanningEvidence.ts`.
+    Fixed a real display bug: the CANCEL_STAY compact summary rendered `scheduledCancellationPenalty`
+    (future exposure, never a refund) labelled as the cancelled stay's value — now uses
+    `recoverableStayCredit`. Current fee / future penalty / recoverable value stay visually and
+    textually separate everywhere (note block, cost lines, net-cost line, glance cell, cancelled-stay
+    article). Net cost can render negative (a saving) with a correctly-placed leading minus. Regression
+    test `test/a5-cancel-stay-case-copy.test.ts`.
+  - Path A/B ranking confirmed end-to-end on the real Jordan D3 planning run (no new engine code needed
+    — CP1's `stayArrivalDateAligned` evaluator already gates this correctly): the AWAITING_AUTHORITY
+    planning attempt's `material_candidates` show exactly one `TRANSPORT:RECOMMENDED` candidate (Path A:
+    TR885 + Narita overnight + new Singapore stay + cancel original) and Path B (keep the original
+    booking after late arrival) present as `REJECTED_DETERMINISTIC` with blocker reason
+    `original_stay_late_arrival_survival_unknown` — never silently viable. Added as a durable assertion
+    in `postgres-integration/a5JordanD3Planning.pgtest.ts` (not just observed via a throwaway debug log).
+  - Checks: 16 operator-ui-convergence + 2 new UI regression tests pass; full D3 planning PG test passes
+    with the new Path A/B structural assertions; `gate:test-boundary` and full `tsc --noEmit` clean.
 - [ ] CP4 — focused graph spine + proposed-service preview
 - [ ] CP5 — Chromium D1/D2/D3 acceptance
 - [ ] CP6 — protected sandbox execution → RESOLVED + sanitized recordings + REPLAY proof

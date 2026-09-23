@@ -494,6 +494,25 @@ describe('A5 Jordan D3 planning (composed REPLAY transport research)', () => {
     const summary = stored.rows.map((row) => summarizePlanning(row)).join('\n');
     assert.equal(planned.result.outcome, 'AWAITING_AUTHORITY', summary);
 
+    // Path B (retain the original booking after a late arrival) must be
+    // deterministically rejected as UNKNOWN, never silently recommended, since
+    // Nuitée exposes no machine-readable no-show/late-arrival survival term
+    // and the dataset carries no reviewed evidence for it either.
+    const awaitingAuthorityRow = stored.rows.find((row) => row.outcome === 'AWAITING_AUTHORITY');
+    assert.ok(awaitingAuthorityRow, `no AWAITING_AUTHORITY planning attempt stored: ${summary}`);
+    const finalCandidates = Array.isArray(awaitingAuthorityRow.material_candidates)
+      ? awaitingAuthorityRow.material_candidates as Array<{
+        domainId?: string; disposition?: string;
+        proposal?: { blockers?: Array<{ reasonCode?: string }> };
+      }>
+      : [];
+    const pathBUnknown = finalCandidates.find((candidate) =>
+      candidate.proposal?.blockers?.some((blocker) => blocker.reasonCode === 'original_stay_late_arrival_survival_unknown'));
+    assert.ok(pathBUnknown, `Path B (keep-original-stay) candidate not found: ${summary}`);
+    assert.equal(pathBUnknown.disposition, 'REJECTED_DETERMINISTIC', summary);
+    const recommendedCandidate = finalCandidates.find((candidate) => candidate.disposition === 'RECOMMENDED');
+    assert.ok(recommendedCandidate, `no RECOMMENDED candidate: ${summary}`);
+
     const recommended = await pool.query<{
       strategy_id: string;
       scenario_change: {
