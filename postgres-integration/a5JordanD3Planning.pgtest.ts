@@ -23,10 +23,10 @@ import { composeStayExecution, runExternalStayExecutionCycle, EXTERNAL_STAY_CAPA
 import { provisionWorkspaceAuthority } from '../src/app/target/workspaceAuthority.ts';
 import { loadRecoveryCaseFacts } from '../src/app/target/readmodels/pgFactAssembler.ts';
 import { projectRecoveryCase } from '../src/app/target/readmodels/projectRecoveryCase.ts';
-import { createBudget, createExternalConnection, linkExternalRecord, observeExternalRecord } from '../src/persistence/postgres/commands/arrangementCommands.ts';
+import { createBudget, createExternalConnection } from '../src/persistence/postgres/commands/arrangementCommands.ts';
 import { composeTargetRecoveryResearch } from '../src/app/composeTargetRecoveryResearch.ts';
 import { createPrincipal } from '../src/persistence/postgres/commands/peopleCommands.ts';
-import { addIntendedVisit, selectCredential } from '../src/persistence/postgres/commands/travelCommands.ts';
+import { selectCredential } from '../src/persistence/postgres/commands/travelCommands.ts';
 import { buildTargetTimezoneResolver, composeTargetTransportResearch } from '../src/app/targetTransportResearch.ts';
 import { loadConfig } from '../src/config/config.ts';
 import { PgUnitOfWork } from '../src/persistence/postgres/pgUnitOfWork.ts';
@@ -335,71 +335,10 @@ describe('A5 Jordan D3 planning (composed REPLAY transport research)', () => {
       [workspaceId],
     );
     assert.equal(jurisdiction.rowCount, 1);
-    const eventName = await pool.query<{ name: string }>(
-      `SELECT name FROM events WHERE workspace_id = $1 ORDER BY name LIMIT 1`,
-      [workspaceId],
-    );
-    assert.equal(eventName.rowCount, 1);
-    const journeyHeadForVisit = await pool.query<{ revision: string }>(
-      `SELECT revision::text AS revision FROM aggregate_heads WHERE workspace_id = $1 AND aggregate_id = $2`,
-      [workspaceId, journeyId],
-    );
-    const visitId = randomUUID();
-    const declaredVisit = await addIntendedVisit(new PgUnitOfWork(pool, workspaceId), {
-      workspaceId,
-      actorPrincipalId: ACTOR,
-      idempotencyKey: `a5-jordan-visit:${visitId}`,
-      journeyId,
-      expectedRevision: Number(journeyHeadForVisit.rows[0]!.revision),
-      visit: {
-        id: visitId,
-        jurisdictionId: jurisdiction.rows[0]!.id,
-        purpose: eventName.rows[0]!.name,
-        intendedDates: { start: '2026-09-29T07:00:00.000Z', end: '2026-10-03T03:00:00.000Z' },
-        transitIntent: false,
-      },
-      evidenceRefs: [evidenceIds[0]!],
-    });
-    assert.equal(declaredVisit.ok, true, JSON.stringify(declaredVisit));
-    const connectionHead = await pool.query<{ revision: string }>(
-      `SELECT revision::text AS revision FROM aggregate_heads WHERE workspace_id = $1 AND aggregate_id = $2`,
-      [workspaceId, sourceConnection.rows[0]!.id],
-    );
-    const visitRecordId = randomUUID();
-    const observedVisit = await observeExternalRecord(new PgUnitOfWork(pool, workspaceId), {
-      workspaceId,
-      actorPrincipalId: ACTOR,
-      idempotencyKey: `a5-jordan-visit-record:${visitId}`,
-      connectionId: sourceConnection.rows[0]!.id,
-      expectedRevision: Number(connectionHead.rows[0]!.revision),
-      record: {
-        id: visitRecordId,
-        recordType: 'SOURCE_INTENDED_VISIT',
-        externalId: 'ait-draft-09-singapore-destination',
-        identityState: 'UNVERIFIED',
-        observedAt: '2026-08-25T09:00:00.000Z',
-      },
-    });
-    assert.equal(observedVisit.ok, true, JSON.stringify(observedVisit));
-    if (!observedVisit.ok) return;
-    const linkedVisit = await linkExternalRecord(new PgUnitOfWork(pool, workspaceId), {
-      workspaceId,
-      actorPrincipalId: ACTOR,
-      idempotencyKey: `a5-jordan-visit-link:${visitId}`,
-      connectionId: sourceConnection.rows[0]!.id,
-      expectedRevision: observedVisit.value.connectionRevision,
-      link: {
-        id: randomUUID(),
-        externalRecordId: visitRecordId,
-        canonicalSubject: { kind: 'JOURNEY', id: journeyId },
-        linkKind: 'SYSTEM_OF_RECORD',
-        evidenceId: evidenceIds[0]!,
-      },
-    });
-    assert.equal(linkedVisit.ok, true, JSON.stringify(linkedVisit));
-    const visitDrain = await new PgReassessmentWorker(pool, { actorId: ACTOR })
-      .drainAvailable(d3.at, pipeline, { workspaceId, maxItems: 100, maxMs: 60_000 });
-    assert.equal(visitDrain.stoppedReason, 'EMPTY', JSON.stringify(visitDrain));
+    // Fixture + prepareBaselineExistingVisits already declared the Singapore
+    // intended visit, bound the SG passport, and published reviewed entry
+    // coverage. Re-declaring the same SOURCE_INTENDED_VISIT external id would
+    // conflict; reuse the fixture visit identity.
     const visit = await pool.query<{ id: string }>(
       `SELECT id FROM intended_visits
         WHERE workspace_id = $1 AND journey_id = $2 AND transit_intent = false`,
