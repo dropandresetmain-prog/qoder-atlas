@@ -28,7 +28,7 @@ import {
 import type { DemoControlCatalog, DemoControlDefinition } from './demoControlCatalog.ts';
 
 /** Demo-boundary hold between displaced bookings and airline reprotection. */
-export const DEMO_DISRUPTION_STAGE_HOLD_MS = 12_000;
+export const DEMO_DISRUPTION_STAGE_HOLD_MS = 6_000;
 
 export interface DemoControlApplyDeps {
   pool: Pool;

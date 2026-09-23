@@ -114,6 +114,14 @@ function populationRow(entry: OperatorOverview['population'][number], issueOverr
       <a class="traveller-link" href="${e(travellerHref(entry.journeyRef))}" data-test="population-traveller-link" data-journey-ref="${e(entry.journeyRef)}">Traveller view</a></span></div></div>`;
 }
 const ROSTER_RANK: Record<ProductOperationalStatus, number> = { DISRUPTED: 0, RECOVERING: 1, AT_RISK: 2, UNKNOWN: 3, READY: 4 };
+/** Attention rail: red/open work first; recovered READY rows do not bury open cases. */
+const ATTENTION_RANK: Record<ProductOperationalStatus, number> = {
+  DISRUPTED: 0,
+  RECOVERING: 1,
+  AT_RISK: 2,
+  UNKNOWN: 3,
+  READY: 4,
+};
 function dedupeQueue(items: readonly OperatorOverviewItem[]): OperatorOverviewItem[] {
   const seen = new Set<string>();
   return items.filter((item) => {
@@ -121,6 +129,16 @@ function dedupeQueue(items: readonly OperatorOverviewItem[]): OperatorOverviewIt
     if (seen.has(key)) return false;
     seen.add(key); return true;
   });
+}
+function attentionQueue(items: readonly OperatorOverviewItem[]): OperatorOverviewItem[] {
+  // "Needs attention" is for open work. Recovered READY cases stay off this rail
+  // so a newly red traveller is never buried under resolved peers.
+  return dedupeQueue(items)
+    .filter((item) => item.status !== 'READY')
+    .sort((a, b) => ATTENTION_RANK[a.status] - ATTENTION_RANK[b.status]
+      || Number(b.decisionRequired) - Number(a.decisionRequired)
+      || a.travellerLabel.localeCompare(b.travellerLabel)
+      || a.tripRef.localeCompare(b.tripRef));
 }
 /** Keep every population member; a case in the work queue does not remove them. */
 function rosterEntries(view: OperatorOverview, queue: readonly OperatorOverviewItem[]) {
@@ -146,13 +164,13 @@ export const ROSTER_PAGE_SIZE = 10;
 export function adaptOperatorOverviewToDashboard(view: OperatorOverview): ProductSurfaceModel {
   const counted = countedSet(view), decisions = view.items.filter((item) => item.decisionRequired).length;
   const summaryHtml = compactReadiness(counted);
-  const queue = dedupeQueue(view.items);
+  const queue = attentionQueue(view.items);
   const decisionNote = decisions > 0
     ? `<p class="sub" data-test="decisions-needed">${decisions === 1 ? 'One case is' : `${decisions} cases are`} waiting on your decision.</p>`
     : '';
   const attentionHtml = `${decisionNote}${queue.length ? `<div class="queue" data-test="product-overview-queue">${queue.map(overviewItemRow).join('')}</div>`
     : '<p class="empty-note" data-test="no-open-cases">Nothing needs attention right now.</p>'}`;
-  const roster = rosterEntries(view, queue);
+  const roster = rosterEntries(view, dedupeQueue(view.items));
   const rows = roster.map(({ entry, issue }, index) => {
     const row = populationRow(entry, issue);
     return index < ROSTER_PAGE_SIZE ? row : row.replace(' data-test="population-row"', ' data-test="population-row" hidden style="display:none"');

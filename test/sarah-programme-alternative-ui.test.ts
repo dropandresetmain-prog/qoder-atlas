@@ -14,10 +14,10 @@ import { renderProductRecoveryCase } from '../src/ui/screens/product-recovery-ca
 const AT = '2026-09-23T02:00:00.000Z';
 const CASE_REF = '11111111-1111-4111-8111-111111111111';
 
-test('demo disruption stage hold is ~10 seconds at the provider-input boundary', () => {
+test('demo disruption stage hold is ~6 seconds at the provider-input boundary', () => {
   assert.ok(
-    DEMO_DISRUPTION_STAGE_HOLD_MS >= 10_000 && DEMO_DISRUPTION_STAGE_HOLD_MS <= 15_000,
-    `expected ~10s demo hold, got ${DEMO_DISRUPTION_STAGE_HOLD_MS}`,
+    DEMO_DISRUPTION_STAGE_HOLD_MS >= 5_000 && DEMO_DISRUPTION_STAGE_HOLD_MS <= 8_000,
+    `expected ~6s demo hold, got ${DEMO_DISRUPTION_STAGE_HOLD_MS}`,
   );
 });
 
@@ -68,6 +68,7 @@ function mixedCaseFacts(): RecoveryCaseFacts {
             effectKind: 'CHANGE_PROGRAMME_ITEM_TIME',
             subjectRef: 'PROGRAMME_ITEM:headline',
             subjectLabel: 'Headline Interview',
+            personLabel: 'Speaker One',
             timeZone: 'Asia/Singapore',
             currentWindow: { start: '2026-10-01T03:30:00.000Z', end: '2026-10-01T04:00:00.000Z' },
             proposedWindow: { start: '2026-10-01T05:30:00.000Z', end: '2026-10-01T06:00:00.000Z' },
@@ -75,7 +76,8 @@ function mixedCaseFacts(): RecoveryCaseFacts {
           {
             effectKind: 'CHANGE_PROGRAMME_ITEM_TIME',
             subjectRef: 'PROGRAMME_ITEM:host',
-            subjectLabel: 'Local host session',
+            subjectLabel: 'Operator Marketplace Roundtable',
+            personLabel: 'Local Host',
             timeZone: 'Asia/Singapore',
             currentWindow: { start: '2026-10-01T05:30:00.000Z', end: '2026-10-01T06:00:00.000Z' },
             proposedWindow: { start: '2026-10-01T03:30:00.000Z', end: '2026-10-01T04:00:00.000Z' },
@@ -203,9 +205,12 @@ test('programme impact modal source contains evidence and sole programme approve
   assert.match(html, /data-test="programme-impact-source"/);
   assert.match(html, /data-test="programme-what-changes"/);
   assert.match(html, /Headline Interview/);
-  assert.match(html, /Local host session/);
+  assert.match(html, /Operator Marketplace Roundtable/);
+  assert.match(html, /data-test="programme-change-person"[^>]*>Speaker One</);
+  assert.match(html, /data-test="programme-change-person"[^>]*>Local Host</);
   assert.match(html, /data-test="programme-panel-who"/);
   assert.match(html, /data-test="programme-direct-people"/);
+  assert.match(html, /2 people affected/);
   assert.match(html, /Speaker One/);
   assert.match(html, /Local Host/);
   assert.match(html, /data-test="programme-new-spend"/);
@@ -213,8 +218,10 @@ test('programme impact modal source contains evidence and sole programme approve
   assert.match(html, /420\.00/);
   assert.match(html, /data-test="programme-blast-direct"/);
   assert.match(html, /data-test="programme-blast-reassess"/);
-  assert.match(html, /Unrelated trip rechecked/);
-  assert.match(html, /Northstar also rechecked/);
+  assert.match(html, /data-test="programme-recheck-summary"/);
+  assert.match(html, /Also checked/);
+  assert.doesNotMatch(html, /Journey<\/li>\s*<li>Journey/);
+  assert.doesNotMatch(html, /blast radius|Provider-derived|programme slots/i);
   assert.match(html, /data-test="approve-programme-change"/);
   assert.match(html, /data-strategy-ref="strat-programme"[^>]*data-action="recover"|data-action="recover"[^>]*data-strategy-ref="strat-programme"/);
 

@@ -368,6 +368,52 @@ test('operator overview keeps attention queue and full managed population', () =
   assert.match(html, /Traveller 002/);
 });
 
+test('attention rail sorts disrupted cases above recovered READY cases', () => {
+  const facts: OperatorOverviewFacts = {
+    generatedAt: '2031-03-10T08:00:00.000Z',
+    projectionRevision: 1,
+    changedVisibleRefs: [],
+    changedEdgeIds: [],
+    currentSemanticState: 'AFFECTED',
+    nodes: [],
+    edges: [],
+    items: [
+      {
+        tripRef: 'TRIP:ready',
+        travellerLabel: 'AAA Recovered',
+        status: 'READY',
+        remainderViability: 'VIABLE',
+        caseRef: 'CASE:ready',
+        affectedPeople: [],
+        affectedItems: [],
+        decisionRequired: false,
+        unresolvedUncertainty: [],
+      },
+      {
+        tripRef: 'TRIP:red',
+        travellerLabel: 'ZZZ Needs Attention',
+        status: 'DISRUPTED',
+        remainderViability: 'NOT_VIABLE',
+        caseRef: 'CASE:red',
+        affectedPeople: [],
+        affectedItems: [],
+        decisionRequired: true,
+        unresolvedUncertainty: [],
+      },
+    ],
+    population: [
+      pop(1, 'DISRUPTED', 'CURRENT', { caseRef: 'CASE:red' }),
+      pop(2, 'READY', 'CURRENT', { caseRef: 'CASE:ready' }),
+    ],
+    eventOverviewSource: baseSource(2),
+  };
+  const surface = adaptOperatorOverviewToDashboard(projectOperatorOverview(facts));
+  assert.equal(surface.attentionCount, 1);
+  assert.match(surface.attentionHtml, /ZZZ Needs Attention/);
+  assert.doesNotMatch(surface.attentionHtml, /AAA Recovered/);
+  assert.match(surface.attentionHtml, /CASE:red/);
+});
+
 function geometryNode(id: string, kind: OgNode['kind'], dayIndex?: number): OgNode {
   return {
     id,

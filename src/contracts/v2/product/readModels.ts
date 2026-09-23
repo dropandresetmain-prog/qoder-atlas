@@ -190,6 +190,11 @@ export const RecoveryStrategyChangeViewSchema = z.strictObject({
    * canonical state has no title for it — never an invented name.
    */
   subjectLabel: z.string().min(1),
+  /**
+   * Required participant display name for programme-item time moves, when
+   * participation truth supplies one. Presentation only — not invented.
+   */
+  personLabel: z.string().min(1).optional(),
   /** Canonical programme item's IANA zone, or UTC when no zone is available. */
   timeZone: z.string().min(1).optional(),
   /** Canonical window before the change, when the subject has one. */

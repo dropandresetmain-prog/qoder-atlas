@@ -269,11 +269,11 @@ try {
   }
   if (!evidence.stageB) fail('stage-b-not-visible', { snap: await overviewSnapshot() });
 
-  // Duration check: Stage A should be roughly 10s (allow 7–18s from trigger to B)
+  // Duration check: Stage A should be roughly 6s (allow 4–14s from trigger to B)
   const holdMs = evidence.stageB.elapsedFromTriggerMs;
   evidence.stageA.measuredHoldApproxMs = holdMs;
-  if (holdMs < 7000) {
-    fail('stage-a-too-short', { holdMs, expectedApprox: 10000 });
+  if (holdMs < 4000) {
+    fail('stage-a-too-short', { holdMs, expectedApprox: 6000 });
   }
   note('stage-timing', { holdMs, stageAFirstPaintMs: stageASeen.elapsedMs });
 

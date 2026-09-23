@@ -513,6 +513,7 @@ async function projectCaseStrategies(
   // 4. Canonical programme state for the items those effects move, so the
   //    option can state current-vs-proposed timing rather than an id.
   const programmeItems = new Map<string, { title: string; timeZone?: string; window?: { start: string; end: string } }>();
+  const programmeParticipants = new Map<string, string>();
   if (programmeItemIds.size > 0) {
     const items = await client.query<{ id: string; title: string; window_start: Date | null; window_end: Date | null; time_zone: string | null }>(
       `SELECT id, title, window_start, window_end, time_zone
@@ -529,6 +530,24 @@ async function projectCaseStrategies(
           : {}),
       });
     }
+    // Required accepted participants — presentation labels for programme moves.
+    const participants = await client.query<{ programme_item_id: string; display_value: string }>(
+      `SELECT p.programme_item_id, n.display_value
+         FROM participations p
+         JOIN travellers t ON t.workspace_id = p.workspace_id AND t.id = p.traveller_id
+         JOIN traveller_names n ON n.workspace_id = t.workspace_id AND n.id = t.display_name_ref
+        WHERE p.workspace_id = $1
+          AND p.programme_item_id = ANY($2::uuid[])
+          AND p.accepted = true
+          AND p.obligation = 'REQUIRED'
+        ORDER BY p.programme_item_id, n.display_value`,
+      [workspaceId, [...programmeItemIds]],
+    );
+    for (const row of participants.rows) {
+      if (!programmeParticipants.has(row.programme_item_id)) {
+        programmeParticipants.set(row.programme_item_id, row.display_value);
+      }
+    }
   }
 
   // 5. The case subjects that are blocking right now. "Who does this fix" is
@@ -539,14 +558,17 @@ async function projectCaseStrategies(
     const summaries = summariesByStrategy.get(row.id) ?? [];
     const verdictByRef = new Map(summaries.map((entry) => [entry.subjectRef, entry.verdict]));
     const changes: RecoveryStrategyChangeFact[] = (effectsByStrategy.get(row.id) ?? []).map((effect) => {
-      const item = effect.subjectRef?.startsWith('PROGRAMME_ITEM:')
-        ? programmeItems.get(effect.subjectRef.slice('PROGRAMME_ITEM:'.length))
+      const itemId = effect.subjectRef?.startsWith('PROGRAMME_ITEM:')
+        ? effect.subjectRef.slice('PROGRAMME_ITEM:'.length)
         : undefined;
+      const item = itemId ? programmeItems.get(itemId) : undefined;
+      const personLabel = itemId ? programmeParticipants.get(itemId) : undefined;
       const subjectRef = effect.subjectRef ?? `${row.id}:${effect.effectKind}`;
       return {
         effectKind: effect.effectKind,
         subjectRef,
         subjectLabel: item?.title ?? subjectRef,
+        ...(personLabel ? { personLabel } : {}),
         ...(item?.timeZone ? { timeZone: item.timeZone } : {}),
         ...(item?.window ? { currentWindow: item.window } : {}),
         ...(effect.proposedWindow ? { proposedWindow: effect.proposedWindow } : {}),

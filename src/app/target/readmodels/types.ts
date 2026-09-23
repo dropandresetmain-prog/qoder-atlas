@@ -199,6 +199,8 @@ export interface RecoveryStrategyChangeFact {
   effectKind: string;
   subjectRef: string;
   subjectLabel: string;
+  /** Required participant for a programme-item move, when participation exists. */
+  personLabel?: string;
   timeZone?: string;
   currentWindow?: { start: string; end: string };
   proposedWindow?: { start: string; end: string };

@@ -338,10 +338,9 @@ function programmeSpendLabel(candidate: PlanningCandidateView | undefined): stri
 function programmeChangeRowsHtml(strategy: RecoveryStrategyView): string {
   const moves = strategy.changes.filter((change) => change.effectKind === 'CHANGE_PROGRAMME_ITEM_TIME' && change.proposedWindow);
   if (!moves.length) return '<p class="cw-muted">No programme time changes were recorded on this strategy.</p>';
-  const people = strategy.resolves.map((person) => decisionText(person.personLabel, '')).filter(Boolean);
-  return `<div class="v5-programme-changes" data-test="programme-what-changes">${moves.map((change, index) => {
-    const title = decisionText(change.subjectLabel, 'Programme item');
-    const person = people[index] ?? people[0];
+  return `<div class="v5-programme-changes" data-test="programme-what-changes">${moves.map((change) => {
+    const title = decisionText(change.subjectLabel, 'Programme session');
+    const person = decisionText(change.personLabel, '');
     const zone = change.timeZone;
     const from = change.currentWindow
       ? decisionTime(change.currentWindow.start, zone)
@@ -358,11 +357,19 @@ function programmeChangeRowsHtml(strategy: RecoveryStrategyView): string {
 function programmeImpactBodyHtml(view: RecoveryCaseView, strategy: RecoveryStrategyView, travelComparators: readonly RecoveryStrategyView[]): string {
   const candidate = candidateFor(view, strategy);
   const blast = candidate?.blastRadius;
-  const directPeople = (blast?.directlyAffected ?? []).map((item) => decisionText(item.label, 'Participant')).filter(Boolean);
-  const directItems = (blast?.changed ?? []).map((item) => decisionText(item.label, 'Changed item')).filter(Boolean);
-  const reassessed = (blast?.reassessed ?? []).map((item) => decisionText(item.label, 'Rechecked')).filter(Boolean);
+  const moves = strategy.changes.filter((change) => change.effectKind === 'CHANGE_PROGRAMME_ITEM_TIME' && change.proposedWindow);
+  const peopleFromMoves = moves
+    .map((change) => decisionText(change.personLabel, ''))
+    .filter(Boolean);
+  const peopleFromBlast = (blast?.directlyAffected ?? [])
+    .map((item) => decisionText(item.label, ''))
+    .filter((label) => label.length > 0 && !/^JOURNEY:|^TRAVELLER:|^Programme item$/i.test(label) && label.toLowerCase() !== 'journey');
+  const directPeople = [...new Set([...peopleFromMoves, ...peopleFromBlast])];
+  const directSessions = moves
+    .map((change) => decisionText(change.subjectLabel, ''))
+    .filter(Boolean);
+  const itemCount = Math.max(directSessions.length, moves.length);
   const peopleCount = directPeople.length;
-  const itemCount = Math.max(directItems.length, strategy.changes.filter((c) => c.effectKind === 'CHANGE_PROGRAMME_ITEM_TIME').length);
   const spend = decisionCosts(candidate?.costComparison);
   const programmeSpend = spend.unavailable ? 'Not compared' : (spend.newSpend?.join(' + ') ?? 'SGD 0');
   const travelCompare = travelComparators
@@ -375,28 +382,26 @@ function programmeImpactBodyHtml(view: RecoveryCaseView, strategy: RecoveryStrat
   const restored = strategy.resolves
     .filter((person) => person.currentVerdict !== 'PASS' && person.projectedVerdict === 'PASS')
     .map((person) => decisionText(person.personLabel, 'the affected traveller'));
-  const restoredLabel = restored[0] ?? 'the affected traveller';
-  const slotCount = strategy.changes.filter((c) => c.effectKind === 'CHANGE_PROGRAMME_ITEM_TIME').length;
+  const restoredLabel = restored[0] ?? directPeople[0] ?? 'the affected traveller';
+  const slotCount = moves.length;
   const subcopy = slotCount >= 2
-    ? `Northstar found a lower-cost way to keep ${restoredLabel}'s trip viable by moving ${slotCount} programme slots.`
-    : `Northstar found a lower-cost way to keep ${restoredLabel}'s trip viable by adjusting the programme.`;
-  const basis = (view.planningEvidence?.recommendation?.basis ?? [])
-    .map((b) => decisionText(b.summary, ''))
-    .filter((text) => text.length > 0 && text.length <= 240)
-    .slice(0, 4);
+    ? `Northstar found a lower-cost way to keep ${restoredLabel}'s trip on track by swapping ${slotCount} programme sessions.`
+    : `Northstar found a lower-cost way to keep ${restoredLabel}'s trip on track by adjusting the programme.`;
   const why = [
-    ...strategy.resolves
-      .filter((person) => person.currentVerdict !== 'PASS' && person.projectedVerdict === 'PASS')
-      .map((person) => `Restores ${decisionText(person.personLabel, 'the affected traveller')}'s required commitment`),
-    programmeSpend === 'SGD 0' || programmeSpend === 'Not compared' ? 'No new spend on this programme change' : `New spend ${programmeSpend}`,
-    peopleCount || itemCount
-      ? `Bounded direct blast radius · ${peopleCount || '—'} ${peopleCount === 1 ? 'person' : 'people'} · ${itemCount || '—'} programme ${itemCount === 1 ? 'item' : 'items'}`
-      : 'Direct blast radius recorded on the candidate',
+    ...restored.map((name) => `Restores ${name}'s required commitment`),
+    programmeSpend === 'SGD 0' || programmeSpend === 'Not compared'
+      ? 'No new spend'
+      : `New spend ${programmeSpend}`,
+    peopleCount >= 2 || itemCount >= 2
+      ? `Affects ${peopleCount || itemCount} ${peopleCount === 1 ? 'person' : 'people'} and ${itemCount} programme ${itemCount === 1 ? 'session' : 'sessions'}`
+      : peopleCount === 1
+        ? 'Limited to the people on those sessions'
+        : 'Limited programme impact',
     strategy.projectedSummary.fail === 0
-      ? 'No new failing trips after reassessment'
-      : `${strategy.projectedSummary.fail} projected failure${strategy.projectedSummary.fail === 1 ? '' : 's'} remain after reassessment`,
-    ...basis,
-  ].slice(0, 5);
+      ? 'No other trips broken by this change'
+      : `${strategy.projectedSummary.fail} trip${strategy.projectedSummary.fail === 1 ? '' : 's'} still need attention after this change`,
+  ].slice(0, 4);
+  const reassessCount = blast?.reassessed?.length ?? 0;
   let approve = '';
   if (view.status === 'AWAITING_AUTHORITY' || view.status === 'OPEN') {
     if (strategy.executionBlocker) {
@@ -411,31 +416,32 @@ function programmeImpactBodyHtml(view: RecoveryCaseView, strategy: RecoveryStrat
     <section data-test="programme-panel-what-changes"><h3>What changes</h3>${programmeChangeRowsHtml(strategy)}</section>
     <section data-test="programme-panel-who"><h3>Direct impact</h3>
       <p class="v5-programme-impact-counts"><strong data-test="programme-direct-people">${peopleCount || '—'} ${peopleCount === 1 ? 'person' : 'people'} affected</strong>
-        <strong data-test="programme-direct-items">${itemCount || '—'} programme ${itemCount === 1 ? 'item' : 'items'} changed</strong></p>
+        <strong data-test="programme-direct-items">${itemCount || '—'} programme ${itemCount === 1 ? 'session' : 'sessions'} changed</strong></p>
       ${directPeople.length ? list(directPeople) : '<p class="cw-muted">Direct participants were not named on this candidate.</p>'}
     </section>
     <section data-test="programme-panel-economics"><h3>Cost comparison</h3>
       <div class="cw-metrics" data-test="programme-cost-compare">
         <div class="cw-metric" data-test="programme-new-spend"><small>PROGRAMME CHANGE</small><strong>${e(programmeSpend)}</strong><span class="cw-metric-note">New spend</span></div>
         ${travelCompare
-          ? `<div class="cw-metric" data-test="travel-compare-spend"><small>TRAVEL RECOVERY</small><strong>${e(travelCompare)}</strong><span class="cw-metric-note">Provider-derived comparable</span></div>`
+          ? `<div class="cw-metric" data-test="travel-compare-spend"><small>TRAVEL RECOVERY</small><strong>${e(travelCompare)}</strong><span class="cw-metric-note">Rebooking cost</span></div>`
           : '<p class="cw-muted">No priced travel alternative is available to compare.</p>'}
       </div>
     </section>
     <section data-test="programme-panel-why"><h3>Why Northstar surfaced this</h3>${list(why)}</section>
     <section data-test="programme-panel-blast">
-      <div data-test="programme-blast-direct"><h3>Direct changes</h3>
-        ${directItems.length || directPeople.length
-          ? list([
-            ...directItems.map((label) => `Programme item · ${label}`),
-            ...directPeople.map((label) => `Participant · ${label}`),
-          ])
+      <div data-test="programme-blast-direct"><h3>Who is moved</h3>
+        ${moves.length
+          ? list(moves.map((change) => {
+            const title = decisionText(change.subjectLabel, 'Programme session');
+            const person = decisionText(change.personLabel, '');
+            return person ? `${person} · ${title}` : title;
+          }))
           : '<p class="cw-muted">No direct change set was recorded.</p>'}
       </div>
-      <div data-test="programme-blast-reassess"><h3>Northstar also rechecked</h3>
-        ${reassessed.length
-          ? `<p class="cw-muted">Broader journeys/trips checked for regressions — not directly changed.</p>${list(reassessed)}`
-          : '<p class="cw-muted">No broader reassessment set was recorded.</p>'}
+      <div data-test="programme-blast-reassess"><h3>Also checked</h3>
+        ${reassessCount > 0
+          ? `<p class="cw-muted" data-test="programme-recheck-summary">Northstar also rechecked ${reassessCount} other trip${reassessCount === 1 ? '' : 's'} for side effects — they are not directly changed.</p>`
+          : '<p class="cw-muted">No broader recheck set was recorded.</p>'}
       </div>
     </section>
     <section class="v5-programme-approve" data-test="programme-panel-approve">

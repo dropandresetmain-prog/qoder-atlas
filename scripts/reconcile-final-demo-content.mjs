@@ -512,7 +512,7 @@ function findCmt(id) {
     localHost = {
       id: 'cmt-ait-d1-local-host-session',
       anchorEventId: 'evt-ait-2026',
-      title: 'Local host session — operator marketplace',
+      title: 'Operator Marketplace Roundtable',
       kind: 'SESSION',
       startsAt: timed('2026-10-01T14:30:00+08:00'),
       endsAt: timed('2026-10-01T15:00:00+08:00'),
@@ -522,7 +522,7 @@ function findCmt(id) {
   } else {
     localHost.anchorEventId = localHost.anchorEventId || 'evt-ait-2026';
     localHost.kind = localHost.kind || 'SESSION';
-    localHost.title = 'Local host session — operator marketplace';
+    localHost.title = 'Operator Marketplace Roundtable';
     localHost.startsAt = timed('2026-10-01T14:30:00+08:00');
     localHost.endsAt = timed('2026-10-01T15:00:00+08:00');
     localHost.placeId = 'place-mbs';
