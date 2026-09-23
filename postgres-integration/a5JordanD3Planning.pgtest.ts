@@ -6,7 +6,7 @@
  */
 import { after, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -25,7 +25,6 @@ import { loadRecoveryCaseFacts } from '../src/app/target/readmodels/pgFactAssemb
 import { projectRecoveryCase } from '../src/app/target/readmodels/projectRecoveryCase.ts';
 import { createBudget, createExternalConnection, linkExternalRecord, observeExternalRecord } from '../src/persistence/postgres/commands/arrangementCommands.ts';
 import { composeTargetRecoveryResearch } from '../src/app/composeTargetRecoveryResearch.ts';
-import { provisionSandboxExecutionInputs } from '../src/app/demo/sandboxExecutionInputs.ts';
 import { createPrincipal } from '../src/persistence/postgres/commands/peopleCommands.ts';
 import { addIntendedVisit, selectCredential } from '../src/persistence/postgres/commands/travelCommands.ts';
 import { buildTargetTimezoneResolver, composeTargetTransportResearch } from '../src/app/targetTransportResearch.ts';
@@ -258,43 +257,23 @@ describe('A5 Jordan D3 planning (composed REPLAY transport research)', () => {
       [workspaceId],
     );
     assert.equal(sourceConnection.rowCount, 1);
-    const credentialId = randomUUID();
-    const versionId = randomUUID();
-    const provisioned = await provisionSandboxExecutionInputs({
-      db: pool,
-      uow: () => new PgUnitOfWork(pool, workspaceId),
-      workspaceId,
-      actorPrincipalId: ACTOR,
-      connectionId: sourceConnection.rows[0]!.id,
-      documentKey: randomBytes(32),
-      documentKeyId: 'a5-jordan-sandbox-passport',
-      env: { ATLAS_ENV: 'sandbox', NORTHSTAR_SYNTHETIC_SANDBOX_INPUTS: '1' },
-      input: {
-        schemaVersion: 1,
-        sandbox: { environment: 'sandbox', marker: 'synthetic-sandbox-inputs' },
-        travellers: [{
-          sourceRef: 'SOURCE_TRAVELLER_DRAFT:ait-draft-09',
-          bookingIdentity: {
-            gender: 'MALE',
-            contactEmail: 'jordan.hale@pacificrim.test',
-            nationality: 'SG',
-          },
-          passport: {
-            credentialId,
-            versionId,
-            syntheticDocumentMarker: 'NORTHSTAR-SYNTHETIC-NOT-VALID-FOR-TRAVEL-ait-draft-09',
-            issuerCountry: 'SG',
-            issueDate: '2020-01-01',
-            expiryDate: '2030-01-01',
-            issuerStatus: 'VALID',
-            physicallyAvailable: true,
-            observedAt: '2026-09-21T01:40:00+00:00',
-          },
-        }],
-        budgets: [],
-      },
-    });
-    assert.equal(provisioned.passportsCreated, 1, JSON.stringify(provisioned));
+    // Fixture build already provisioned Jordan's synthetic sandbox passport
+    // (prepareAitBaselineReadiness). Re-provisioning with a different document
+    // key hits KEY_ID_MISMATCH on the same content hash — assert reuse instead.
+    const existingPassport = await pool.query<{ credential_id: string; version_id: string }>(
+      `SELECT tc.id AS credential_id, tc.current_version_id AS version_id
+         FROM travel_credentials tc
+         JOIN travellers t ON t.workspace_id = tc.workspace_id AND t.id = tc.traveller_id
+         JOIN external_record_links l
+           ON l.workspace_id = t.workspace_id AND l.canonical_subject_kind = 'TRAVELLER'
+          AND l.canonical_subject_id = t.id AND l.superseded_at IS NULL
+         JOIN external_records r ON r.workspace_id = l.workspace_id AND r.id = l.external_record_id
+        WHERE tc.workspace_id = $1 AND tc.kind = 'PASSPORT' AND tc.issuer_country = 'SG'
+          AND r.record_type = 'SOURCE_TRAVELLER_DRAFT' AND r.external_id = 'ait-draft-09'`,
+      [workspaceId],
+    );
+    assert.equal(existingPassport.rowCount, 1, 'fixture sandbox passport for Jordan must already exist');
+    assert.equal(existingPassport.rows[0]!.credential_id, '6f1c0a2e-7b44-4c1a-9d3e-2a8b5c6d7e01');
     const passportDrain = await new PgReassessmentWorker(pool, { actorId: ACTOR })
       .drainAvailable(d3.at, pipeline, { workspaceId, maxItems: 100, maxMs: 60_000 });
     assert.equal(passportDrain.stoppedReason, 'EMPTY', JSON.stringify(passportDrain));

@@ -23,14 +23,17 @@ import { createSwappablePool, type SwappablePoolHandle } from '../../persistence
 import {
   computeDemoBaselineIdentity,
   fingerprintMigrationsDirectory,
+  hashFileContent,
   hashOptionalFileContent,
 } from './demoBaselineIdentity.ts';
 import { loadDataset, datasetDirectoryFromEnv } from './datasetLoader.ts';
 import { provisionDataset } from './provisionDataset.ts';
 import { provisionDatasetSandboxInputsIfEnabled } from './sandboxExecutionInputs.ts';
 import { runBaselineEvaluation } from './baselineEvaluation.ts';
-import { provisionWorkspaceAuthority } from '../target/workspaceAuthority.ts';
+import { prepareBaselineExistingVisits } from './prepareBaselineExistingVisits.ts';
+import { provisionWorkspaceAuthority, workspacePrincipalId } from '../target/workspaceAuthority.ts';
 import { PgUnitOfWork } from '../../persistence/postgres/pgUnitOfWork.ts';
+import { loadConfig } from '../../config/config.ts';
 
 /** Frozen template databases for the product demo baseline. */
 export const DEMO_TEMPLATE_DB_PREFIX = 'ns_demo_fx_';
@@ -38,6 +41,7 @@ export const DEMO_TEMPLATE_DB_PREFIX = 'ns_demo_fx_';
 export const DEMO_CLONE_DB_PREFIX = 'ns_demo_cl_';
 
 const DEFAULT_MIGRATIONS_DIR = fileURLToPath(new URL('../../persistence/postgres/migrations/', import.meta.url));
+const BASELINE_READINESS_MODULE = fileURLToPath(new URL('./prepareBaselineExistingVisits.ts', import.meta.url));
 
 export interface DemoRuntimeSession {
   templateDatabaseName: string;
@@ -85,12 +89,14 @@ async function resolveBaselineIdentity(params: {
     || join(params.datasetDirectory, 'recovery-research.json');
   const sandboxInputsHash = await hashOptionalFileContent(sandboxPath);
   const researchConfigHash = await hashOptionalFileContent(researchPath);
+  const baselineReadinessHash = await hashFileContent(BASELINE_READINESS_MODULE);
   return {
     identity: computeDemoBaselineIdentity({
       migrationsFingerprint,
       datasetContentHash: params.datasetContentHash,
       ...(sandboxInputsHash ? { sandboxInputsHash } : {}),
       ...(researchConfigHash ? { researchConfigHash } : {}),
+      baselineReadinessHash,
     }),
     ...(sandboxInputsHash ? { sandboxInputsHash } : {}),
     ...(researchConfigHash ? { researchConfigHash } : {}),
@@ -174,12 +180,35 @@ async function buildTemplateDatabase(params: {
       datasetKey,
       env: params.env,
     });
+    // Reviewed entry publication requires a registered PRINCIPAL UUID issuer —
+    // provision operator/executor before binding existing-visit readiness.
+    await provisionWorkspaceAuthority({
+      pool,
+      uow: () => new PgUnitOfWork(pool, params.workspaceId),
+      workspaceId: params.workspaceId,
+      actorPrincipalId: params.actorPrincipalId,
+      now: new Date().toISOString(),
+      operatorAuthSubject: params.env.NORTHSTAR_OPERATOR_AUTH_SUBJECT?.trim() || undefined,
+    });
+    await prepareBaselineExistingVisits({
+      pool,
+      workspaceId: params.workspaceId,
+      actorPrincipalId: params.actorPrincipalId,
+      reviewerPrincipalId: workspacePrincipalId(params.workspaceId, 'operator'),
+      uow: () => new PgUnitOfWork(pool, params.workspaceId),
+      config: loadConfig(params.env),
+      cwd: process.cwd(),
+      datasetDirectory: params.datasetDirectory,
+      now: new Date().toISOString(),
+    });
     const baseline = await runBaselineEvaluation({
       pool,
       workspaceId: params.workspaceId,
       actorPrincipalId: params.actorPrincipalId,
     });
     baselineEvaluated = baseline.evaluated;
+    // Idempotent re-run after baseline so coverage stays complete if subjects
+    // appeared during evaluation (same pattern as composeTargetBoot).
     await provisionWorkspaceAuthority({
       pool,
       uow: () => new PgUnitOfWork(pool, params.workspaceId),

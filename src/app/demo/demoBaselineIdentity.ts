@@ -14,6 +14,8 @@ export interface DemoBaselineIdentityInput {
   datasetContentHash: string;
   sandboxInputsHash?: string;
   researchConfigHash?: string;
+  /** Boot-time visit/entry readiness composition that stamps baseline assessments. */
+  baselineReadinessHash?: string;
 }
 
 /** Stable sha256 digest over baseline component hashes (labeled, ordered). */
@@ -30,6 +32,10 @@ export function computeDemoBaselineIdentity(input: DemoBaselineIdentityInput): s
   if (input.researchConfigHash !== undefined) {
     hash.update('\0research\0');
     hash.update(input.researchConfigHash);
+  }
+  if (input.baselineReadinessHash !== undefined) {
+    hash.update('\0baseline-readiness\0');
+    hash.update(input.baselineReadinessHash);
   }
   return hash.digest('hex');
 }

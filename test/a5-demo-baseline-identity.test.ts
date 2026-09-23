@@ -57,6 +57,10 @@ describe('a5 demo baseline identity', () => {
     );
     assert.notEqual(
       root,
+      computeDemoBaselineIdentity({ ...base, baselineReadinessHash: 'ready-b' }),
+    );
+    assert.notEqual(
+      root,
       computeDemoBaselineIdentity({
         migrationsFingerprint: base.migrationsFingerprint,
         datasetContentHash: base.datasetContentHash,

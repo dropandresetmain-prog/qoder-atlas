@@ -22,17 +22,69 @@ import {
 import { runMigrations } from '../src/persistence/postgres/migrate.ts';
 import { loadDataset, type LoadedDataset } from '../src/app/demo/datasetLoader.ts';
 import { provisionDataset } from '../src/app/demo/provisionDataset.ts';
+import { provisionDatasetSandboxInputsIfEnabled } from '../src/app/demo/sandboxExecutionInputs.ts';
+import { prepareBaselineExistingVisits } from '../src/app/demo/prepareBaselineExistingVisits.ts';
 import { runBaselineEvaluation } from '../src/app/demo/baselineEvaluation.ts';
+import { PgUnitOfWork } from '../src/persistence/postgres/pgUnitOfWork.ts';
+import { loadConfig } from '../src/config/config.ts';
+import { provisionWorkspaceAuthority, workspacePrincipalId } from '../src/app/target/workspaceAuthority.ts';
 import { MIGRATIONS_DIR } from './harness.ts';
 
 /** Fixed workspace identity so DatasetIdentityMinter IDs are reproducible across fresh builds. */
 export const AIT_FIXTURE_WORKSPACE_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeee1';
 export const AIT_FIXTURE_ACTOR = 'principal:ait-fixture-builder';
-/** Pinned evaluation instant — wall-clock must not enter the baseline fixture. */
-export const AIT_FIXTURE_NOW = '2026-09-18T12:00:00.000Z';
+/** Pinned evaluation instant — wall-clock must not enter the baseline fixture.
+ * Must be on/after reviewed official-document REPLAY observations (~2026-09-21)
+ * and inside reviewed entry policy effective windows (from 2026-09-20), but
+ * before the progressive-delay disruption timeline (from 2026-09-28). */
+export const AIT_FIXTURE_NOW = '2026-09-22T12:00:00.000Z';
 export const AIT_BUNDLE_DIR = fileURLToPath(
   new URL('../fixtures/programmes/ait-summit-2026/', import.meta.url),
 );
+
+/** Synthetic sandbox + reviewed-visit readiness required for truthful Jordan baseline PASS. */
+const AIT_FIXTURE_SANDBOX_ENV: NodeJS.ProcessEnv = {
+  ...process.env,
+  ATLAS_ENV: 'sandbox',
+  NORTHSTAR_SYNTHETIC_SANDBOX_INPUTS: '1',
+  ADAPTER_MODE: process.env.ADAPTER_MODE?.trim() || 'REPLAY',
+};
+
+async function prepareAitBaselineReadiness(
+  pool: Pool,
+  workspaceId: string,
+  datasetKey: string,
+  now: string,
+  actorPrincipalId: string = AIT_FIXTURE_ACTOR,
+): Promise<void> {
+  await provisionDatasetSandboxInputsIfEnabled({
+    pool,
+    uow: () => new PgUnitOfWork(pool, workspaceId),
+    workspaceId,
+    actorPrincipalId,
+    datasetDirectory: AIT_BUNDLE_DIR,
+    datasetKey,
+    env: AIT_FIXTURE_SANDBOX_ENV,
+  });
+  await provisionWorkspaceAuthority({
+    pool,
+    uow: () => new PgUnitOfWork(pool, workspaceId),
+    workspaceId,
+    actorPrincipalId,
+    now,
+  });
+  await prepareBaselineExistingVisits({
+    pool,
+    workspaceId,
+    actorPrincipalId,
+    reviewerPrincipalId: workspacePrincipalId(workspaceId, 'operator'),
+    uow: () => new PgUnitOfWork(pool, workspaceId),
+    config: loadConfig(AIT_FIXTURE_SANDBOX_ENV),
+    cwd: fileURLToPath(new URL('..', import.meta.url)),
+    datasetDirectory: AIT_BUNDLE_DIR,
+    now,
+  });
+}
 
 /** Disposable fixture DB prefix — never a working mutable test DB. */
 export const AIT_FIXTURE_DB_PREFIX = 'ns_ait_fx_';
@@ -162,6 +214,7 @@ export async function buildAitFixtureDatabase(options?: {
     }
 
     if (runBaseline) {
+      await prepareAitBaselineReadiness(pool, workspaceId, dataset.datasetKey, AIT_FIXTURE_NOW);
       const baseline = await runBaselineEvaluation({
         pool,
         workspaceId,
@@ -467,6 +520,7 @@ export async function buildFreshAitBaselineDatabase(): Promise<{
   if (outcome.status !== 'MATERIALIZED') {
     throw new Error(`fresh control expected MATERIALIZED, got ${outcome.status}`);
   }
+  await prepareAitBaselineReadiness(pool, workspaceId, dataset.datasetKey, AIT_FIXTURE_NOW);
   await runBaselineEvaluation({
     pool,
     workspaceId,
@@ -600,6 +654,13 @@ export async function obtainAitSummitWorld(params: {
   }
   let baselineEvaluated: number | undefined;
   if (includeBaseline) {
+    await prepareAitBaselineReadiness(
+      pool,
+      workspaceId,
+      dataset.datasetKey,
+      params.baselineNow ?? new Date().toISOString(),
+      params.actorPrincipalId,
+    );
     const baseline = await runBaselineEvaluation({
       pool,
       workspaceId,

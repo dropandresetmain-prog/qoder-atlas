@@ -20,6 +20,7 @@ import { provisionConfiguredDataset } from './demo/provisionDataset.ts';
 import { provisionDatasetSandboxInputsIfEnabled } from './demo/sandboxExecutionInputs.ts';
 import { datasetDirectoryFromEnv } from './demo/datasetLoader.ts';
 import { runBaselineEvaluation } from './demo/baselineEvaluation.ts';
+import { prepareBaselineExistingVisits } from './demo/prepareBaselineExistingVisits.ts';
 import { demoCloneResetEnabled, openDemoWorkingClone, clearDemoRuntimeSession, DEMO_CLONE_DB_PREFIX } from './demo/demoBaselineClone.ts';
 import { dropDisposableDatabase } from '../persistence/postgres/databaseTemplateClone.ts';
 import { captureWorld } from '../persistence/postgres/world/pgCurrentState.ts';
@@ -198,24 +199,8 @@ export async function composeTargetBoot(
     }
   }
 
-  // Baseline assessments come from the real evaluator, and only for subjects
-  // that hold none. A restart against the same database evaluates nothing.
-  // Clone boot already ran baseline on the template.
-  const baseline = demoSession
-    ? { evaluated: 0, verdicts: {} as Record<string, number> }
-    : await runBaselineEvaluation({
-      pool: endpoints.app.pool,
-      workspaceId: config.workspaceId,
-      actorPrincipalId,
-    });
-  if (baseline.evaluated > 0) {
-    console.log(`[atlas] baseline evaluation assessed ${baseline.evaluated} journeys ${JSON.stringify(baseline.verdicts)}`);
-  }
-
-  // B1: the workspace's operating principals and their enumerated authority
-  // coverage (approver: authorize; runtime executor: dispatch). Idempotent;
-  // never a decision or an approval. See workspaceAuthority.ts for the
-  // coverage-at-provisioning limit it reports.
+  // B1: operating principals before baseline visit readiness — reviewed entry
+  // publication requires a registered PRINCIPAL UUID issuer (operator).
   // Clone boot already ran authority on the template, but re-run idempotently
   // so coverage stays complete if the template was built before subjects existed
   // or operator subject env differs from the founder's runtime.
@@ -233,6 +218,61 @@ export async function composeTargetBoot(
       (authority.uncoveredSubjectCount > 0 ? ` UNCOVERED=${authority.uncoveredSubjectCount} (re-provision a fresh workspace to cover new subjects)` : ''),
   );
   const executorPrincipalId = workspacePrincipalId(config.workspaceId, 'executor');
+
+  // Bind configured passports / reviewed entry coverage for declared intended
+  // visits BEFORE the first baseline stamp. Doing this only later (during
+  // recovery planning) leaves travellers with intended visits as
+  // overallVerdict=UNKNOWN even when connection/programme PASS — Overview
+  // then paints them RED at D1. Clone boot inherits this from the template.
+  if (!demoSession && datasetDirectory && provisioning.status !== 'NOT_CONFIGURED') {
+    const visitPrep = await prepareBaselineExistingVisits({
+      pool: endpoints.app.pool,
+      workspaceId: config.workspaceId,
+      actorPrincipalId,
+      reviewerPrincipalId: authority.principals.operator,
+      uow: () => endpoints.app.unitOfWork(),
+      config: loadConfig(resolved),
+      cwd: options.cwd ?? process.cwd(),
+      datasetDirectory,
+      now: new Date().toISOString(),
+    });
+    if (visitPrep === 'PREPARED') {
+      console.log('[atlas] baseline existing-visit readiness prepared');
+    }
+  }
+
+  // Baseline assessments come from the real evaluator, and only for subjects
+  // that hold none. A restart against the same database evaluates nothing.
+  // Clone boot already ran baseline on the template.
+  const baseline = demoSession
+    ? { evaluated: 0, verdicts: {} as Record<string, number> }
+    : await runBaselineEvaluation({
+      pool: endpoints.app.pool,
+      workspaceId: config.workspaceId,
+      actorPrincipalId,
+    });
+  if (baseline.evaluated > 0) {
+    console.log(`[atlas] baseline evaluation assessed ${baseline.evaluated} journeys ${JSON.stringify(baseline.verdicts)}`);
+  }
+
+  // Idempotent authority re-run after baseline so newly assessed subjects gain
+  // coverage if the first provision ran before they existed.
+  const authorityAfterBaseline = await provisionWorkspaceAuthority({
+      pool: endpoints.app.pool,
+      uow: () => endpoints.app.unitOfWork(),
+      workspaceId: config.workspaceId,
+      actorPrincipalId,
+      now: new Date().toISOString(),
+      operatorAuthSubject: resolved.NORTHSTAR_OPERATOR_AUTH_SUBJECT?.trim() || undefined,
+    });
+  if (authorityAfterBaseline.coverageCount !== authority.coverageCount) {
+    console.log(
+      `[atlas] workspace authority refreshed coverage=${authorityAfterBaseline.coverageCount}` +
+        (authorityAfterBaseline.uncoveredSubjectCount > 0
+          ? ` UNCOVERED=${authorityAfterBaseline.uncoveredSubjectCount}`
+          : ''),
+    );
+  }
 
   // A5 CP3: one authoritative evaluation clock for scenario/planning time.
   // Default WALL; harness/demo may advance CONTROLLED mode. Operational
